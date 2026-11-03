@@ -1,6 +1,6 @@
+import bcrypt from 'bcryptjs';
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 const router = Router();

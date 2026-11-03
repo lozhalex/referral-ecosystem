@@ -9,6 +9,14 @@ const Register: React.FC = () => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
+  // Системный реферер по умолчанию
+  const DEFAULT_REFERRER = '+79503278027';
+
+  // Функция для автоматической подстановки номера
+  const handleSetDefaultReferrer = () => {
+    setReferredBy(DEFAULT_REFERRER);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -17,7 +25,8 @@ const Register: React.FC = () => {
     try {
       const response = await apiClient.post('/api/auth/register', {
         phone,
-        referred_by_phone: referredBy || null,
+        // Если поле пустое, отправляем undefined, иначе отправляем введенный или системный номер
+        referred_by_phone: referredBy.trim() === '' ? undefined : referredBy,
       });
 
       if (response.data.success) {
@@ -65,6 +74,14 @@ const Register: React.FC = () => {
             placeholder="+79001234567"
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
           />
+          {/* Кнопка для автоматической подстановки системного реферера */}
+          <button
+            type="button"
+            onClick={handleSetDefaultReferrer}
+            className="mt-1 text-xs text-blue-600 hover:text-blue-800 underline focus:outline-none"
+          >
+            Не знаю номера (использовать системный)
+          </button>
         </div>
 
         {error && (
