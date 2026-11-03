@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // ЖЕСТКО ЗАДАЕМ АДРЕС ВАШЕГО VPS СЕРВЕРА
-const API_BASE_URL = 'http://177.177.212.220:3000';
+ const API_BASE_URL = 'https://stable-defining-coal-radio.trycloudflare.com';
 
 // Создаем экземпляр axios с базовыми настройками
 export const apiClient = axios.create({
