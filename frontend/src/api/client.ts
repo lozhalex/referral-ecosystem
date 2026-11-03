@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Адрес вашего бэкенда. 
 // Если тестируете на ПК, оставьте localhost. Если на телефоне — замените на 192.168.3.16
-const API_BASE_URL = 'http://localhost:3000'; 
+   const API_BASE_URL = 'http://177.177.212.220:3000';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

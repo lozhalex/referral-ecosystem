@@ -8,12 +8,10 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'https://localhost:5173',
-    'http://192.168.3.16:5173',
-    'https://192.168.3.16:5173'
-  ],
+  origin: true, // Разрешает ЛЮБОЙ источник (идеально для туннелей и локальной сети)
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'bypass-tunnel-reminder']
 }));
 
 app.use(express.json());
