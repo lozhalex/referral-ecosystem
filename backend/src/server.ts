@@ -4,29 +4,43 @@ import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/auth';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
+// ИСПРАВЛЕНИЕ 1: Явное приведение к числу, чтобы избежать ошибки TS2769 при компиляции (npx tsc)
+const PORT: number = Number(process.env.PORT) || 3000;
+
+// ==========================================
 // Middleware
+// ==========================================
+
+// CORS: Разрешаем запросы с фронтенда. 
+// Для MVP оставляем origin: true (отражает запрос), но в будущем для строгой безопасности 
+// лучше указать конкретный домен: origin: 'http://177.177.212.220'
 app.use(cors({
-  origin: true, // Разрешает ЛЮБОЙ источник (идеально для туннелей и локальной сети)
+  origin: true, 
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'bypass-tunnel-reminder']
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json());
 
-// Rate limiting (10 запросов в минуту на один IP для auth endpoints)
+// Rate limiting (Раздел 5.4 Плана: не более 5 попыток в минуту на один IP)
 const authLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 минута
-  max: 10, // 10 запросов
+  max: 5, // ИСПРАВЛЕНИЕ 2: 5 запросов вместо 10, согласно ТЗ
   message: {
     success: false,
     message: 'Слишком много попыток. Попробуйте позже.'
-  }
+  },
+  standardHeaders: true, // Возвращает информацию о лимите в заголовках `RateLimit-*`
+  legacyHeaders: false, // Отключаем устаревшие заголовки `X-RateLimit-*`
 });
 
-// Health check endpoint
+// ==========================================
+// Маршруты (Endpoints)
+// ==========================================
+
+// Health check endpoint (Раздел 5.3 Плана)
 app.get('/api/health', (req, res) => {
   res.json({
     success: true,
@@ -38,7 +52,11 @@ app.get('/api/health', (req, res) => {
 // Подключаем роуты авторизации с ограничением частоты
 app.use('/api/auth', authLimiter, authRoutes);
 
-// Обработка 404
+// ==========================================
+// Обработка ошибок и 404
+// ==========================================
+
+// Обработка 404 (Маршрут не найден)
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -46,16 +64,20 @@ app.use((req, res) => {
   });
 });
 
-// Обработка ошибок
+// Глобальный обработчик необработанных ошибок
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Необработанная ошибка:', err);
+  console.error('❌ Необработанная ошибка сервера:', err);
   res.status(500).json({
     success: false,
     message: 'Внутренняя ошибка сервера'
   });
 });
 
-// Запуск сервера на всех интерфейсах (для доступа с локальной сети)
+// ==========================================
+// Запуск сервера
+// ==========================================
+
+// Запуск сервера на всех интерфейсах (0.0.0.0) для корректной работы с Nginx и локальной сетью
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Сервер запущен на порту ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
