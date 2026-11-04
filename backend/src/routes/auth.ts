@@ -6,7 +6,7 @@ import jwt from 'jsonwebtoken';
 const router = Router();
 const prisma = new PrismaClient();
 
-// Секретный ключ для JWT (используем тот же, что и в сервере)
+// Секретный ключ для JWT
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
 
 // ==========================================
@@ -36,27 +36,35 @@ router.post('/register', async (req: Request, res: Response) => {
   try {
     const { phone, referred_by_phone } = req.body;
 
+    // 🔍 ОТЛАДКА: Смотрим, что реально приходит с фронтенда
+    console.log('📩 Получены данные регистрации:', { phone, referred_by_phone });
+
     // 1. Нормализация телефона пользователя
     let cleanPhone = phone.replace(/\D/g, '');
     if (cleanPhone.startsWith('8')) cleanPhone = '7' + cleanPhone.slice(1);
     if (!cleanPhone.startsWith('7')) cleanPhone = '7' + cleanPhone;
     const formattedPhone = '+' + cleanPhone;
 
-    // 2. АВТОМАТИЧЕСКОЕ ПРИСВАИВАНИЕ: если реферер не указан или пустой, берем системный
-    const targetRefPhone = (referred_by_phone && referred_by_phone.trim() !== '') 
-      ? referred_by_phone 
-      : '+79503278027';
+    // 2. ЖЕСТКАЯ ЛОГИКА РЕФЕРЕРА: По умолчанию берем системный номер
+    let refPhoneToSearch = '+79503278027';
 
-    let cleanRefPhone = targetRefPhone.replace(/\D/g, '');
-    if (cleanRefPhone.startsWith('8')) cleanRefPhone = '7' + cleanRefPhone.slice(1);
-    if (!cleanRefPhone.startsWith('7')) cleanRefPhone = '7' + cleanRefPhone;
-    const formattedRefPhone = '+' + cleanRefPhone;
+    // Если фронтенд всё-таки что-то передал (и это не пустая строка), переопределяем
+    if (referred_by_phone && typeof referred_by_phone === 'string' && referred_by_phone.trim() !== '') {
+      let cleanRef = referred_by_phone.replace(/\D/g, '');
+      if (cleanRef.startsWith('8')) cleanRef = '7' + cleanRef.slice(1);
+      if (!cleanRef.startsWith('7')) cleanRef = '7' + cleanRef;
+      refPhoneToSearch = '+' + cleanRef;
+    }
+
+    console.log('🔍 Ищем реферера с номером:', refPhoneToSearch);
 
     // 3. Ищем реферера в базе
-    const referrer = await prisma.user.findUnique({ where: { phone: formattedRefPhone } });
-    
-    // Если реферер найден, запоминаем его ID (если вдруг его нет в БД, будет null, но система не упадет)
+    const referrer = await prisma.user.findUnique({ 
+      where: { phone: refPhoneToSearch } 
+    });
+
     const referredById = referrer ? referrer.id : null;
+    console.log('✅ Найден реферер ID:', referredById);
 
     // 4. Проверяем, не занят ли номер нового пользователя
     const existingUser = await prisma.user.findUnique({ where: { phone: formattedPhone } });
@@ -71,11 +79,11 @@ router.post('/register', async (req: Request, res: Response) => {
       data: {
         phone: formattedPhone,
         passwordHash,
-        referredById, // Присваиваем ID реферера (автоматически или тот, что ввел пользователь)
+        referredById, 
       },
     });
 
-    // 6. Увеличиваем счетчик рефералов у пригласившего, если он найден
+    // 6. Увеличиваем счетчик рефералов у пригласившего
     if (referredById) {
       await prisma.user.update({
         where: { id: referredById },
@@ -89,7 +97,7 @@ router.post('/register', async (req: Request, res: Response) => {
       user: { id: newUser.id, phone: newUser.phone } 
     });
   } catch (error) {
-    console.error('Ошибка регистрации:', error);
+    console.error('❌ Ошибка регистрации:', error);
     res.status(500).json({ success: false, message: 'Ошибка сервера при регистрации' });
   }
 });
@@ -116,7 +124,6 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, message: 'Неверный номер телефона или пароль' });
     }
 
-    // Генерируем JWT-токен
     const token = jwt.sign(
       { userId: user.id, phone: user.phone, role: user.role }, 
       JWT_SECRET, 
@@ -148,7 +155,6 @@ router.post('/change-password', authenticateToken, async (req: any, res: Respons
       return res.status(404).json({ success: false, message: 'Пользователь не найден' });
     }
 
-    // Проверяем текущий пароль
     if (current_password) {
       const isPasswordValid = await bcrypt.compare(current_password, user.passwordHash);
       if (!isPasswordValid) {
@@ -156,7 +162,6 @@ router.post('/change-password', authenticateToken, async (req: any, res: Respons
       }
     }
 
-    // Хэшируем и сохраняем новый пароль
     const newPasswordHash = await bcrypt.hash(new_password, 10);
 
     await prisma.user.update({
@@ -205,7 +210,7 @@ router.get('/me', authenticateToken, async (req: any, res: Response) => {
       success: true,
       user: {
         ...user,
-        registeredAt: user.createdAt, // для совместимости с типами на фронтенде
+        registeredAt: user.createdAt,
       },
     });
   } catch (error) {
