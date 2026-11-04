@@ -36,42 +36,46 @@ router.post('/register', async (req: Request, res: Response) => {
   try {
     const { phone, referred_by_phone } = req.body;
 
-    // Нормализация телефона (убираем всё кроме цифр, заменяем 8 на +7)
+    // 1. Нормализация телефона пользователя
     let cleanPhone = phone.replace(/\D/g, '');
     if (cleanPhone.startsWith('8')) cleanPhone = '7' + cleanPhone.slice(1);
     if (!cleanPhone.startsWith('7')) cleanPhone = '7' + cleanPhone;
     const formattedPhone = '+' + cleanPhone;
 
-    let referredById = null;
-    if (referred_by_phone) {
-      let cleanRefPhone = referred_by_phone.replace(/\D/g, '');
-      if (cleanRefPhone.startsWith('8')) cleanRefPhone = '7' + cleanRefPhone.slice(1);
-      if (!cleanRefPhone.startsWith('7')) cleanRefPhone = '7' + cleanRefPhone;
-      
-      const referrer = await prisma.user.findUnique({ where: { phone: '+' + cleanRefPhone } });
-      if (!referrer) {
-        return res.status(400).json({ success: false, message: 'Пользователь, который вас пригласил, не найден' });
-      }
-      referredById = referrer.id;
-    }
+    // 2. АВТОМАТИЧЕСКОЕ ПРИСВАИВАНИЕ: если реферер не указан или пустой, берем системный
+    const targetRefPhone = (referred_by_phone && referred_by_phone.trim() !== '') 
+      ? referred_by_phone 
+      : '+79503278027';
 
+    let cleanRefPhone = targetRefPhone.replace(/\D/g, '');
+    if (cleanRefPhone.startsWith('8')) cleanRefPhone = '7' + cleanRefPhone.slice(1);
+    if (!cleanRefPhone.startsWith('7')) cleanRefPhone = '7' + cleanRefPhone;
+    const formattedRefPhone = '+' + cleanRefPhone;
+
+    // 3. Ищем реферера в базе
+    const referrer = await prisma.user.findUnique({ where: { phone: formattedRefPhone } });
+    
+    // Если реферер найден, запоминаем его ID (если вдруг его нет в БД, будет null, но система не упадет)
+    const referredById = referrer ? referrer.id : null;
+
+    // 4. Проверяем, не занят ли номер нового пользователя
     const existingUser = await prisma.user.findUnique({ where: { phone: formattedPhone } });
     if (existingUser) {
       return res.status(400).json({ success: false, message: 'Пользователь с таким номером уже существует' });
     }
 
-    // Хэшируем дефолтный пароль "1234"
+    // 5. Хэшируем пароль и создаем пользователя
     const passwordHash = await bcrypt.hash('1234', 10);
 
     const newUser = await prisma.user.create({
       data: {
         phone: formattedPhone,
         passwordHash,
-        referredById,
+        referredById, // Присваиваем ID реферера (автоматически или тот, что ввел пользователь)
       },
     });
 
-    // Увеличиваем счетчик рефералов у пригласившего
+    // 6. Увеличиваем счетчик рефералов у пригласившего, если он найден
     if (referredById) {
       await prisma.user.update({
         where: { id: referredById },
