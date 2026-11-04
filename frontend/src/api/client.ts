@@ -1,10 +1,11 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://stable-defining-coal-radio.trycloudflare.com';
+// ПУСТАЯ строка означает "использовать текущий домен". 
+// Nginx перехватит запросы к /api и перенаправит их на localhost:3000
+const API_BASE_URL = '';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -25,7 +26,11 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      // При истечении токена (или невалидном) очищаем хранилище
       localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      // Опционально: можно сделать редирект на страницу входа
+      // window.location.href = '/';
     }
     return Promise.reject(error);
   }

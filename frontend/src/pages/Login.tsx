@@ -21,11 +21,13 @@ const Login: React.FC = () => {
       });
 
       if (response.data.success) {
-     localStorage.setItem('token', response.data.token);
-     localStorage.setItem('user', JSON.stringify(response.data.user));
-     navigate('/profile'); // <-- ДОБАВИТЬ ЭТУ СТРОКУ
-   }
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        navigate('/profile');
+      }
     } catch (err: any) {
+      // Бэкенд уже возвращает точный текст из Плана: 
+      // "Неверный номер телефона или пароль. Возможно, данный номер не зарегистрирован в системе"
       const errorMessage = err.response?.data?.message || 'Произошла ошибка при входе';
       setError(errorMessage);
     } finally {
@@ -36,10 +38,10 @@ const Login: React.FC = () => {
   return (
     <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-sm">
       <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">
-        Вход в систему
+        С возвращением!
       </h1>
       <p className="text-center text-gray-500 mb-6 text-sm">
-        Введите ваши данные для доступа
+        Войдите в свой аккаунт
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -73,9 +75,28 @@ const Login: React.FC = () => {
           />
         </div>
 
+        {/* Блок ошибки с двумя кнопками, как в разделе 4.3 Плана */}
         {error && (
-          <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-200">
-            {error}
+          <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-200 space-y-3">
+            <p>{error}</p>
+            <div className="flex gap-2">
+              <Link 
+                to="/register" 
+                className="flex-1 text-center py-1.5 px-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs font-medium transition"
+              >
+                Регистрация
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setError('');
+                  setPassword(''); // Очищаем поле пароля для повторной попытки
+                }}
+                className="flex-1 py-1.5 px-3 border border-red-300 text-red-700 rounded-lg hover:bg-red-100 text-xs font-medium transition"
+              >
+                Повторный вход
+              </button>
+            </div>
           </div>
         )}
 
