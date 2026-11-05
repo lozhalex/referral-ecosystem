@@ -259,6 +259,13 @@ router.get('/me', authenticateToken, async (req: any, res: Response) => {
         role: true,
         referralCount: true,
         createdAt: true,
+        // 👇 ДОБАВЛЕНО: получение баланса кошелька 👇
+        wallet: {
+          select: {
+            balance: true,
+          },
+        },
+        // 👆 КОНЕЦ ДОБАВЛЕННОГО БЛОКА 👆
         referredBy: {
           select: { id: true, phone: true },
         },

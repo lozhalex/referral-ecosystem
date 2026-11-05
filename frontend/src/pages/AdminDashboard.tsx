@@ -31,6 +31,12 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // 👇 Новые состояния для модального окна изменения баланса 👇
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [adjustForm, setAdjustForm] = useState({ amount: '', type: 'MANUAL_ADJUSTMENT', description: '' });
+  const [adjustLoading, setAdjustLoading] = useState(false);
+  // 👆 Конец новых состояний 👆
+
   const token = localStorage.getItem('token');
 
   useEffect(() => {
@@ -72,6 +78,47 @@ export default function AdminDashboard() {
       setError(err.response?.data?.message || 'Ошибка загрузки деталей');
     }
   };
+
+  // 👇 Функция отправки формы изменения баланса 👇
+  const handleAdjustSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser) return;
+
+    const numAmount = Number(adjustForm.amount);
+    if (numAmount === 0) {
+      alert('Сумма не может быть равна 0');
+      return;
+    }
+    if (adjustForm.description.trim().length < 10) {
+      alert('Описание должно содержать минимум 10 символов');
+      return;
+    }
+
+    setAdjustLoading(true);
+    try {
+      await axios.post(
+        `/api/admin/users/${selectedUser.id}/wallet/adjust`,
+        {
+          amount: numAmount,
+          type: adjustForm.type,
+          description: adjustForm.description.trim(),
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      alert('Баланс успешно обновлен!');
+      setShowAdjustModal(false);
+      setAdjustForm({ amount: '', type: 'MANUAL_ADJUSTMENT', description: '' });
+      
+      // Перезагружаем детали пользователя, чтобы увидеть новый баланс и транзакцию
+      await loadUserDetail(selectedUser.id);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Ошибка при изменении баланса');
+    } finally {
+      setAdjustLoading(false);
+    }
+  };
+  // 👆 Конец функции 👆
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('ru-RU');
@@ -219,6 +266,18 @@ export default function AdminDashboard() {
                     <label className="text-sm font-medium text-gray-500">Дата регистрации</label>
                     <p className="text-gray-900">{formatDate(selectedUser.createdAt)}</p>
                   </div>
+
+                  {/* 👇 КНОПКА ИЗМЕНЕНИЯ БАЛАНСА 👇 */}
+                  <div className="pt-4 border-t border-gray-200">
+                    <button
+                      onClick={() => setShowAdjustModal(true)}
+                      className="w-full py-2 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium flex items-center justify-center gap-2"
+                    >
+                      💰 Изменить баланс
+                    </button>
+                  </div>
+                  {/* 👆 КОНЕЦ КНОПКИ 👆 */}
+
                   <div>
                     <label className="text-sm font-medium text-gray-500">Пригласил</label>
                     <p className="text-gray-900">
@@ -273,6 +332,83 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+
+        {/* 👇 Модальное окно изменения баланса 👇 */}
+        {showAdjustModal && selectedUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-gray-900">Изменение баланса</h3>
+                <button onClick={() => setShowAdjustModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleAdjustSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Сумма (положительная для начисления, отрицательная для списания)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={adjustForm.amount}
+                    onChange={(e) => setAdjustForm({ ...adjustForm, amount: e.target.value })}
+                    placeholder="Например: 100 или -50"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Тип операции</label>
+                  <select
+                    value={adjustForm.type}
+                    onChange={(e) => setAdjustForm({ ...adjustForm, type: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  >
+                    <option value="MANUAL_ADJUSTMENT">Ручная корректировка</option>
+                    <option value="BONUS">Бонус / Подарок</option>
+                    <option value="PENALTY">Штраф / Возврат</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Причина / Комментарий (мин. 10 символов)
+                  </label>
+                  <textarea
+                    required
+                    minLength={10}
+                    rows={3}
+                    value={adjustForm.description}
+                    onChange={(e) => setAdjustForm({ ...adjustForm, description: e.target.value })}
+                    placeholder="Например: Начислено за ошибку в системе при регистрации"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdjustModal(false)}
+                    className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                    disabled={adjustLoading}
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={adjustLoading}
+                    className="flex-1 py-2 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-50"
+                  >
+                    {adjustLoading ? 'Сохранение...' : 'Сохранить'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        {/* 👆 Конец модального окна изменения баланса 👆 */}
 
         {/* Back Button */}
         <div className="mt-6">

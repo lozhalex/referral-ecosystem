@@ -87,4 +87,63 @@ router.get('/users/:id', requireAdmin, async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/admin/users/:id/wallet/adjust — Ручное изменение баланса
+router.post('/users/:id/wallet/adjust', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const userId = Number(req.params.id);
+    const { amount, type, description, referenceId } = req.body;
+
+    // Валидация
+    if (typeof amount !== 'number' || amount === 0) {
+      return res.status(400).json({ success: false, message: 'Сумма должна быть числом и не равна 0' });
+    }
+    if (typeof description !== 'string' || description.trim().length < 10) {
+      return res.status(400).json({ success: false, message: 'Описание обязательно и минимум 10 символов' });
+    }
+
+    // Проверяем существование пользователя
+    const user = await prisma.user.findUnique({ where: { id: userId }, include: { wallet: true } });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Пользователь не найден' });
+    }
+
+    // Если у пользователя еще нет кошелька, создаем его с балансом 0
+    let walletId = user.wallet?.id;
+    if (!walletId) {
+      const newWallet = await prisma.wallet.create({
+        data: { userId: user.id, balance: 0 }
+      });
+      walletId = newWallet.id;
+    }
+
+    // Атомарная транзакция: обновляем баланс и создаем запись в истории
+    await prisma.$transaction(async (tx) => {
+      // 1. Обновляем баланс (increment работает и с отрицательными числами для списания)
+      await tx.wallet.update({
+        where: { id: walletId },
+        data: { balance: { increment: amount } }
+      });
+
+      // 2. Создаем запись в истории транзакций
+      await tx.transaction.create({
+        data: {
+          walletId,
+          amount,
+          type: type || 'MANUAL_ADJUSTMENT',
+          description: description.trim(),
+          referenceId: referenceId || null
+        }
+      });
+    });
+
+    // Логируем действие админа
+    console.log(`[ADMIN ACTION] Admin (ID: ${req.user?.userId}) adjusted wallet of user ${userId} by ${amount}. Reason: ${description}`);
+
+    res.json({ success: true, message: 'Баланс успешно обновлен' });
+  } catch (err) {
+    console.error('Admin wallet adjust error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера при изменении баланса' });
+  }
+});
+
 export default router;
