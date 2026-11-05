@@ -191,9 +191,18 @@ router.get('/tree/logs/export', requireAdmin, async (req: Request, res: Response
       orderBy: { createdAt: 'desc' }
     });
 
-    const csvRows = [['ID', 'Дата', 'Админ', 'Целевой пользователь', 'Действие', 'Старые данные', 'Новые данные']];
+    // 👇 ИСПРАВЛЕНО: Явно указываем тип string[][] и преобразуем log.id в строку
+    const csvRows: string[][] = [['ID', 'Дата', 'Админ', 'Целевой пользователь', 'Действие', 'Старые данные', 'Новые данные']];
     logs.forEach(log => {
-      csvRows.push([log.id, log.createdAt.toISOString(), log.admin.phone, log.targetUser.phone, log.action, log.oldData || '', log.newData || '']);
+      csvRows.push([
+        String(log.id), // <-- Вот здесь было исправление
+        log.createdAt.toISOString(),
+        log.admin.phone,
+        log.targetUser.phone,
+        log.action,
+        log.oldData || '',
+        log.newData || ''
+      ]);
     });
 
     const csvContent = csvRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -208,11 +217,10 @@ router.get('/tree/logs/export', requireAdmin, async (req: Request, res: Response
   }
 });
 
-// 👇 НОВЫЕ ЭНДПОИНТЫ ДЛЯ BACKUP/RESTORE ДЕРЕВА 👇
+// 👇 ЭНДПОИНТЫ ДЛЯ BACKUP/RESTORE ДЕРЕВА 👇
 
 router.get('/tree/export', requireAdmin, async (req: Request, res: Response) => {
   try {
-    // Выгружаем только необходимые поля для восстановления структуры
     const treeData = await prisma.user.findMany({
       select: { id: true, phone: true, referredById: true }
     });
@@ -235,7 +243,6 @@ router.post('/tree/import', requireAdmin, async (req: Request, res: Response) =>
       return res.status(400).json({ success: false, message: 'Неверный формат данных: ожидается массив' });
     }
 
-    // Валидация: проверяем, что все упомянутые referredById существуют в базе или равны null
     const userIdsInDb = await prisma.user.findMany({ select: { id: true } });
     const validIds = new Set(userIdsInDb.map(u => u.id));
 
@@ -254,12 +261,9 @@ router.post('/tree/import', requireAdmin, async (req: Request, res: Response) =>
       }
     }
 
-    // Атомарная транзакция восстановления
     await prisma.$transaction(async (tx) => {
-      // 1. Сбрасываем все связи и счетчики для затрагиваемых пользователей (для чистоты)
       const targetIds = treeData.map(n => n.id);
       
-      // Сначала обнуляем referralCount у всех, кто был реферером в старой структуре
       const oldReferrers = await tx.user.findMany({
         where: { id: { in: targetIds } },
         select: { id: true }
@@ -269,7 +273,6 @@ router.post('/tree/import', requireAdmin, async (req: Request, res: Response) =>
         await tx.user.update({ where: { id: ref.id }, data: { referralCount: 0 } });
       }
 
-      // 2. Применяем новые связи и пересчитываем счетчики
       for (const node of treeData) {
         await tx.user.update({
           where: { id: node.id },
@@ -284,11 +287,10 @@ router.post('/tree/import', requireAdmin, async (req: Request, res: Response) =>
         }
       }
 
-      // 3. Логируем действие IMPORT
       await tx.treeAuditLog.create({
         data: {
           adminId,
-          targetUserId: 0, // 0 означает массовую операцию
+          targetUserId: 0,
           action: 'IMPORT',
           oldData: null,
           newData: JSON.stringify(treeData)
