@@ -50,12 +50,12 @@ model Transaction {
 // 👇 Новая модель: Журнал изменений дерева рефералов 👇
 model TreeAuditLog {
   id            Int      @id @default(autoincrement())
-  adminId       Int      // ID админа, который совершил действие
+  adminId       Int      // ID админа, совершившего действие
   admin         User     @relation("AuditAdmin", fields: [adminId], references: [id])
-  targetUserId  Int      // ID пользователя, которого коснулось изменение
-  targetUser    User     @relation("AuditTarget", fields: [targetUserId], references: [id])
-  action        String   // Тип действия: "CREATE", "MOVE", "DELETE", "IMPORT", "EXPORT"
-  oldData       String?  // JSON: старое состояние (например, старый referredById)
+  targetUserId  Int?     // ID пользователя (nullable для массовых операций)
+  targetUser    User?    @relation("AuditTarget", fields: [targetUserId], references: [id])
+  action        String   // "MOVE", "IMPORT", "EXPORT", "CREATE", "DELETE"
+  oldData       String?  // JSON: старое состояние
   newData       String?  // JSON: новое состояние
   createdAt     DateTime @default(now())
 }

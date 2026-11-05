@@ -145,7 +145,9 @@ router.post('/tree/move', requireAdmin, async (req: Request, res: Response) => {
       }
       await tx.treeAuditLog.create({
         data: {
-          adminId, targetUserId, action: 'MOVE',
+          adminId,
+          targetUserId,
+          action: 'MOVE',
           oldData: JSON.stringify({ referredById: oldReferredById }),
           newData: JSON.stringify({ referredById: newReferredById })
         }
@@ -162,7 +164,10 @@ router.post('/tree/move', requireAdmin, async (req: Request, res: Response) => {
 router.get('/tree/logs', requireAdmin, async (req: Request, res: Response) => {
   try {
     const logs = await prisma.treeAuditLog.findMany({
-      include: { admin: { select: { id: true, phone: true } }, targetUser: { select: { id: true, phone: true } } },
+      include: {
+        admin: { select: { id: true, phone: true } },
+        targetUser: { select: { id: true, phone: true } } // Теперь targetUser может быть null
+      },
       orderBy: { createdAt: 'desc' },
       take: 200
     });
@@ -170,7 +175,7 @@ router.get('/tree/logs', requireAdmin, async (req: Request, res: Response) => {
     const formattedLogs = logs.map(log => ({
       id: log.id,
       adminPhone: log.admin.phone,
-      targetPhone: log.targetUser.phone,
+      targetPhone: log.targetUser?.phone || 'ВСЕ', // Обработка null
       action: log.action,
       oldData: log.oldData ? JSON.parse(log.oldData) : null,
       newData: log.newData ? JSON.parse(log.newData) : null,
@@ -187,18 +192,20 @@ router.get('/tree/logs', requireAdmin, async (req: Request, res: Response) => {
 router.get('/tree/logs/export', requireAdmin, async (req: Request, res: Response) => {
   try {
     const logs = await prisma.treeAuditLog.findMany({
-      include: { admin: { select: { phone: true } }, targetUser: { select: { phone: true } } },
+      include: {
+        admin: { select: { phone: true } },
+        targetUser: { select: { phone: true } }
+      },
       orderBy: { createdAt: 'desc' }
     });
 
-    // 👇 ИСПРАВЛЕНО: Явно указываем тип string[][] и преобразуем log.id в строку
     const csvRows: string[][] = [['ID', 'Дата', 'Админ', 'Целевой пользователь', 'Действие', 'Старые данные', 'Новые данные']];
     logs.forEach(log => {
       csvRows.push([
-        String(log.id), // <-- Вот здесь было исправление
+        String(log.id),
         log.createdAt.toISOString(),
         log.admin.phone,
-        log.targetUser.phone,
+        log.targetUser?.phone || 'ВСЕ', // Обработка null
         log.action,
         log.oldData || '',
         log.newData || ''
@@ -209,15 +216,13 @@ router.get('/tree/logs/export', requireAdmin, async (req: Request, res: Response
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename=tree_audit_logs_${new Date().toISOString().slice(0, 10)}.csv`);
-    res.write('\uFEFF'); // UTF-8 BOM
+    res.write('\uFEFF');
     res.send(csvContent);
   } catch (err) {
     console.error('Admin tree export error:', err);
     res.status(500).json({ success: false, message: 'Ошибка сервера при экспорте логов' });
   }
 });
-
-// 👇 ЭНДПОИНТЫ ДЛЯ BACKUP/RESTORE ДЕРЕВА 👇
 
 router.get('/tree/export', requireAdmin, async (req: Request, res: Response) => {
   try {
@@ -290,7 +295,7 @@ router.post('/tree/import', requireAdmin, async (req: Request, res: Response) =>
       await tx.treeAuditLog.create({
         data: {
           adminId,
-          targetUserId: 0,
+          targetUserId: null, // ИСПРАВЛЕНО: было 0, теперь null
           action: 'IMPORT',
           oldData: null,
           newData: JSON.stringify(treeData)
