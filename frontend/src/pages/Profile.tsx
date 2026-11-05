@@ -199,6 +199,16 @@ const Profile: React.FC = () => {
           Сменить пароль
         </button>
 
+        {/* КНОПКА АДМИН-ПАНЕЛИ (Только для роли admin) */}
+        {user.role === 'admin' && (
+          <button
+            onClick={() => navigate('/admin')}
+            className="w-full py-2.5 px-4 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition flex items-center justify-center gap-2"
+          >
+            <span>🔧</span> Админ-панель
+          </button>
+        )}
+
         <button
           onClick={() => setShowLogoutModal(true)}
           className="w-full py-2.5 px-4 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition"
