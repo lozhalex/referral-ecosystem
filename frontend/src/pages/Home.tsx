@@ -19,7 +19,6 @@ export default function Home() {
   const development = projects.filter(p => p.status === 'development');
   const planned = projects.filter(p => p.status === 'planned');
 
-  const visiblePlanned = showAll ? planned : [];
   const hiddenCount = planned.length;
 
   return (
