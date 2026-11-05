@@ -5,14 +5,14 @@ import { requireAdmin } from '../middleware/requireAdmin';
 const router = Router();
 const prisma = new PrismaClient();
 
-// GET /api/admin/users — список пользователей с поиском по телефону
+// ==========================================
+// ПОЛЬЗОВАТЕЛИ
+// ==========================================
+
 router.get('/users', requireAdmin, async (req: Request, res: Response) => {
   try {
     const phoneFilter = req.query.phone as string | undefined;
-    
-    const where = phoneFilter ? {
-      phone: { contains: phoneFilter.replace(/\D/g, '') }
-    } : {};
+    const where = phoneFilter ? { phone: { contains: phoneFilter.replace(/\D/g, '') } } : {};
 
     const users = await prisma.user.findMany({
       where,
@@ -40,33 +40,19 @@ router.get('/users', requireAdmin, async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/admin/users/:id — полная карточка пользователя
 router.get('/users/:id', requireAdmin, async (req: Request, res: Response) => {
   try {
     const userId = Number(req.params.id);
-
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        wallet: {
-          include: {
-            transactions: {
-              orderBy: { createdAt: 'desc' },
-              take: 50
-            }
-          }
-        },
+        wallet: { include: { transactions: { orderBy: { createdAt: 'desc' }, take: 50 } } },
         referredBy: { select: { id: true, phone: true } },
-        referrals: {
-          select: { id: true, phone: true, createdAt: true },
-          orderBy: { createdAt: 'desc' }
-        }
+        referrals: { select: { id: true, phone: true, createdAt: true }, orderBy: { createdAt: 'desc' } }
       }
     });
 
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'Пользователь не найден' });
-    }
+    if (!user) return res.status(404).json({ success: false, message: 'Пользователь не найден' });
 
     res.json({
       success: true,
@@ -87,13 +73,11 @@ router.get('/users/:id', requireAdmin, async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/admin/users/:id/wallet/adjust — Ручное изменение баланса
 router.post('/users/:id/wallet/adjust', requireAdmin, async (req: Request, res: Response) => {
   try {
     const userId = Number(req.params.id);
     const { amount, type, description, referenceId } = req.body;
 
-    // Валидация
     if (typeof amount !== 'number' || amount === 0) {
       return res.status(400).json({ success: false, message: 'Сумма должна быть числом и не равна 0' });
     }
@@ -101,48 +85,222 @@ router.post('/users/:id/wallet/adjust', requireAdmin, async (req: Request, res: 
       return res.status(400).json({ success: false, message: 'Описание обязательно и минимум 10 символов' });
     }
 
-    // Проверяем существование пользователя
     const user = await prisma.user.findUnique({ where: { id: userId }, include: { wallet: true } });
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'Пользователь не найден' });
-    }
+    if (!user) return res.status(404).json({ success: false, message: 'Пользователь не найден' });
 
-    // Если у пользователя еще нет кошелька, создаем его с балансом 0
     let walletId = user.wallet?.id;
     if (!walletId) {
-      const newWallet = await prisma.wallet.create({
-        data: { userId: user.id, balance: 0 }
-      });
+      const newWallet = await prisma.wallet.create({ data: { userId: user.id, balance: 0 } });
       walletId = newWallet.id;
     }
 
-    // Атомарная транзакция: обновляем баланс и создаем запись в истории
     await prisma.$transaction(async (tx) => {
-      // 1. Обновляем баланс (increment работает и с отрицательными числами для списания)
-      await tx.wallet.update({
-        where: { id: walletId },
-        data: { balance: { increment: amount } }
-      });
-
-      // 2. Создаем запись в истории транзакций
+      await tx.wallet.update({ where: { id: walletId }, data: { balance: { increment: amount } } });
       await tx.transaction.create({
-        data: {
-          walletId,
-          amount,
-          type: type || 'MANUAL_ADJUSTMENT',
-          description: description.trim(),
-          referenceId: referenceId || null
-        }
+        data: { walletId, amount, type: type || 'MANUAL_ADJUSTMENT', description: description.trim(), referenceId: referenceId || null }
       });
     });
 
-    // Логируем действие админа
-    console.log(`[ADMIN ACTION] Admin (ID: ${req.user?.userId}) adjusted wallet of user ${userId} by ${amount}. Reason: ${description}`);
-
+    console.log(`[ADMIN ACTION] Admin (ID: ${req.user?.userId}) adjusted wallet of user ${userId} by ${amount}.`);
     res.json({ success: true, message: 'Баланс успешно обновлен' });
   } catch (err) {
     console.error('Admin wallet adjust error:', err);
     res.status(500).json({ success: false, message: 'Ошибка сервера при изменении баланса' });
+  }
+});
+
+// ==========================================
+// ДЕРЕВО РЕФЕРАЛОВ И АУДИТ
+// ==========================================
+
+router.post('/tree/move', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { targetUserId, newReferredById } = req.body;
+    const adminId = req.user!.userId;
+
+    if (targetUserId === undefined || newReferredById === undefined) {
+      return res.status(400).json({ success: false, message: 'targetUserId и newReferredById обязательны' });
+    }
+    if (targetUserId === newReferredById) {
+      return res.status(400).json({ success: false, message: 'Пользователь не может быть своим собственным реферером' });
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!targetUser) return res.status(404).json({ success: false, message: 'Целевой пользователь не найден' });
+
+    if (newReferredById !== null) {
+      const newReferrer = await prisma.user.findUnique({ where: { id: newReferredById } });
+      if (!newReferrer) return res.status(404).json({ success: false, message: 'Новый реферер не найден' });
+    }
+
+    const oldReferredById = targetUser.referredById;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: targetUserId }, data: { referredById: newReferredById === null ? null : newReferredById } });
+      if (oldReferredById !== null) {
+        await tx.user.update({ where: { id: oldReferredById }, data: { referralCount: { decrement: 1 } } });
+      }
+      if (newReferredById !== null) {
+        await tx.user.update({ where: { id: newReferredById }, data: { referralCount: { increment: 1 } } });
+      }
+      await tx.treeAuditLog.create({
+        data: {
+          adminId, targetUserId, action: 'MOVE',
+          oldData: JSON.stringify({ referredById: oldReferredById }),
+          newData: JSON.stringify({ referredById: newReferredById })
+        }
+      });
+    });
+
+    res.json({ success: true, message: 'Реферер успешно изменен' });
+  } catch (err) {
+    console.error('Admin tree move error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера при изменении реферера' });
+  }
+});
+
+router.get('/tree/logs', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const logs = await prisma.treeAuditLog.findMany({
+      include: { admin: { select: { id: true, phone: true } }, targetUser: { select: { id: true, phone: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 200
+    });
+
+    const formattedLogs = logs.map(log => ({
+      id: log.id,
+      adminPhone: log.admin.phone,
+      targetPhone: log.targetUser.phone,
+      action: log.action,
+      oldData: log.oldData ? JSON.parse(log.oldData) : null,
+      newData: log.newData ? JSON.parse(log.newData) : null,
+      createdAt: log.createdAt
+    }));
+
+    res.json({ success: true, logs: formattedLogs });
+  } catch (err) {
+    console.error('Admin tree logs error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера при получении логов' });
+  }
+});
+
+router.get('/tree/logs/export', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const logs = await prisma.treeAuditLog.findMany({
+      include: { admin: { select: { phone: true } }, targetUser: { select: { phone: true } } },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const csvRows = [['ID', 'Дата', 'Админ', 'Целевой пользователь', 'Действие', 'Старые данные', 'Новые данные']];
+    logs.forEach(log => {
+      csvRows.push([log.id, log.createdAt.toISOString(), log.admin.phone, log.targetUser.phone, log.action, log.oldData || '', log.newData || '']);
+    });
+
+    const csvContent = csvRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename=tree_audit_logs_${new Date().toISOString().slice(0, 10)}.csv`);
+    res.write('\uFEFF'); // UTF-8 BOM
+    res.send(csvContent);
+  } catch (err) {
+    console.error('Admin tree export error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера при экспорте логов' });
+  }
+});
+
+// 👇 НОВЫЕ ЭНДПОИНТЫ ДЛЯ BACKUP/RESTORE ДЕРЕВА 👇
+
+router.get('/tree/export', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    // Выгружаем только необходимые поля для восстановления структуры
+    const treeData = await prisma.user.findMany({
+      select: { id: true, phone: true, referredById: true }
+    });
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename=tree_backup_${new Date().toISOString().slice(0, 10)}.json`);
+    res.json(treeData);
+  } catch (err) {
+    console.error('Admin tree backup error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера при экспорте дерева' });
+  }
+});
+
+router.post('/tree/import', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const treeData = req.body;
+    const adminId = req.user!.userId;
+
+    if (!Array.isArray(treeData)) {
+      return res.status(400).json({ success: false, message: 'Неверный формат данных: ожидается массив' });
+    }
+
+    // Валидация: проверяем, что все упомянутые referredById существуют в базе или равны null
+    const userIdsInDb = await prisma.user.findMany({ select: { id: true } });
+    const validIds = new Set(userIdsInDb.map(u => u.id));
+
+    for (const node of treeData) {
+      if (node.referredById !== null && !validIds.has(node.referredById)) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Ошибка валидации: пользователь ID ${node.id} ссылается на несуществующего реферера ID ${node.referredById}` 
+        });
+      }
+      if (node.id === node.referredById) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Ошибка валидации: пользователь ID ${node.id} не может быть своим собственным реферером` 
+        });
+      }
+    }
+
+    // Атомарная транзакция восстановления
+    await prisma.$transaction(async (tx) => {
+      // 1. Сбрасываем все связи и счетчики для затрагиваемых пользователей (для чистоты)
+      const targetIds = treeData.map(n => n.id);
+      
+      // Сначала обнуляем referralCount у всех, кто был реферером в старой структуре
+      const oldReferrers = await tx.user.findMany({
+        where: { id: { in: targetIds } },
+        select: { id: true }
+      });
+      
+      for (const ref of oldReferrers) {
+        await tx.user.update({ where: { id: ref.id }, data: { referralCount: 0 } });
+      }
+
+      // 2. Применяем новые связи и пересчитываем счетчики
+      for (const node of treeData) {
+        await tx.user.update({
+          where: { id: node.id },
+          data: { referredById: node.referredById }
+        });
+
+        if (node.referredById !== null) {
+          await tx.user.update({
+            where: { id: node.referredById },
+            data: { referralCount: { increment: 1 } }
+          });
+        }
+      }
+
+      // 3. Логируем действие IMPORT
+      await tx.treeAuditLog.create({
+        data: {
+          adminId,
+          targetUserId: 0, // 0 означает массовую операцию
+          action: 'IMPORT',
+          oldData: null,
+          newData: JSON.stringify(treeData)
+        }
+      });
+    });
+
+    console.log(`[ADMIN ACTION] Admin (ID: ${adminId}) performed tree IMPORT with ${treeData.length} nodes.`);
+    res.json({ success: true, message: `Дерево успешно восстановлено (${treeData.length} узлов)` });
+  } catch (err: any) {
+    console.error('Admin tree import error:', err);
+    res.status(500).json({ success: false, message: err.message || 'Ошибка сервера при импорте дерева' });
   }
 });
 
