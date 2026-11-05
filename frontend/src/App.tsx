@@ -6,6 +6,9 @@ import ChangePassword from './pages/ChangePassword';
 import AdminDashboard from './pages/AdminDashboard';
 import Home from './pages/Home';
 import ProjectStub from './pages/ProjectStub';
+import Events from './pages/Events';
+import Tickets from './pages/Tickets';
+import Scanner from './pages/Scanner';
 
 function App() {
   return (
@@ -18,13 +21,18 @@ function App() {
         <Route path="/change-password" element={<ChangePassword />} />
         <Route path="/admin" element={<AdminDashboard />} />
         
-        {/* Заглушки для всех проектов */}
+        {/* Проект "Билеты" */}
+        <Route path="/events" element={<Events />} />
+        <Route path="/tickets" element={<Tickets />} />
+        <Route path="/scanner" element={<Scanner />} />
+        
+        {/* Заглушки для остальных проектов */}
         <Route path="/auto" element={<ProjectStub />} />
         <Route path="/daylabor" element={<ProjectStub />} />
         <Route path="/poh" element={<ProjectStub />} />
         <Route path="/gruzchiki" element={<ProjectStub />} />
         <Route path="/carpooling" element={<ProjectStub />} />
-        <Route path="/tickets" element={<ProjectStub />} />
+        <Route path="/tickets-stub" element={<ProjectStub />} />
         <Route path="/housing" element={<ProjectStub />} />
         <Route path="/booking" element={<ProjectStub />} />
         <Route path="/glamping" element={<ProjectStub />} />

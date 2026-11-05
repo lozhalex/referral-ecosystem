@@ -11,17 +11,19 @@ model User {
   id             Int       @id @default(autoincrement())
   phone          String    @unique
   passwordHash   String
-  role           String    @default("user")
+  role           String    @default("user") // "user", "admin", "controller"
   referralCount  Int       @default(0)
   referredById   Int?
   referredBy     User?     @relation("UserReferrals", fields: [referredById], references: [id])
   referrals      User[]    @relation("UserReferrals")
   wallet         Wallet?
-  
-  // 👇 Новые связи для аудита дерева рефералов 👇
   auditLogsAsAdmin   TreeAuditLog[] @relation("AuditAdmin")
   auditLogsAsTarget  TreeAuditLog[] @relation("AuditTarget")
-  // 👆 Конец новых связей 👆
+  
+  // Связи для проекта "Билеты"
+  tickets            Ticket[]            @relation("TicketOwner")
+  scannedTickets     Ticket[]            @relation("ScannerUser")
+  eventsAsController EventController[]
   
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -39,24 +41,73 @@ model Transaction {
   id          String   @id @default(uuid())
   walletId    Int
   amount      Int
-  type        String
+  type        String   // "CASHBACK_TICKET", "REFERRAL_BONUS", "MANUAL_ADJUSTMENT"
   description String
   referenceId String?
   createdAt   DateTime @default(now())
-
   wallet      Wallet   @relation(fields: [walletId], references: [id])
 }
 
-// 👇 Новая модель: Журнал изменений дерева рефералов 👇
 model TreeAuditLog {
   id            Int      @id @default(autoincrement())
-  adminId       Int      // ID админа, совершившего действие
+  adminId       Int
   admin         User     @relation("AuditAdmin", fields: [adminId], references: [id])
-  targetUserId  Int?     // ID пользователя (nullable для массовых операций)
+  targetUserId  Int?
   targetUser    User?    @relation("AuditTarget", fields: [targetUserId], references: [id])
-  action        String   // "MOVE", "IMPORT", "EXPORT", "CREATE", "DELETE"
-  oldData       String?  // JSON: старое состояние
-  newData       String?  // JSON: новое состояние
+  action        String   // "MOVE", "IMPORT", "ROLE_CHANGE", "PASSWORD_RESET"
+  oldData       String?
+  newData       String?
   createdAt     DateTime @default(now())
 }
-// 👆 Конец новой модели 👆
+
+// ==========================================
+// ПРОЕКТ "БИЛЕТЫ"
+// ==========================================
+
+model Event {
+  id             Int       @id @default(autoincrement())
+  title          String    // Название мероприятия
+  description    String?   // Описание
+  location       String?   // Место (район/метро, без точного адреса — Правило №1)
+  eventDate      DateTime  // Дата и время мероприятия
+  cashbackAmount Int       @default(50)   // Кэшбек участнику (рубли)
+  referrerBonus  Int       @default(100)  // Бонус рефереру (рубли)
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  
+  tickets        Ticket[]
+  controllers    EventController[]
+}
+
+model Ticket {
+  id          Int       @id @default(autoincrement())
+  userId      Int       // Владелец билета
+  eventId     Int       // Мероприятие
+  qrCode      String    @unique  // Уникальный UUID-токен для QR
+  status      String    @default("ACTIVE")  // "ACTIVE", "USED", "EXPIRED", "REFUNDED"
+  scannedAt   DateTime? // Когда отсканирован
+  scannedById Int?      // ID контролера, который отсканировал
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  user        User      @relation("TicketOwner", fields: [userId], references: [id])
+  event       Event     @relation(fields: [eventId], references: [id])
+  scannedBy   User?     @relation("ScannerUser", fields: [scannedById], references: [id])
+  
+  @@unique([userId, eventId])  // Один билет на мероприятие на пользователя
+  @@index([qrCode])
+  @@index([eventId, status])
+}
+
+model EventController {
+  id        Int       @id @default(autoincrement())
+  eventId   Int       // Мероприятие
+  userId    Int       // Контролер (пользователь с ролью controller)
+  createdAt DateTime  @default(now())
+  
+  event     Event     @relation(fields: [eventId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+  
+  @@unique([eventId, userId])  // Один контролер на мероприятие (без дублей)
+}

@@ -65,15 +65,15 @@ export const projects: Project[] = [
     stage: 2,
   },
   {
-    id: 'tickets',
-    icon: '🎟️',
-    title: 'Билеты на мероприятия',
-    description: 'Кэшбек за посещение + бонус рефереру',
-    status: 'development',
-    progress: 15,
-    route: '/tickets',
-    stage: 2,
-  },
+   id: 'tickets',
+   icon: '🎟️',
+   title: 'Билеты на мероприятия',
+   description: 'Кэшбек за посещение + бонус рефереру',
+   status: 'available', // Было: 'development'
+   progress: 100, // Было: 15
+   route: '/events', // Было: '/tickets'
+   stage: 2,
+  },  
 
   // === ЭТАП 3: Дом и Жильё ===
   {
