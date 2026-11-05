@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import { apiClient } from '../api/client';
@@ -13,7 +13,7 @@ export default function Scanner() {
   useEffect(() => {
     return () => {
       if (scanner) {
-        scanner.stop().catch(console.error);
+        scanner.stop().catch(() => {});
       }
     };
   }, [scanner]);
@@ -31,15 +31,12 @@ export default function Scanner() {
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         async (decodedText) => {
-          // QR распознан
           await html5QrCode.stop();
           setScanning(false);
-          
-          // Отправляем на сервер
           await handleScan(decodedText);
         },
-        (errorMessage) => {
-          // Ошибка распознавания (игнорируем)
+        () => {
+          // Ошибка распознавания — игнорируем
         }
       );
     } catch (err) {
@@ -59,7 +56,7 @@ export default function Scanner() {
     try {
       const response = await apiClient.post('/api/scanner/scan', {
         qrCode,
-        eventId: 1 // TODO: Получать из контекста или выбирать
+        eventId: 1
       });
 
       if (response.data.success) {
@@ -84,7 +81,6 @@ export default function Scanner() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Шапка */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <button

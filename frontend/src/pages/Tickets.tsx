@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { apiClient } from '../api/client';
@@ -74,7 +74,6 @@ export default function Tickets() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Шапка */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <button
@@ -132,7 +131,6 @@ export default function Tickets() {
         )}
       </div>
 
-      {/* Модальное окно с QR-кодом */}
       {selectedTicket && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
