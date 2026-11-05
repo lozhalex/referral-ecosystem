@@ -1,9 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { requireAdmin } from '../middleware/requireAdmin';
+import bcrypt from 'bcryptjs';
 
 const router = Router();
 const prisma = new PrismaClient();
+
+const ROOT_PHONE = '+79503278027'; // Защита корневого пользователя
 
 // ==========================================
 // ПОЛЬЗОВАТЕЛИ
@@ -110,6 +113,104 @@ router.post('/users/:id/wallet/adjust', requireAdmin, async (req: Request, res: 
 });
 
 // ==========================================
+// УПРАВЛЕНИЕ РОЛЯМИ И ПАРОЛЯМИ (ШАГ 3)
+// ==========================================
+
+router.put('/users/:id/role', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const userId = Number(req.params.id);
+    const { role } = req.body;
+    const adminId = req.user!.userId;
+
+    const validRoles = ['user', 'admin', 'controller'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ success: false, message: `Недопустимая роль. Допустимые: ${validRoles.join(', ')}` });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ success: false, message: 'Пользователь не найден' });
+
+    // Защита корневого пользователя
+    if (user.phone === ROOT_PHONE) {
+      return res.status(403).json({ success: false, message: 'Нельзя изменить роль корневого администратора' });
+    }
+
+    const oldRole = user.role;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { role }
+      });
+
+      await tx.treeAuditLog.create({
+        data: {
+          adminId,
+          targetUserId: userId,
+          action: 'ROLE_CHANGE',
+          oldData: JSON.stringify({ role: oldRole }),
+          newData: JSON.stringify({ role })
+        }
+      });
+    });
+
+    console.log(`[ADMIN ACTION] Admin (ID: ${adminId}) changed role of user ${userId} from ${oldRole} to ${role}`);
+    res.json({ success: true, message: `Роль успешно изменена на ${role}` });
+  } catch (err) {
+    console.error('Admin role change error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера при смене роли' });
+  }
+});
+
+router.post('/users/:id/reset-password', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const userId = Number(req.params.id);
+    const adminId = req.user!.userId;
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ success: false, message: 'Пользователь не найден' });
+
+    // Защита корневого пользователя
+    if (user.phone === ROOT_PHONE) {
+      return res.status(403).json({ success: false, message: 'Нельзя сбросить пароль корневого администратора через API' });
+    }
+
+    // Генерируем случайный 6-значный пароль
+    const newPassword = Math.floor(100000 + Math.random() * 900000).toString();
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { passwordHash: newPasswordHash }
+      });
+
+      await tx.treeAuditLog.create({
+        data: {
+          adminId,
+          targetUserId: userId,
+          action: 'PASSWORD_RESET',
+          oldData: null,
+          newData: JSON.stringify({ message: 'Пароль сброшен администратором' })
+        }
+      });
+    });
+
+    console.log(`[ADMIN ACTION] Admin (ID: ${adminId}) reset password for user ${userId}`);
+    
+    // Возвращаем новый пароль админу (только один раз!)
+    res.json({ 
+      success: true, 
+      message: 'Пароль успешно сброшен',
+      newPassword // ⚠️ Важно: отдаем только в ответе, не сохраняем в БД в открытом виде
+    });
+  } catch (err) {
+    console.error('Admin password reset error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера при сбросе пароля' });
+  }
+});
+
+// ==========================================
 // ДЕРЕВО РЕФЕРАЛОВ И АУДИТ
 // ==========================================
 
@@ -166,7 +267,7 @@ router.get('/tree/logs', requireAdmin, async (req: Request, res: Response) => {
     const logs = await prisma.treeAuditLog.findMany({
       include: {
         admin: { select: { id: true, phone: true } },
-        targetUser: { select: { id: true, phone: true } } // Теперь targetUser может быть null
+        targetUser: { select: { id: true, phone: true } }
       },
       orderBy: { createdAt: 'desc' },
       take: 200
@@ -175,7 +276,7 @@ router.get('/tree/logs', requireAdmin, async (req: Request, res: Response) => {
     const formattedLogs = logs.map(log => ({
       id: log.id,
       adminPhone: log.admin.phone,
-      targetPhone: log.targetUser?.phone || 'ВСЕ', // Обработка null
+      targetPhone: log.targetUser?.phone || 'ВСЕ',
       action: log.action,
       oldData: log.oldData ? JSON.parse(log.oldData) : null,
       newData: log.newData ? JSON.parse(log.newData) : null,
@@ -205,7 +306,7 @@ router.get('/tree/logs/export', requireAdmin, async (req: Request, res: Response
         String(log.id),
         log.createdAt.toISOString(),
         log.admin.phone,
-        log.targetUser?.phone || 'ВСЕ', // Обработка null
+        log.targetUser?.phone || 'ВСЕ',
         log.action,
         log.oldData || '',
         log.newData || ''
@@ -216,8 +317,7 @@ router.get('/tree/logs/export', requireAdmin, async (req: Request, res: Response
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename=tree_audit_logs_${new Date().toISOString().slice(0, 10)}.csv`);
-    res.write('\uFEFF');
-    res.send(csvContent);
+    res.send('\uFEFF' + csvContent);
   } catch (err) {
     console.error('Admin tree export error:', err);
     res.status(500).json({ success: false, message: 'Ошибка сервера при экспорте логов' });
@@ -295,7 +395,7 @@ router.post('/tree/import', requireAdmin, async (req: Request, res: Response) =>
       await tx.treeAuditLog.create({
         data: {
           adminId,
-          targetUserId: null, // ИСПРАВЛЕНО: было 0, теперь null
+          targetUserId: null,
           action: 'IMPORT',
           oldData: null,
           newData: JSON.stringify(treeData)

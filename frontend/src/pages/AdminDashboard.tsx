@@ -45,14 +45,22 @@ export default function AdminDashboard() {
   const [moveForm, setMoveForm] = useState({ newReferredId: '' });
   const [moveLoading, setMoveLoading] = useState(false);
 
+  // 👇 Новые состояния для Шага 3 (Роли и Пароли) 👇
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [roleForm, setRoleForm] = useState({ role: 'user' });
+  const [roleLoading, setRoleLoading] = useState(false);
+
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [generatedPassword, setGeneratedPassword] = useState('');
+  // 👆 Конец новых состояний 👆
+
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
 
-  // 👇 Новые состояния для импорта дерева 👇
   const [showImportModal, setShowImportModal] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // 👆 Конец новых состояний 👆
 
   const token = localStorage.getItem('token');
 
@@ -83,6 +91,7 @@ export default function AdminDashboard() {
 
   const loadLogs = async () => {
     setLogsLoading(true);
+    setError('');
     try {
       const response = await axios.get('/api/admin/tree/logs', { headers: { Authorization: `Bearer ${token}` } });
       setLogs(response.data.logs);
@@ -150,22 +159,73 @@ export default function AdminDashboard() {
     }
   };
 
+  // 👇 Обработчики для Шага 3 👇
+  const handleRoleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser) return;
+
+    setRoleLoading(true);
+    try {
+      await axios.put(`/api/admin/users/${selectedUser.id}/role`, { role: roleForm.role }, { headers: { Authorization: `Bearer ${token}` } });
+      alert(`Роль успешно изменена на ${roleForm.role}!`);
+      setShowRoleModal(false);
+      await loadUserDetail(selectedUser.id);
+      loadUsers(); // Обновляем общий список
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Ошибка при смене роли');
+    } finally {
+      setRoleLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!selectedUser) return;
+    if (!window.confirm(`Вы уверены, что хотите сбросить пароль для ${selectedUser.phone}?`)) return;
+
+    setResetLoading(true);
+    try {
+      const response = await axios.post(`/api/admin/users/${selectedUser.id}/reset-password`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      setGeneratedPassword(response.data.newPassword);
+      setShowResetModal(true); // Показываем модалку с новым паролем
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Ошибка при сбросе пароля');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+  // 👆 Конец обработчиков 👆
+
   const handleExportLogs = async () => {
     try {
-      const response = await axios.get('/api/admin/tree/logs/export', { headers: { Authorization: `Bearer ${token}` }, responseType: 'blob' });
+      const response = await axios.get('/api/admin/tree/logs/export', {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
+      });
+
+      if (response.data.type === 'application/json') {
+        const text = await response.data.text();
+        const errorJson = JSON.parse(text);
+        alert(errorJson.message || 'Ошибка сервера при экспорте');
+        return;
+      }
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `tree_audit_logs_${new Date().toISOString().slice(0, 10)}.csv`);
       document.body.appendChild(link);
       link.click();
-      link.remove();
-    } catch (err) {
-      alert('Ошибка при экспорте логов');
+      
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+    } catch (err: any) {
+      console.error('Export error:', err);
+      alert('Ошибка при экспорте логов: ' + (err.message || 'Неизвестная ошибка'));
     }
   };
 
-  // 👇 Функции для экспорта/импорта дерева 👇
   const handleExportTree = async () => {
     try {
       const response = await axios.get('/api/admin/tree/export', { headers: { Authorization: `Bearer ${token}` }, responseType: 'blob' });
@@ -175,7 +235,10 @@ export default function AdminDashboard() {
       link.setAttribute('download', `tree_backup_${new Date().toISOString().slice(0, 10)}.json`);
       document.body.appendChild(link);
       link.click();
-      link.remove();
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
     } catch (err) {
       alert('Ошибка при экспорте дерева');
     }
@@ -202,7 +265,7 @@ export default function AdminDashboard() {
       alert(response.data.message || 'Дерево успешно восстановлено!');
       setShowImportModal(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      loadLogs(); // Обновляем логи, чтобы увидеть запись об IMPORT
+      loadLogs();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Ошибка при импорте дерева. Проверьте формат JSON.');
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -210,7 +273,6 @@ export default function AdminDashboard() {
       setImportLoading(false);
     }
   };
-  // 👆 Конец функций экспорта/импорта 👆
 
   const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString('ru-RU');
   const formatDateTime = (dateString: string) => new Date(dateString).toLocaleString('ru-RU');
@@ -326,14 +388,13 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* User Detail Modal */}
         {selectedUser && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6">
                 <div className="flex justify-between items-start mb-6">
                   <h2 className="text-2xl font-bold text-gray-900">Карточка пользователя</h2>
-                  <button onClick={() => { setSelectedUser(null); setShowMoveModal(false); }} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
+                  <button onClick={() => { setSelectedUser(null); setShowMoveModal(false); setShowRoleModal(false); setShowResetModal(false); }} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
                 </div>
                 <div className="space-y-4">
                   <div><label className="text-sm font-medium text-gray-500">ID</label><p className="text-gray-900">{selectedUser.id}</p></div>
@@ -343,8 +404,12 @@ export default function AdminDashboard() {
                   <div><label className="text-sm font-medium text-gray-500">Дата регистрации</label><p className="text-gray-900">{formatDate(selectedUser.createdAt)}</p></div>
 
                   <div className="pt-4 border-t border-gray-200 grid grid-cols-2 gap-3">
-                    <button onClick={() => setShowAdjustModal(true)} className="py-2 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium flex items-center justify-center gap-2">💰 Изменить баланс</button>
-                    <button onClick={() => setShowMoveModal(true)} className="py-2 px-4 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition font-medium flex items-center justify-center gap-2">🔄 Сменить реферера</button>
+                    <button onClick={() => setShowAdjustModal(true)} className="py-2 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium flex items-center justify-center gap-2">💰 Баланс</button>
+                    <button onClick={() => setShowMoveModal(true)} className="py-2 px-4 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition font-medium flex items-center justify-center gap-2">🔄 Реферер</button>
+                    <button onClick={() => { setRoleForm({ role: selectedUser.role }); setShowRoleModal(true); }} className="py-2 px-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium flex items-center justify-center gap-2">🛡️ Роль</button>
+                    <button onClick={handleResetPassword} disabled={resetLoading} className="py-2 px-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium flex items-center justify-center gap-2 disabled:opacity-50">
+                      {resetLoading ? 'Сброс...' : '🔑 Сброс пароля'}
+                    </button>
                   </div>
 
                   <div><label className="text-sm font-medium text-gray-500">Текущий пригласитель</label><p className="text-gray-900">{selectedUser.referredBy ? `${selectedUser.referredBy.phone} (ID: ${selectedUser.referredBy.id})` : 'Нет (корневой)'}</p></div>
@@ -377,7 +442,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Adjust Balance Modal */}
         {showAdjustModal && selectedUser && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
@@ -411,7 +475,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Move Referrer Modal */}
         {showMoveModal && selectedUser && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
@@ -437,7 +500,54 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* 👇 Import Tree Modal 👇 */}
+        {/* 👇 Модальное окно смены роли 👇 */}
+        {showRoleModal && selectedUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-gray-900">Смена роли</h3>
+                <button onClick={() => setShowRoleModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
+              </div>
+              <form onSubmit={handleRoleSubmit} className="space-y-4">
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-purple-800">
+                  <p>Пользователь: <strong>{selectedUser.phone}</strong></p>
+                  <p className="mt-1">Текущая роль: <strong>{selectedUser.role}</strong></p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Новая роль</label>
+                  <select value={roleForm.role} onChange={(e) => setRoleForm({ ...roleForm, role: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    <option value="user">user (Пользователь)</option>
+                    <option value="admin">admin (Администратор)</option>
+                    <option value="controller">controller (Контроллер)</option>
+                  </select>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button type="button" onClick={() => setShowRoleModal(false)} className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" disabled={roleLoading}>Отмена</button>
+                  <button type="submit" disabled={roleLoading} className="flex-1 py-2 px-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50">{roleLoading ? 'Сохранение...' : 'Сохранить'}</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* 👇 Модальное окно результата сброса пароля 👇 */}
+        {showResetModal && selectedUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-gray-900">Пароль сброшен!</h3>
+                <button onClick={() => { setShowResetModal(false); setGeneratedPassword(''); }} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
+              </div>
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                <p className="text-sm text-green-800 mb-2">Новый временный пароль для <strong>{selectedUser.phone}</strong>:</p>
+                <p className="text-3xl font-bold text-green-900 text-center tracking-widest">{generatedPassword}</p>
+                <p className="text-xs text-green-700 mt-2 text-center">⚠️ Скопируйте пароль сейчас! Он не будет показан снова.</p>
+              </div>
+              <button onClick={() => { setShowResetModal(false); setGeneratedPassword(''); }} className="w-full py-2 px-4 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Закрыть</button>
+            </div>
+          </div>
+        )}
+
         {showImportModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
@@ -467,7 +577,6 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
-        {/* 👆 Конец Import Tree Modal 👆 */}
 
         <div className="mt-6">
           <button onClick={() => navigate('/profile')} className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">← Вернуться в профиль</button>

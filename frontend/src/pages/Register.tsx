@@ -2,9 +2,8 @@ import React, { useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { apiClient } from '../api/client';
 
-const ROOT_PHONE_DIGITS = '79503278027'; // +79503278027
+const ROOT_PHONE_DIGITS = '79503278027';
 
-// Приводит ввод к маске +7 (___) ___-__-__
 const formatPhone = (value: string): string => {
   let digits = value.replace(/\D/g, '');
   if (!digits) return '';
@@ -34,7 +33,6 @@ const Register: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  // Реферальная ссылка ?ref=... (PROJECT_PLAN п. 2.4)
   const refFromUrl = digitsOf(searchParams.get('ref') || '');
   const isRefLocked = refFromUrl.length === 11;
 
@@ -48,7 +46,6 @@ const Register: React.FC = () => {
 
   const referrerInputRef = useRef<HTMLInputElement>(null);
 
-  // Фактическая отправка формы
   const submitRegistration = async (referrerDigits: string) => {
     setLoading(true);
     setError('');
@@ -60,7 +57,6 @@ const Register: React.FC = () => {
       });
 
       if (response.data.success) {
-        // Бэкенд возвращает токен (авто-вход по PROJECT_PLAN п. 3.4.А)
         if (response.data.token) {
           localStorage.setItem('token', response.data.token);
           localStorage.setItem('user', JSON.stringify(response.data.user));
@@ -68,9 +64,14 @@ const Register: React.FC = () => {
 
         alert('✅ Регистрация успешна!\nВаш временный пароль: 1234');
 
-        // ВРЕМЕННО: ведём на страницу входа.
-        // Авто-переход в личный кабинет включим, когда сверим App.tsx и Login.tsx.
-        navigate('/');
+        // 🎯 ЛОГИКА РЕДИРЕКТА ПОСЛЕ РЕГИСТРАЦИИ
+        const redirectPath = localStorage.getItem('redirectAfterLogin');
+        if (redirectPath) {
+          localStorage.removeItem('redirectAfterLogin');
+          navigate(redirectPath);
+        } else {
+          navigate('/profile'); // Стандартный переход в профиль после регистрации
+        }
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Ошибка при регистрации');
@@ -90,7 +91,6 @@ const Register: React.FC = () => {
 
     const refDigits = digitsOf(referredBy);
 
-    // PROJECT_PLAN п. 4.2: пустой реферер -> модальное окно
     if (refDigits.length !== 11) {
       setShowReferrerModal(true);
       return;
@@ -99,13 +99,11 @@ const Register: React.FC = () => {
     await submitRegistration(refDigits);
   };
 
-  // Кнопка "OK" — закрыть и вернуть фокус в поле
   const handleModalOk = () => {
     setShowReferrerModal(false);
     setTimeout(() => referrerInputRef.current?.focus(), 50);
   };
 
-  // Кнопка "Я не знаю номер пригласителя" — корневой реферер + сразу регистрация
   const handleModalDontKnow = async () => {
     setShowReferrerModal(false);
     setReferredBy(formatPhone(ROOT_PHONE_DIGITS));
@@ -113,107 +111,108 @@ const Register: React.FC = () => {
   };
 
   return (
-    <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-sm relative">
-      <h1 className="text-2xl font-bold text-center text-gray-800">
-        Создать аккаунт
-      </h1>
-      <p className="text-sm text-center text-gray-500 mb-6">
-        Присоединяйтесь к экосистеме
-      </p>
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-sm">
+        <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">
+          Создать аккаунт
+        </h1>
+        <p className="text-sm text-center text-gray-500 mb-6">
+          Присоединяйтесь к экосистеме
+        </p>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Ваш номер телефона
-          </label>
-          <input
-            type="tel"
-            inputMode="tel"
-            value={phone}
-            onChange={(e) => setPhone(formatPhone(e.target.value))}
-            placeholder="+7 (___) ___-__-__"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            required
-          />
-        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Ваш номер телефона
+            </label>
+            <input
+              type="tel"
+              inputMode="tel"
+              value={phone}
+              onChange={(e) => setPhone(formatPhone(e.target.value))}
+              placeholder="+7 (___) ___-__-__"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              required
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Номер телефона пригласителя
-          </label>
-          <input
-            ref={referrerInputRef}
-            type="tel"
-            inputMode="tel"
-            value={referredBy}
-            onChange={(e) => {
-              if (!isRefLocked) setReferredBy(formatPhone(e.target.value));
-            }}
-            readOnly={isRefLocked}
-            placeholder="+7 (___) ___-__-__"
-            className={`w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 ${
-              isRefLocked ? 'bg-gray-100 border-gray-300 text-gray-600' : 'border-gray-300'
-            }`}
-          />
-          {isRefLocked && (
-            <p className="mt-1 text-xs text-green-600">
-              🔒 Автозаполнено по реферальной ссылке
-            </p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Номер телефона пригласителя
+            </label>
+            <input
+              ref={referrerInputRef}
+              type="tel"
+              inputMode="tel"
+              value={referredBy}
+              onChange={(e) => {
+                if (!isRefLocked) setReferredBy(formatPhone(e.target.value));
+              }}
+              readOnly={isRefLocked}
+              placeholder="+7 (___) ___-__-__"
+              className={`w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 ${
+                isRefLocked ? 'bg-gray-100 border-gray-300 text-gray-600' : 'border-gray-300'
+              }`}
+            />
+            {isRefLocked && (
+              <p className="mt-1 text-xs text-green-600">
+                🔒 Автозаполнено по реферальной ссылке
+              </p>
+            )}
+          </div>
+
+          {error && (
+            <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-200">
+              {error}
+            </div>
           )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className={`w-full py-2.5 px-4 rounded-lg text-white font-semibold transition ${
+              loading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+            }`}
+          >
+            {loading ? 'Загрузка...' : 'Зарегистрироваться'}
+          </button>
+        </form>
+
+        <div className="mt-6 text-center">
+          <p className="text-sm text-gray-500">
+            Уже есть аккаунт?{' '}
+            <Link to="/login" className="text-blue-600 font-medium hover:underline">
+              Войти
+            </Link>
+          </p>
         </div>
 
-        {error && (
-          <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-200">
-            {error}
+        {showReferrerModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-xs p-6">
+              <p className="text-center text-gray-800 font-medium mb-5">
+                Необходимо ввести номер телефона пригласителя
+              </p>
+
+              <button
+                type="button"
+                onClick={handleModalDontKnow}
+                className="w-full py-2.5 px-4 mb-2 rounded-lg text-white font-semibold bg-blue-600 hover:bg-blue-700 transition"
+              >
+                Я не знаю номер пригласителя
+              </button>
+
+              <button
+                type="button"
+                onClick={handleModalOk}
+                className="w-full py-2.5 px-4 rounded-lg font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition"
+              >
+                OK
+              </button>
+            </div>
           </div>
         )}
-
-        <button
-          type="submit"
-          disabled={loading}
-          className={`w-full py-2.5 px-4 rounded-lg text-white font-semibold transition ${
-            loading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
-          }`}
-        >
-          {loading ? 'Загрузка...' : 'Зарегистрироваться'}
-        </button>
-      </form>
-
-      <div className="mt-6 text-center">
-        <p className="text-sm text-gray-500">
-          Уже есть аккаунт?{' '}
-          <Link to="/" className="text-blue-600 font-medium hover:underline">
-            Войти
-          </Link>
-        </p>
       </div>
-
-      {/* Модальное окно при пустом реферере (PROJECT_PLAN п. 4.2) */}
-      {showReferrerModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-xs p-6">
-            <p className="text-center text-gray-800 font-medium mb-5">
-              Необходимо ввести номер телефона пригласителя
-            </p>
-
-            <button
-              type="button"
-              onClick={handleModalDontKnow}
-              className="w-full py-2.5 px-4 mb-2 rounded-lg text-white font-semibold bg-blue-600 hover:bg-blue-700 transition"
-            >
-              Я не знаю номер пригласителя
-            </button>
-
-            <button
-              type="button"
-              onClick={handleModalOk}
-              className="w-full py-2.5 px-4 rounded-lg font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition"
-            >
-              OK
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
