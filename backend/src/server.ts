@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/auth';
+import adminRoutes from './routes/admin'; // <-- ДОБАВЛЕНО
 
 const app = express();
 
@@ -41,6 +42,9 @@ app.get('/api/health', (req, res) => {
 
 // Подключаем роуты авторизации с ограничением частоты
 app.use('/api/auth', authLimiter, authRoutes);
+
+// Подключаем роуты админки (авторизация и проверка роли admin внутри роутов)
+app.use('/api/admin', adminRoutes); // <-- ДОБАВЛЕНО
 
 // Обработка 404
 app.use((req, res) => {

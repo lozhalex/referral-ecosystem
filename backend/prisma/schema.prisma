@@ -8,18 +8,35 @@ datasource db {
 }
 
 model User {
-  id             Int      @id @default(autoincrement())
-  phone          String   @unique
-  passwordHash   String   @map("password_hash")
-  role           String   @default("USER") @map("role")
-  referredById   Int?     @map("referred_by_id")
-  referralCount  Int      @default(0) @map("referral_count")
-  isDeleted      Boolean  @default(false) @map("is_deleted")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id             Int       @id @default(autoincrement())
+  phone          String    @unique
+  passwordHash   String
+  role           String    @default("user")
+  referralCount  Int       @default(0)
+  referredById   Int?
+  referredBy     User?     @relation("UserReferrals", fields: [referredById], references: [id])
+  referrals      User[]    @relation("UserReferrals")
+  wallet         Wallet?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
 
-  referredBy     User?    @relation("Referrals", fields: [referredById], references: [id])
-  referrals      User[]   @relation("Referrals")
+model Wallet {
+  id           Int           @id @default(autoincrement())
+  userId       Int           @unique
+  balance      Int           @default(0)
+  user         User          @relation(fields: [userId], references: [id])
+  transactions Transaction[]
+}
 
-  @@map("users")
+model Transaction {
+  id          String   @id @default(uuid())
+  walletId    Int
+  amount      Int
+  type        String
+  description String
+  referenceId String?
+  createdAt   DateTime @default(now())
+
+  wallet      Wallet   @relation(fields: [walletId], references: [id])
 }
