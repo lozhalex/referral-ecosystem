@@ -46,7 +46,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
  * Должен использоваться ПОСЛЕ authMiddleware
  */
 export function adminMiddleware(req: Request, res: Response, next: NextFunction) {
-  if (!req.user || req.user.role !== 'SUPER_ADMIN') {
+  if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({
       success: false,
       message: 'Доступ запрещен. Требуются права администратора.'
