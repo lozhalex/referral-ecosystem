@@ -143,7 +143,7 @@ const Profile: React.FC = () => {
             </div>
           </div>
           <span className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full">
-            {user.role === 'admin' ? 'Администратор' : 'Пользователь'}
+            {user.role === 'admin' || user.role === 'SUPER_ADMIN' ? 'Администратор' : 'Пользователь'}
           </span>
         </div>
 
@@ -229,7 +229,7 @@ const Profile: React.FC = () => {
             Сменить пароль
           </button>
 
-          {user.role === 'admin' && (
+          {(user.role === 'admin' || user.role === 'SUPER_ADMIN') && (
             <button
               onClick={() => navigate('/admin')}
               className="w-full py-2.5 px-4 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition flex items-center justify-center gap-2"
