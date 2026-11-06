@@ -1,10 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import ProjectCard from '../components/ProjectCard';
 import { projects } from '../data/projects';
+import { apiClient } from '../api/client';
+
+// Функция для правильного склонения слова "человек"
+const getUserCountText = (count: number) => {
+  const lastTwo = count % 100;
+  const lastOne = count % 10;
+  if (lastTwo > 10 && lastTwo < 20) return 'человек';
+  if (lastOne > 1 && lastOne < 5) return 'человека';
+  if (lastOne === 1) return 'человек';
+  return 'человек';
+};
 
 export default function Home() {
   const [showAll, setShowAll] = useState(false);
+  const [userCount, setUserCount] = useState<number | null>(null);
 
   const token = localStorage.getItem('token');
   const user = token ? JSON.parse(atob(token.split('.')[1])) : null;
@@ -13,6 +25,17 @@ export default function Home() {
     localStorage.removeItem('token');
     window.location.reload();
   };
+
+  // Загрузка реального количества пользователей
+  useEffect(() => {
+    apiClient.get('/api/stats/total-users')
+      .then((res) => {
+        if (res.data.success) {
+          setUserCount(res.data.count);
+        }
+      })
+      .catch(() => setUserCount(1247)); // Фолбэк, если сервер недоступен
+  }, []);
 
   // Разделяем проекты по статусам
   const available = projects.filter(p => p.status === 'available');
@@ -36,10 +59,16 @@ export default function Home() {
           </p>
         </section>
 
-        {/* Счётчик пользователей (пока статичный) */}
+        {/* Счётчик пользователей (реальный) */}
         <section className="text-center mb-8">
           <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-full px-5 py-2">
-            <span className="text-blue-600 font-semibold">👥 Нас уже 1 247 человек</span>
+            <span className="text-blue-600 font-semibold">
+              {userCount !== null ? (
+                <>👥 Нас уже {userCount.toLocaleString('ru-RU')} {getUserCountText(userCount)}</>
+              ) : (
+                <>👥 Загрузка...</>
+              )}
+            </span>
           </div>
         </section>
 

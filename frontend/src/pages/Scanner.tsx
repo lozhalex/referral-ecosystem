@@ -6,7 +6,12 @@ import { apiClient } from '../api/client';
 export default function Scanner() {
   const navigate = useNavigate();
   const [scanning, setScanning] = useState(false);
-  const [result, setResult] = useState<{ success: boolean; message: string; cashback?: any } | null>(null);
+  const [result, setResult] = useState<{ 
+    success: boolean; 
+    message: string; 
+    cashback?: { participant: number; referrer: number };
+    eventTitle?: string;
+  } | null>(null);
   const [error, setError] = useState('');
   const [scanner, setScanner] = useState<Html5Qrcode | null>(null);
 
@@ -39,9 +44,22 @@ export default function Scanner() {
           // Ошибка распознавания — игнорируем
         }
       );
-    } catch (err) {
-      setError('Не удалось запустить камеру. Проверьте разрешения.');
+    } catch (err: any) {
+      console.error("Camera error:", err);
       setScanning(false);
+      
+      let errorMsg = 'Не удалось запустить камеру.';
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        errorMsg = 'Доступ к камере запрещён. Проверьте настройки браузера.';
+      } else if (err.name === 'NotSupportedError' || err.message?.includes('Only secure origins are allowed')) {
+        errorMsg = '❌ Камера работает только на сайтах с HTTPS (или localhost). Текущий сайт использует HTTP.';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        errorMsg = 'Камера не найдена на этом устройстве.';
+      } else {
+        errorMsg += ` (${err.name || 'Unknown error'})`;
+      }
+      
+      setError(errorMsg);
     }
   };
 
@@ -55,15 +73,16 @@ export default function Scanner() {
   const handleScan = async (qrCode: string) => {
     try {
       const response = await apiClient.post('/api/scanner/scan', {
-        qrCode,
-        eventId: 1
+        qrCode
+        // eventId больше не нужен — бэкенд сам определит мероприятие по QR
       });
 
       if (response.data.success) {
         setResult({
           success: true,
           message: response.data.message,
-          cashback: response.data.cashback
+          cashback: response.data.cashback,
+          eventTitle: response.data.event?.title
         });
       } else {
         setResult({
@@ -99,6 +118,9 @@ export default function Scanner() {
           <h2 className="text-lg font-bold text-gray-900 mb-4 text-center">
             Сканирование QR-кода
           </h2>
+          <p className="text-sm text-gray-500 text-center mb-4">
+            Наведите камеру на QR-код билета. Мероприятие определится автоматически.
+          </p>
 
           {!scanning ? (
             <button
@@ -130,6 +152,11 @@ export default function Scanner() {
               <p className={`font-semibold ${result.success ? 'text-green-800' : 'text-red-800'}`}>
                 {result.message}
               </p>
+              {result.eventTitle && (
+                <p className="text-sm text-gray-600 mt-1">
+                  🎟️ Мероприятие: {result.eventTitle}
+                </p>
+              )}
               {result.cashback && (
                 <div className="mt-2 text-sm text-green-700">
                   <p>Кэшбек участнику: {result.cashback.participant} ₽</p>
@@ -154,8 +181,8 @@ export default function Scanner() {
           <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
             <li>Нажмите "Запустить камеру"</li>
             <li>Наведите камеру на QR-код билета</li>
-            <li>Дождитесь результата сканирования</li>
-            <li>Проверьте начисленные бонусы</li>
+            <li>Мероприятие определится автоматически</li>
+            <li>Дождитесь результата и проверьте бонусы</li>
           </ol>
         </div>
       </div>

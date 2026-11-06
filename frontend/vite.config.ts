@@ -33,7 +33,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://177.177.212.220',
+        target: 'http://localhost:3000', // 👈 ИЗМЕНИЛИ ЗДЕСЬ на локальный сервер
         changeOrigin: true,
         secure: false,
       },

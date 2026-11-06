@@ -8,6 +8,7 @@ interface User {
   role: string;
   balance: number;
   referralCount: number;
+  isPaidMember: boolean; // 👈 ДОБАВЛЕНО
   createdAt: string;
 }
 
@@ -45,7 +46,6 @@ export default function AdminDashboard() {
   const [moveForm, setMoveForm] = useState({ newReferredId: '' });
   const [moveLoading, setMoveLoading] = useState(false);
 
-  // 👇 Новые состояния для Шага 3 (Роли и Пароли) 👇
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [roleForm, setRoleForm] = useState({ role: 'user' });
   const [roleLoading, setRoleLoading] = useState(false);
@@ -53,7 +53,6 @@ export default function AdminDashboard() {
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [generatedPassword, setGeneratedPassword] = useState('');
-  // 👆 Конец новых состояний 👆
 
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
@@ -62,58 +61,49 @@ export default function AdminDashboard() {
   const [importLoading, setImportLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [alerts, setAlerts] = useState<{ largeAdjustments: any[]; frequentChanges: any[] } | null>(null);
+
   const token = localStorage.getItem('token');
 
   useEffect(() => {
-    if (!token) {
-      navigate('/login');
-      return;
-    }
+    if (!token) { navigate('/login'); return; }
     if (activeTab === 'users') loadUsers();
     else loadLogs();
+    loadAlerts();
   }, [token, navigate, activeTab]);
 
   const loadUsers = async (phone?: string) => {
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
-      const response = await axios.get('/api/admin/users', {
-        headers: { Authorization: `Bearer ${token}` },
-        params: phone ? { phone } : undefined
-      });
+      const response = await axios.get('/api/admin/users', { headers: { Authorization: `Bearer ${token}` }, params: phone ? { phone } : undefined });
       setUsers(response.data.users);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка загрузки пользователей');
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) { setError(err.response?.data?.message || 'Ошибка загрузки пользователей'); }
+    finally { setLoading(false); }
   };
 
   const loadLogs = async () => {
-    setLogsLoading(true);
-    setError('');
+    setLogsLoading(true); setError('');
     try {
       const response = await axios.get('/api/admin/tree/logs', { headers: { Authorization: `Bearer ${token}` } });
       setLogs(response.data.logs);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка загрузки логов');
-    } finally {
-      setLogsLoading(false);
-    }
+    } catch (err: any) { setError(err.response?.data?.message || 'Ошибка загрузки логов'); }
+    finally { setLogsLoading(false); }
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    loadUsers(searchPhone);
+  const loadAlerts = async () => {
+    try {
+      const response = await axios.get('/api/admin/alerts/balance', { headers: { Authorization: `Bearer ${token}` } });
+      if (response.data.success) setAlerts(response.data.alerts);
+    } catch (err) { console.error('Failed to load alerts', err); }
   };
+
+  const handleSearch = (e: React.FormEvent) => { e.preventDefault(); loadUsers(searchPhone); };
 
   const loadUserDetail = async (userId: number) => {
     try {
       const response = await axios.get(`/api/admin/users/${userId}`, { headers: { Authorization: `Bearer ${token}` } });
       setSelectedUser(response.data.user);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка загрузки деталей');
-    }
+    } catch (err: any) { setError(err.response?.data?.message || 'Ошибка загрузки деталей'); }
   };
 
   const handleAdjustSubmit = async (e: React.FormEvent) => {
@@ -125,105 +115,97 @@ export default function AdminDashboard() {
 
     setAdjustLoading(true);
     try {
-      await axios.post(`/api/admin/users/${selectedUser.id}/wallet/adjust`, {
-        amount: numAmount, type: adjustForm.type, description: adjustForm.description.trim(),
-      }, { headers: { Authorization: `Bearer ${token}` } });
-      
+      await axios.post(`/api/admin/users/${selectedUser.id}/wallet/adjust`, { amount: numAmount, type: adjustForm.type, description: adjustForm.description.trim() }, { headers: { Authorization: `Bearer ${token}` } });
       alert('Баланс успешно обновлен!');
       setShowAdjustModal(false);
       setAdjustForm({ amount: '', type: 'MANUAL_ADJUSTMENT', description: '' });
       await loadUserDetail(selectedUser.id);
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Ошибка при изменении баланса');
-    } finally {
-      setAdjustLoading(false);
-    }
+      loadAlerts();
+    } catch (err: any) { alert(err.response?.data?.message || 'Ошибка при изменении баланса'); }
+    finally { setAdjustLoading(false); }
   };
 
   const handleMoveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
     const newRefId = moveForm.newReferredId === '' ? null : Number(moveForm.newReferredId);
-    
     setMoveLoading(true);
     try {
       await axios.post('/api/admin/tree/move', { targetUserId: selectedUser.id, newReferredById: newRefId }, { headers: { Authorization: `Bearer ${token}` } });
       alert('Реферер успешно изменен!');
-      setShowMoveModal(false);
-      setMoveForm({ newReferredId: '' });
+      setShowMoveModal(false); setMoveForm({ newReferredId: '' });
       await loadUserDetail(selectedUser.id);
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Ошибка при изменении реферера');
-    } finally {
-      setMoveLoading(false);
-    }
+    } catch (err: any) { alert(err.response?.data?.message || 'Ошибка при изменении реферера'); }
+    finally { setMoveLoading(false); }
   };
 
-  // 👇 Обработчики для Шага 3 👇
   const handleRoleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
-
     setRoleLoading(true);
     try {
       await axios.put(`/api/admin/users/${selectedUser.id}/role`, { role: roleForm.role }, { headers: { Authorization: `Bearer ${token}` } });
       alert(`Роль успешно изменена на ${roleForm.role}!`);
       setShowRoleModal(false);
       await loadUserDetail(selectedUser.id);
-      loadUsers(); // Обновляем общий список
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Ошибка при смене роли');
-    } finally {
-      setRoleLoading(false);
-    }
+      loadUsers();
+    } catch (err: any) { alert(err.response?.data?.message || 'Ошибка при смене роли'); }
+    finally { setRoleLoading(false); }
   };
 
   const handleResetPassword = async () => {
     if (!selectedUser) return;
     if (!window.confirm(`Вы уверены, что хотите сбросить пароль для ${selectedUser.phone}?`)) return;
-
     setResetLoading(true);
     try {
       const response = await axios.post(`/api/admin/users/${selectedUser.id}/reset-password`, {}, { headers: { Authorization: `Bearer ${token}` } });
       setGeneratedPassword(response.data.newPassword);
-      setShowResetModal(true); // Показываем модалку с новым паролем
+      setShowResetModal(true);
+    } catch (err: any) { alert(err.response?.data?.message || 'Ошибка при сбросе пароля'); }
+    finally { setResetLoading(false); }
+  };
+
+  // 🆕 Обработчик переключения статуса платного участия
+  const handleToggleMembership = async () => {
+    if (!selectedUser) return;
+    
+    const isCurrentlyPaid = selectedUser.isPaidMember;
+    const confirmMessage = isCurrentlyPaid 
+      ? `⚠️ ВНИМАНИЕ! Вы точно хотите изменить статус пользователя ${selectedUser.phone} на БЕСПЛАТНЫЙ?\n\nВсе будущие бонусы от его рефералов будут уходить выше по дереву или в резервный фонд. Это действие будет записано в журнал аудита.`
+      : `Переключить пользователя ${selectedUser.phone} в статус ПЛАТНЫЙ участник?\n\nТеперь все бонусы от его рефералов будут идти ему.`;
+
+    if (!window.confirm(confirmMessage)) return;
+
+    try {
+      const response = await axios.post(`/api/admin/membership/${selectedUser.id}/toggle`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      if (response.data.success) {
+        alert(response.data.message);
+        await loadUserDetail(selectedUser.id);
+        loadUsers();
+        loadLogs(); // Обновляем логи, так как туда добавилась запись
+      }
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Ошибка при сбросе пароля');
-    } finally {
-      setResetLoading(false);
+      alert(err.response?.data?.message || 'Ошибка при смене статуса участия');
     }
   };
-  // 👆 Конец обработчиков 👆
 
   const handleExportLogs = async () => {
     try {
-      const response = await axios.get('/api/admin/tree/logs/export', {
-        headers: { Authorization: `Bearer ${token}` },
-        responseType: 'blob'
-      });
-
+      const response = await axios.get('/api/admin/tree/logs/export', { headers: { Authorization: `Bearer ${token}` }, responseType: 'blob' });
       if (response.data.type === 'application/json') {
         const text = await response.data.text();
         const errorJson = JSON.parse(text);
         alert(errorJson.message || 'Ошибка сервера при экспорте');
         return;
       }
-
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `tree_audit_logs_${new Date().toISOString().slice(0, 10)}.csv`);
       document.body.appendChild(link);
       link.click();
-      
-      setTimeout(() => {
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-      }, 100);
-    } catch (err: any) {
-      console.error('Export error:', err);
-      alert('Ошибка при экспорте логов: ' + (err.message || 'Неизвестная ошибка'));
-    }
+      setTimeout(() => { document.body.removeChild(link); window.URL.revokeObjectURL(url); }, 100);
+    } catch (err: any) { console.error('Export error:', err); alert('Ошибка при экспорте логов'); }
   };
 
   const handleExportTree = async () => {
@@ -235,43 +217,28 @@ export default function AdminDashboard() {
       link.setAttribute('download', `tree_backup_${new Date().toISOString().slice(0, 10)}.json`);
       document.body.appendChild(link);
       link.click();
-      setTimeout(() => {
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-      }, 100);
-    } catch (err) {
-      alert('Ошибка при экспорте дерева');
-    }
+      setTimeout(() => { document.body.removeChild(link); window.URL.revokeObjectURL(url); }, 100);
+    } catch (err) { alert('Ошибка при экспорте дерева'); }
   };
 
   const handleImportTree = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (!window.confirm('ВНИМАНИЕ! Это действие перезапишет текущую структуру дерева рефералов данными из файла. Продолжить?')) {
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
-
     setImportLoading(true);
     try {
       const text = await file.text();
       const jsonData = JSON.parse(text);
-      
-      const response = await axios.post('/api/admin/tree/import', jsonData, { 
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } 
-      });
-      
+      const response = await axios.post('/api/admin/tree/import', jsonData, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
       alert(response.data.message || 'Дерево успешно восстановлено!');
       setShowImportModal(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
       loadLogs();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Ошибка при импорте дерева. Проверьте формат JSON.');
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    } finally {
-      setImportLoading(false);
-    }
+    } catch (err: any) { alert(err.response?.data?.message || 'Ошибка при импорте дерева'); if (fileInputRef.current) fileInputRef.current.value = ''; }
+    finally { setImportLoading(false); }
   };
 
   const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString('ru-RU');
@@ -282,18 +249,77 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-6">
+        
+                {/* 🚨 БЛОК ПРЕДУПРЕЖДЕНИЙ БЕЗОПАСНОСТИ */}
+        {alerts && (alerts.largeAdjustments.length > 0 || alerts.frequentChanges.length > 0) && (
+          <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg shadow-sm">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-3 flex-1">
+                <div className="flex-shrink-0">
+                  <svg className="h-6 w-6 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-bold text-red-800 mb-2">⚠️ Обнаружены подозрительные операции с балансом</h3>
+                  
+                  {/* Крупные изменения */}
+                  {alerts.largeAdjustments.length > 0 && (
+                    <div className="mb-2">
+                      <p className="text-sm font-semibold text-red-700 mb-1">💰 Крупные ручные изменения (&gt;5000₽):</p>
+                      <ul className="text-xs text-red-600 space-y-1">
+                        {alerts.largeAdjustments.map((op: any) => (
+                          <li key={op.id} className="bg-red-100 px-2 py-1 rounded">
+                            <strong>{op.phone}</strong>: {op.amount > 0 ? '+' : ''}{op.amount}₽ 
+                            <span className="text-gray-600 ml-2">({op.formattedDate})</span>
+                            <br />
+                            <span className="text-gray-500 italic">"{op.description}"</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {/* Частые изменения */}
+                  {alerts.frequentChanges.length > 0 && (
+                    <div>
+                      <p className="text-sm font-semibold text-red-700 mb-1">🔄 Частые изменения (&gt;3 раз за 24ч):</p>
+                      <ul className="text-xs text-red-600 space-y-1">
+                        {alerts.frequentChanges.map((user: any) => (
+                          <li key={user.walletId} className="bg-red-100 px-2 py-1 rounded">
+                            <strong>{user.phone}</strong> — {user.count} операций
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Кнопка "Разобрался" */}
+              <button
+                onClick={() => setAlerts(null)}
+                className="ml-4 px-3 py-1 bg-red-200 text-red-800 text-xs font-semibold rounded hover:bg-red-300 transition"
+                title="Скрыть предупреждение (оно появится снова при новых подозрительных операциях)"
+              >
+                Разобрался ✓
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Админ-панель</h1>
-          <p className="mt-2 text-gray-600">Управление пользователями и деревом рефералов</p>
+          <p className="mt-2 text-gray-600">Центр управления экосистемой</p>
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button onClick={() => navigate('/admin/events')} className="flex items-center justify-center gap-3 p-5 bg-indigo-600 text-white rounded-xl shadow-md hover:bg-indigo-700 transition font-bold text-lg"><span className="text-3xl">🎟️</span>Управление мероприятиями</button>
+            <button onClick={() => navigate('/profile')} className="flex items-center justify-center gap-3 p-5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl shadow-sm hover:bg-gray-50 hover:border-gray-300 transition font-bold text-lg"><span className="text-3xl">👤</span>Вернуться в профиль</button>
+          </div>
         </div>
 
         <div className="flex border-b border-gray-200 mb-6">
-          <button onClick={() => setActiveTab('users')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition ${activeTab === 'users' ? 'bg-white text-blue-600 border-t border-l border-r border-gray-200' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}>
-            👥 Пользователи
-          </button>
-          <button onClick={() => setActiveTab('logs')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition ${activeTab === 'logs' ? 'bg-white text-blue-600 border-t border-l border-r border-gray-200' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}>
-            🌳 Дерево и Журнал
-          </button>
+          <button onClick={() => setActiveTab('users')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition ${activeTab === 'users' ? 'bg-white text-blue-600 border-t border-l border-r border-gray-200' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}>👥 Пользователи</button>
+          <button onClick={() => setActiveTab('logs')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition ${activeTab === 'logs' ? 'bg-white text-blue-600 border-t border-l border-r border-gray-200' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}>🌳 Дерево и Журнал</button>
         </div>
 
         {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">{error}</div>}
@@ -316,6 +342,7 @@ export default function AdminDashboard() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Телефон</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Роль</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">💳 Статус</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Баланс</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Рефералы</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Дата</th>
@@ -323,11 +350,18 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {loading ? <tr><td colSpan={7} className="px-6 py-4 text-center text-gray-500">Загрузка...</td></tr> : users.length === 0 ? <tr><td colSpan={7} className="px-6 py-4 text-center text-gray-500">Не найдено</td></tr> : users.map((user) => (
+                    {loading ? <tr><td colSpan={8} className="px-6 py-4 text-center text-gray-500">Загрузка...</td></tr> : users.length === 0 ? <tr><td colSpan={8} className="px-6 py-4 text-center text-gray-500">Не найдено</td></tr> : users.map((user) => (
                       <tr key={user.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.id}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.phone}</td>
                         <td className="px-6 py-4 whitespace-nowrap"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'}`}>{user.role}</span></td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {user.isPaidMember ? (
+                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">✅ Платный</span>
+                          ) : (
+                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">⚪ Бесплатный</span>
+                          )}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.balance} ₽</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.referralCount}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(user.createdAt)}</td>
@@ -346,15 +380,9 @@ export default function AdminDashboard() {
             <div className="p-6 border-b border-gray-200 flex flex-wrap gap-3 justify-between items-center">
               <h2 className="text-lg font-semibold text-gray-900">Управление деревом и аудит</h2>
               <div className="flex gap-3">
-                <button onClick={handleExportTree} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2">
-                  💾 Скачать backup дерева (JSON)
-                </button>
-                <button onClick={() => setShowImportModal(true)} className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition flex items-center gap-2">
-                  📤 Восстановить из backup (JSON)
-                </button>
-                <button onClick={handleExportLogs} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2">
-                  📥 Скачать логи (CSV)
-                </button>
+                <button onClick={handleExportTree} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2">💾 Скачать backup дерева (JSON)</button>
+                <button onClick={() => setShowImportModal(true)} className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition flex items-center gap-2">📤 Восстановить из backup (JSON)</button>
+                <button onClick={handleExportLogs} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2">📥 Скачать логи (CSV)</button>
               </div>
             </div>
             <div className="overflow-x-auto">
@@ -376,10 +404,8 @@ export default function AdminDashboard() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateTime(log.createdAt)}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{log.adminPhone}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{log.targetPhone || 'ВСЕ'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${log.action === 'MOVE' ? 'bg-yellow-100 text-yellow-800' : log.action === 'IMPORT' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>{log.action}</span></td>
-                      <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-600 font-mono max-w-xs truncate" title={JSON.stringify(log.newData || log.oldData)}>
-                        {log.newData ? JSON.stringify(log.newData) : (log.oldData ? JSON.stringify(log.oldData) : '-')}
-                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${log.action === 'MOVE' ? 'bg-yellow-100 text-yellow-800' : log.action === 'IMPORT' ? 'bg-red-100 text-red-800' : log.action === 'MEMBERSHIP_TOGGLE' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>{log.action}</span></td>
+                      <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-600 font-mono max-w-xs truncate" title={JSON.stringify(log.newData || log.oldData)}>{log.newData ? JSON.stringify(log.newData) : (log.oldData ? JSON.stringify(log.oldData) : '-')}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -400,6 +426,7 @@ export default function AdminDashboard() {
                   <div><label className="text-sm font-medium text-gray-500">ID</label><p className="text-gray-900">{selectedUser.id}</p></div>
                   <div><label className="text-sm font-medium text-gray-500">Телефон</label><p className="text-gray-900">{selectedUser.phone}</p></div>
                   <div><label className="text-sm font-medium text-gray-500">Роль</label><p className="text-gray-900">{selectedUser.role}</p></div>
+                  <div><label className="text-sm font-medium text-gray-500">💳 Статус участия</label><p className="text-gray-900">{selectedUser.isPaidMember ? '✅ Платный участник' : '⚪ Бесплатный участник'}</p></div>
                   <div><label className="text-sm font-medium text-gray-500">Баланс</label><p className="text-gray-900">{selectedUser.balance} ₽</p></div>
                   <div><label className="text-sm font-medium text-gray-500">Дата регистрации</label><p className="text-gray-900">{formatDate(selectedUser.createdAt)}</p></div>
 
@@ -407,8 +434,17 @@ export default function AdminDashboard() {
                     <button onClick={() => setShowAdjustModal(true)} className="py-2 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium flex items-center justify-center gap-2">💰 Баланс</button>
                     <button onClick={() => setShowMoveModal(true)} className="py-2 px-4 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition font-medium flex items-center justify-center gap-2">🔄 Реферер</button>
                     <button onClick={() => { setRoleForm({ role: selectedUser.role }); setShowRoleModal(true); }} className="py-2 px-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium flex items-center justify-center gap-2">🛡️ Роль</button>
-                    <button onClick={handleResetPassword} disabled={resetLoading} className="py-2 px-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium flex items-center justify-center gap-2 disabled:opacity-50">
-                      {resetLoading ? 'Сброс...' : '🔑 Сброс пароля'}
+                    <button onClick={handleResetPassword} disabled={resetLoading} className="py-2 px-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium flex items-center justify-center gap-2 disabled:opacity-50">{resetLoading ? 'Сброс...' : '🔑 Сброс пароля'}</button>
+                    {/* 🆕 Кнопка переключения статуса */}
+                    <button 
+                      onClick={handleToggleMembership} 
+                      className={`py-2 px-4 rounded-lg transition font-medium flex items-center justify-center gap-2 col-span-2 ${
+                        selectedUser.isPaidMember 
+                          ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' 
+                          : 'bg-green-600 text-white hover:bg-green-700'
+                      }`}
+                    >
+                      {selectedUser.isPaidMember ? '⬇️ Сделать бесплатным' : '⬆️ Сделать платным'}
                     </button>
                   </div>
 
@@ -445,31 +481,12 @@ export default function AdminDashboard() {
         {showAdjustModal && selectedUser && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-gray-900">Изменение баланса</h3>
-                <button onClick={() => setShowAdjustModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
-              </div>
+              <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-gray-900">Изменение баланса</h3><button onClick={() => setShowAdjustModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button></div>
               <form onSubmit={handleAdjustSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Сумма</label>
-                  <input type="number" required value={adjustForm.amount} onChange={(e) => setAdjustForm({ ...adjustForm, amount: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Тип операции</label>
-                  <select value={adjustForm.type} onChange={(e) => setAdjustForm({ ...adjustForm, type: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                    <option value="MANUAL_ADJUSTMENT">Ручная корректировка</option>
-                    <option value="BONUS">Бонус / Подарок</option>
-                    <option value="PENALTY">Штраф / Возврат</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Причина (мин. 10 символов)</label>
-                  <textarea required minLength={10} rows={3} value={adjustForm.description} onChange={(e) => setAdjustForm({ ...adjustForm, description: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
-                </div>
-                <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setShowAdjustModal(false)} className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" disabled={adjustLoading}>Отмена</button>
-                  <button type="submit" disabled={adjustLoading} className="flex-1 py-2 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">{adjustLoading ? 'Сохранение...' : 'Сохранить'}</button>
-                </div>
+                <div><label className="block text-sm font-medium text-gray-700 mb-1">Сумма</label><input type="number" required value={adjustForm.amount} onChange={(e) => setAdjustForm({ ...adjustForm, amount: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div>
+                <div><label className="block text-sm font-medium text-gray-700 mb-1">Тип операции</label><select value={adjustForm.type} onChange={(e) => setAdjustForm({ ...adjustForm, type: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg"><option value="MANUAL_ADJUSTMENT">Ручная корректировка</option><option value="BONUS">Бонус / Подарок</option><option value="PENALTY">Штраф / Возврат</option></select></div>
+                <div><label className="block text-sm font-medium text-gray-700 mb-1">Причина (мин. 10 символов)</label><textarea required minLength={10} rows={3} value={adjustForm.description} onChange={(e) => setAdjustForm({ ...adjustForm, description: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div>
+                <div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowAdjustModal(false)} className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" disabled={adjustLoading}>Отмена</button><button type="submit" disabled={adjustLoading} className="flex-1 py-2 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">{adjustLoading ? 'Сохранение...' : 'Сохранить'}</button></div>
               </form>
             </div>
           </div>
@@ -478,71 +495,34 @@ export default function AdminDashboard() {
         {showMoveModal && selectedUser && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-gray-900">Смена реферера</h3>
-                <button onClick={() => setShowMoveModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
-              </div>
+              <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-gray-900">Смена реферера</h3><button onClick={() => setShowMoveModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button></div>
               <form onSubmit={handleMoveSubmit} className="space-y-4">
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-                  <p>Текущий пригласитель: <strong>{selectedUser.referredBy ? selectedUser.referredBy.phone : 'Нет'}</strong></p>
-                  <p className="mt-1 text-xs">Это действие будет записано в журнал аудита.</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ID нового пригласителя (пусто = корневой)</label>
-                  <input type="number" value={moveForm.newReferredId} onChange={(e) => setMoveForm({ ...moveForm, newReferredId: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
-                </div>
-                <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setShowMoveModal(false)} className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" disabled={moveLoading}>Отмена</button>
-                  <button type="submit" disabled={moveLoading} className="flex-1 py-2 px-4 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50">{moveLoading ? 'Сохранение...' : 'Сохранить'}</button>
-                </div>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800"><p>Текущий пригласитель: <strong>{selectedUser.referredBy ? selectedUser.referredBy.phone : 'Нет'}</strong></p><p className="mt-1 text-xs">Это действие будет записано в журнал аудита.</p></div>
+                <div><label className="block text-sm font-medium text-gray-700 mb-1">ID нового пригласителя (пусто = корневой)</label><input type="number" value={moveForm.newReferredId} onChange={(e) => setMoveForm({ ...moveForm, newReferredId: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div>
+                <div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowMoveModal(false)} className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" disabled={moveLoading}>Отмена</button><button type="submit" disabled={moveLoading} className="flex-1 py-2 px-4 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50">{moveLoading ? 'Сохранение...' : 'Сохранить'}</button></div>
               </form>
             </div>
           </div>
         )}
 
-        {/* 👇 Модальное окно смены роли 👇 */}
         {showRoleModal && selectedUser && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-gray-900">Смена роли</h3>
-                <button onClick={() => setShowRoleModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
-              </div>
+              <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-gray-900">Смена роли</h3><button onClick={() => setShowRoleModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button></div>
               <form onSubmit={handleRoleSubmit} className="space-y-4">
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-purple-800">
-                  <p>Пользователь: <strong>{selectedUser.phone}</strong></p>
-                  <p className="mt-1">Текущая роль: <strong>{selectedUser.role}</strong></p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Новая роль</label>
-                  <select value={roleForm.role} onChange={(e) => setRoleForm({ ...roleForm, role: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                    <option value="user">user (Пользователь)</option>
-                    <option value="admin">admin (Администратор)</option>
-                    <option value="controller">controller (Контроллер)</option>
-                  </select>
-                </div>
-                <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setShowRoleModal(false)} className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" disabled={roleLoading}>Отмена</button>
-                  <button type="submit" disabled={roleLoading} className="flex-1 py-2 px-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50">{roleLoading ? 'Сохранение...' : 'Сохранить'}</button>
-                </div>
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-purple-800"><p>Пользователь: <strong>{selectedUser.phone}</strong></p><p className="mt-1">Текущая роль: <strong>{selectedUser.role}</strong></p></div>
+                <div><label className="block text-sm font-medium text-gray-700 mb-1">Новая роль</label><select value={roleForm.role} onChange={(e) => setRoleForm({ ...roleForm, role: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg"><option value="user">user (Пользователь)</option><option value="admin">admin (Администратор)</option><option value="controller">controller (Контроллер)</option></select></div>
+                <div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowRoleModal(false)} className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" disabled={roleLoading}>Отмена</button><button type="submit" disabled={roleLoading} className="flex-1 py-2 px-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50">{roleLoading ? 'Сохранение...' : 'Сохранить'}</button></div>
               </form>
             </div>
           </div>
         )}
 
-        {/* 👇 Модальное окно результата сброса пароля 👇 */}
         {showResetModal && selectedUser && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-gray-900">Пароль сброшен!</h3>
-                <button onClick={() => { setShowResetModal(false); setGeneratedPassword(''); }} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
-              </div>
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                <p className="text-sm text-green-800 mb-2">Новый временный пароль для <strong>{selectedUser.phone}</strong>:</p>
-                <p className="text-3xl font-bold text-green-900 text-center tracking-widest">{generatedPassword}</p>
-                <p className="text-xs text-green-700 mt-2 text-center">⚠️ Скопируйте пароль сейчас! Он не будет показан снова.</p>
-              </div>
+              <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-gray-900">Пароль сброшен!</h3><button onClick={() => { setShowResetModal(false); setGeneratedPassword(''); }} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button></div>
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4"><p className="text-sm text-green-800 mb-2">Новый временный пароль для <strong>{selectedUser.phone}</strong>:</p><p className="text-3xl font-bold text-green-900 text-center tracking-widest">{generatedPassword}</p><p className="text-xs text-green-700 mt-2 text-center">⚠️ Скопируйте пароль сейчас! Он не будет показан снова.</p></div>
               <button onClick={() => { setShowResetModal(false); setGeneratedPassword(''); }} className="w-full py-2 px-4 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Закрыть</button>
             </div>
           </div>
@@ -551,36 +531,15 @@ export default function AdminDashboard() {
         {showImportModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-gray-900">Восстановление дерева</h3>
-                <button onClick={() => { setShowImportModal(false); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
-              </div>
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800 mb-4">
-                <p className="font-bold">⚠️ ВНИМАНИЕ!</p>
-                <p className="mt-1">Это действие полностью перезапишет текущие связи `referredById` и пересчитает счетчики рефералов на основе данных из файла.</p>
-              </div>
+              <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-gray-900">Восстановление дерева</h3><button onClick={() => { setShowImportModal(false); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button></div>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800 mb-4"><p className="font-bold">⚠️ ВНИМАНИЕ!</p><p className="mt-1">Это действие полностью перезапишет текущие связи `referredById` и пересчитает счетчики рефералов на основе данных из файла.</p></div>
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Выберите файл backup дерева (.json)</label>
-                  <input 
-                    type="file" 
-                    ref={fileInputRef}
-                    accept=".json" 
-                    onChange={handleImportTree}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100"
-                  />
-                </div>
-                <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => { setShowImportModal(false); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" disabled={importLoading}>Отмена</button>
-                </div>
+                <div><label className="block text-sm font-medium text-gray-700 mb-1">Выберите файл backup дерева (.json)</label><input type="file" ref={fileInputRef} accept=".json" onChange={handleImportTree} className="w-full px-3 py-2 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100" /></div>
+                <div className="flex gap-3 pt-2"><button type="button" onClick={() => { setShowImportModal(false); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" disabled={importLoading}>Отмена</button></div>
               </div>
             </div>
           </div>
         )}
-
-        <div className="mt-6">
-          <button onClick={() => navigate('/profile')} className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">← Вернуться в профиль</button>
-        </div>
       </div>
     </div>
   );

@@ -9,6 +9,7 @@ import ProjectStub from './pages/ProjectStub';
 import Events from './pages/Events';
 import Tickets from './pages/Tickets';
 import Scanner from './pages/Scanner';
+import AdminEvents from './pages/AdminEvents'; // 👈 ДОБАВЛЕНО
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
         <Route path="/profile" element={<Profile />} />
         <Route path="/change-password" element={<ChangePassword />} />
         <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin/events" element={<AdminEvents />} /> {/* 👈 ДОБАВЛЕНО */}
         
         {/* Проект "Билеты" */}
         <Route path="/events" element={<Events />} />
@@ -32,7 +34,6 @@ function App() {
         <Route path="/poh" element={<ProjectStub />} />
         <Route path="/gruzchiki" element={<ProjectStub />} />
         <Route path="/carpooling" element={<ProjectStub />} />
-        <Route path="/tickets-stub" element={<ProjectStub />} />
         <Route path="/housing" element={<ProjectStub />} />
         <Route path="/booking" element={<ProjectStub />} />
         <Route path="/glamping" element={<ProjectStub />} />

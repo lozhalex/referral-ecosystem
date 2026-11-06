@@ -5,14 +5,19 @@ import { requireAdmin } from '../middleware/requireAdmin';
 const router = Router();
 const prisma = new PrismaClient();
 
-// GET /api/events — список активных мероприятий
+// GET /api/events — список активных мероприятий с контролерами
 router.get('/', async (req: Request, res: Response) => {
   try {
     const events = await prisma.event.findMany({
       where: { isActive: true },
       orderBy: { eventDate: 'asc' },
       include: {
-        _count: { select: { tickets: true, controllers: true } }
+        _count: { select: { tickets: true, controllers: true } },
+        controllers: {
+          include: {
+            user: { select: { id: true, phone: true, role: true } }
+          }
+        }
       }
     });
 
@@ -24,14 +29,16 @@ router.get('/', async (req: Request, res: Response) => {
       eventDate: e.eventDate,
       cashbackAmount: e.cashbackAmount,
       referrerBonus: e.referrerBonus,
+      isActive: e.isActive,
       ticketsCount: e._count.tickets,
-      controllersCount: e._count.controllers
+      controllersCount: e._count.controllers,
+      controllers: e.controllers
     }));
 
     res.json({ success: true, events: result });
   } catch (err) {
-    console.error('Events list error:', err);
-    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+    console.error('❌ Events list error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера при загрузке мероприятий' });
   }
 });
 
@@ -50,15 +57,15 @@ router.post('/', requireAdmin, async (req: Request, res: Response) => {
         description: description || null,
         location: location || null,
         eventDate: new Date(eventDate),
-        cashbackAmount: cashbackAmount || 50,
-        referrerBonus: referrerBonus || 100
+        cashbackAmount: Number(cashbackAmount) || 50,
+        referrerBonus: Number(referrerBonus) || 100
       }
     });
 
     res.json({ success: true, event });
   } catch (err) {
-    console.error('Event create error:', err);
-    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+    console.error('❌ Event create error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера при создании мероприятия' });
   }
 });
 
@@ -77,18 +84,17 @@ router.post('/:id/controllers', requireAdmin, async (req: Request, res: Response
       return res.status(404).json({ success: false, message: 'Мероприятие не найдено' });
     }
 
-    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const user = await prisma.user.findUnique({ where: { id: Number(userId) } });
     if (!user) {
       return res.status(404).json({ success: false, message: 'Пользователь не найден' });
     }
 
-    // Автоматически назначаем роль controller, если её нет
     if (user.role !== 'controller' && user.role !== 'admin') {
-      await prisma.user.update({ where: { id: userId }, data: { role: 'controller' } });
+      await prisma.user.update({ where: { id: Number(userId) }, data: { role: 'controller' } });
     }
 
     const controller = await prisma.eventController.create({
-      data: { eventId, userId }
+      data: { eventId, userId: Number(userId) }
     });
 
     res.json({ success: true, controller });
@@ -96,8 +102,30 @@ router.post('/:id/controllers', requireAdmin, async (req: Request, res: Response
     if (err.code === 'P2002') {
       return res.status(400).json({ success: false, message: 'Этот контролер уже назначен на мероприятие' });
     }
-    console.error('Event controller error:', err);
-    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+    console.error('❌ Event controller error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера при назначении контролера' });
+  }
+});
+
+// 🆕 DELETE /api/events/:eventId/controllers/:userId — удаление контролера (только admin)
+router.delete('/:eventId/controllers/:userId', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const eventId = Number(req.params.eventId);
+    const userId = Number(req.params.userId);
+
+    await prisma.eventController.delete({
+      where: {
+        eventId_userId: { eventId, userId }
+      }
+    });
+
+    res.json({ success: true, message: 'Контролер успешно удален с мероприятия' });
+  } catch (err: any) {
+    if (err.code === 'P2025') {
+      return res.status(404).json({ success: false, message: 'Назначение не найдено' });
+    }
+    console.error('❌ Event controller delete error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера при удалении контролера' });
   }
 });
 

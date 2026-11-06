@@ -31,6 +31,7 @@ router.get('/users', requireAdmin, async (req: Request, res: Response) => {
       id: u.id,
       phone: u.phone,
       role: u.role,
+      isPaidMember: u.isPaidMember, // 👈 ДОБАВЛЕНО: теперь фронтенд увидит это поле
       balance: u.wallet?.balance ?? 0,
       referralCount: u._count.referrals,
       createdAt: u.createdAt
@@ -63,6 +64,7 @@ router.get('/users/:id', requireAdmin, async (req: Request, res: Response) => {
         id: user.id,
         phone: user.phone,
         role: user.role,
+        isPaidMember: user.isPaidMember, // 👈 ДОБАВЛЕНО: для модального окна деталей
         createdAt: user.createdAt,
         balance: user.wallet?.balance ?? 0,
         referredBy: user.referredBy,
@@ -113,7 +115,7 @@ router.post('/users/:id/wallet/adjust', requireAdmin, async (req: Request, res: 
 });
 
 // ==========================================
-// УПРАВЛЕНИЕ РОЛЯМИ И ПАРОЛЯМИ (ШАГ 3)
+// УПРАВЛЕНИЕ РОЛЯМИ И ПАРОЛЯМИ
 // ==========================================
 
 router.put('/users/:id/role', requireAdmin, async (req: Request, res: Response) => {
@@ -130,7 +132,6 @@ router.put('/users/:id/role', requireAdmin, async (req: Request, res: Response) 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ success: false, message: 'Пользователь не найден' });
 
-    // Защита корневого пользователя
     if (user.phone === ROOT_PHONE) {
       return res.status(403).json({ success: false, message: 'Нельзя изменить роль корневого администратора' });
     }
@@ -170,12 +171,10 @@ router.post('/users/:id/reset-password', requireAdmin, async (req: Request, res:
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ success: false, message: 'Пользователь не найден' });
 
-    // Защита корневого пользователя
     if (user.phone === ROOT_PHONE) {
       return res.status(403).json({ success: false, message: 'Нельзя сбросить пароль корневого администратора через API' });
     }
 
-    // Генерируем случайный 6-значный пароль
     const newPassword = Math.floor(100000 + Math.random() * 900000).toString();
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
 
@@ -198,11 +197,10 @@ router.post('/users/:id/reset-password', requireAdmin, async (req: Request, res:
 
     console.log(`[ADMIN ACTION] Admin (ID: ${adminId}) reset password for user ${userId}`);
     
-    // Возвращаем новый пароль админу (только один раз!)
     res.json({ 
       success: true, 
       message: 'Пароль успешно сброшен',
-      newPassword // ⚠️ Важно: отдаем только в ответе, не сохраняем в БД в открытом виде
+      newPassword
     });
   } catch (err) {
     console.error('Admin password reset error:', err);
