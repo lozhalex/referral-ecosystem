@@ -123,20 +123,38 @@ router.put('/users/:id/role', requireAdmin, async (req: Request, res: Response) 
     const userId = Number(req.params.id);
     const { role } = req.body;
     const adminId = req.user!.userId;
+    const currentAdminRole = req.user!.role; // Получаем роль того, кто делает запрос
 
-    const validRoles = ['user', 'admin', 'controller'];
+    const validRoles = ['user', 'admin', 'controller', 'SUPER_ADMIN'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ success: false, message: `Недопустимая роль. Допустимые: ${validRoles.join(', ')}` });
     }
 
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) return res.status(404).json({ success: false, message: 'Пользователь не найден' });
+    const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+    if (!targetUser) return res.status(404).json({ success: false, message: 'Пользователь не найден' });
 
-    if (user.phone === ROOT_PHONE) {
+    // 🛡️ ЗАЩИТА 1: Никто (даже SUPER_ADMIN) не может изменить роль SUPER_ADMIN через API
+    if (targetUser.role === 'SUPER_ADMIN') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Роль SUPER_ADMIN не может быть изменена через интерфейс.' 
+      });
+    }
+
+    // 🛡️ ЗАЩИТА 2: Обычный admin НЕ может менять роли других admin или SUPER_ADMIN
+    if (currentAdminRole === 'admin' && (targetUser.role === 'admin' || targetUser.role === 'SUPER_ADMIN')) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Недостаточно прав для изменения роли этого пользователя.' 
+      });
+    }
+
+    // 🛡️ ЗАЩИТА 3: Оставляем твою изначальную защиту корневого телефона (двойная защита не повредит)
+    if (targetUser.phone === ROOT_PHONE) {
       return res.status(403).json({ success: false, message: 'Нельзя изменить роль корневого администратора' });
     }
 
-    const oldRole = user.role;
+    const oldRole = targetUser.role;
 
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
@@ -150,12 +168,12 @@ router.put('/users/:id/role', requireAdmin, async (req: Request, res: Response) 
           targetUserId: userId,
           action: 'ROLE_CHANGE',
           oldData: JSON.stringify({ role: oldRole }),
-          newData: JSON.stringify({ role })
+          newData: JSON.stringify({ role, reason: req.body.reason || 'Без причины' })
         }
       });
     });
 
-    console.log(`[ADMIN ACTION] Admin (ID: ${adminId}) changed role of user ${userId} from ${oldRole} to ${role}`);
+    console.log(`[ADMIN ACTION] Admin (ID: ${adminId}, Role: ${currentAdminRole}) changed role of user ${userId} from ${oldRole} to ${role}`);
     res.json({ success: true, message: `Роль успешно изменена на ${role}` });
   } catch (err) {
     console.error('Admin role change error:', err);

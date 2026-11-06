@@ -1,6 +1,19 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
+// Расширяем глобальный интерфейс Request, чтобы TypeScript не ругался на req.user
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        userId: number;
+        phone: string;
+        role: string;
+      };
+    }
+  }
+}
+
 interface JwtPayload {
   userId: number;
   phone: string;
@@ -25,12 +38,21 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
   }
 }
 
+/**
+ * Middleware для проверки прав администратора.
+ * Теперь пропускает как 'admin', так и 'SUPER_ADMIN'.
+ * Конкретные ограничения на действия (например, запрет менять роль другого админа) 
+ * проверяются внутри самих роутов (в admin.ts).
+ */
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   authenticateToken(req, res, () => {
-    if (req.user && req.user.role === 'admin') {
+    if (req.user && (req.user.role === 'admin' || req.user.role === 'SUPER_ADMIN')) {
       next();
     } else {
-      return res.status(403).json({ success: false, message: 'Доступ запрещен: требуется роль admin' });
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Доступ запрещен: требуются права администратора' 
+      });
     }
   });
 }
