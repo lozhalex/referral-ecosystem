@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -12,8 +13,29 @@ const ROOT_PHONE = '+79503278027'; // PROJECT_PLAN п. 3.1
 const DEFAULT_PASSWORD = '1234'; // PROJECT_PLAN п. 3.1
 
 // ==========================================
+// RATE LIMITING (Пункт 8: Защита от брутфорса и спама)
+// ==========================================
+
+// Лимитер для входа: макс. 5 попыток в минуту с одного IP
+const loginLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 минута
+  max: 5, // 5 попыток
+  message: { success: false, message: 'Слишком много попыток входа. Пожалуйста, попробуйте снова через 1 минуту.' },
+  standardHeaders: true, // Возвращает информацию о лимите в заголовках RateLimit-*
+  legacyHeaders: false, // Отключает устаревшие заголовки X-RateLimit-*
+});
+
+// Лимитер для регистрации: макс. 3 попытки в 15 минут с одного IP
+const registerLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 минут
+  max: 3, // 3 попытки
+  message: { success: false, message: 'Слишком много попыток регистрации с этого IP. Попробуйте через 15 минут.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// ==========================================
 // Утилита: нормализация телефона к +7XXXXXXXXXX
-// Возвращает null, если номер некорректный
 // ==========================================
 const normalizePhone = (raw: unknown): string | null => {
   if (typeof raw !== 'string') return null;
@@ -56,12 +78,11 @@ const authenticateToken = (req: any, res: Response, next: Function) => {
 // ==========================================
 // 1. Регистрация (PROJECT_PLAN п. 3.4.А)
 // ==========================================
-router.post('/register', async (req: Request, res: Response) => {
+router.post('/register', registerLimiter, async (req: Request, res: Response) => {
   try {
     const { phone, referred_by_phone } = req.body;
     console.log('📩 Регистрация, входные данные:', { phone, referred_by_phone });
 
-    // Шаг 1. Нормализация номера пользователя
     const formattedPhone = normalizePhone(phone);
     if (!formattedPhone) {
       return res.status(400).json({
@@ -70,7 +91,6 @@ router.post('/register', async (req: Request, res: Response) => {
       });
     }
 
-    // Шаг 2. Защита корневого пользователя
     if (formattedPhone === ROOT_PHONE) {
       return res.status(400).json({
         success: false,
@@ -78,7 +98,6 @@ router.post('/register', async (req: Request, res: Response) => {
       });
     }
 
-    // Шаг 3. Проверка уникальности
     const existingUser = await prisma.user.findUnique({ where: { phone: formattedPhone } });
     if (existingUser) {
       return res.status(400).json({
@@ -87,7 +106,6 @@ router.post('/register', async (req: Request, res: Response) => {
       });
     }
 
-    // Шаг 4. Определение реферера: пустой -> корневой
     const normalizedRef = normalizePhone(referred_by_phone);
     const referrerPhone = normalizedRef || ROOT_PHONE;
     const isFallbackToRoot = !normalizedRef;
@@ -101,7 +119,6 @@ router.post('/register', async (req: Request, res: Response) => {
       });
     }
 
-    // Шаг 5. Пригласитель обязан существовать
     const referrer = await prisma.user.findUnique({ where: { phone: referrerPhone } });
     if (!referrer) {
       if (isFallbackToRoot) {
@@ -116,7 +133,6 @@ router.post('/register', async (req: Request, res: Response) => {
 
     console.log('✅ Пригласитель найден, ID:', referrer.id);
 
-    // Шаг 6. Создание пользователя + инкремент счётчика одной транзакцией
     const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
 
     const newUser = await prisma.$transaction(async (tx) => {
@@ -136,7 +152,6 @@ router.post('/register', async (req: Request, res: Response) => {
       return created;
     });
 
-    // Шаг 7. JWT на 30 дней (авто-вход после регистрации)
     const token = signToken(newUser);
 
     return res.status(201).json({
@@ -160,7 +175,7 @@ router.post('/register', async (req: Request, res: Response) => {
 // ==========================================
 // 2. Вход в систему (PROJECT_PLAN п. 3.4.Б)
 // ==========================================
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', loginLimiter, async (req: Request, res: Response) => {
   try {
     const { phone, password } = req.body;
 
@@ -208,7 +223,6 @@ router.post('/change-password', authenticateToken, async (req: any, res: Respons
       return res.status(404).json({ success: false, message: 'Пользователь не найден' });
     }
 
-    // Защита корневого пользователя (PROJECT_PLAN п. 5.4)
     if (user.phone === ROOT_PHONE) {
       return res.status(403).json({
         success: false,
@@ -259,13 +273,11 @@ router.get('/me', authenticateToken, async (req: any, res: Response) => {
         role: true,
         referralCount: true,
         createdAt: true,
-        // 👇 ДОБАВЛЕНО: получение баланса кошелька 👇
         wallet: {
           select: {
             balance: true,
           },
         },
-        // 👆 КОНЕЦ ДОБАВЛЕННОГО БЛОКА 👆
         referredBy: {
           select: { id: true, phone: true },
         },
@@ -284,7 +296,7 @@ router.get('/me', authenticateToken, async (req: any, res: Response) => {
       success: true,
       user: {
         ...user,
-        registeredAt: user.createdAt, // совместимость с типами фронтенда
+        registeredAt: user.createdAt,
       },
     });
   } catch (error) {

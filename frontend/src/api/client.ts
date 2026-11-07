@@ -8,6 +8,8 @@ export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
+    // ПУНКТ 16: Добавлен заголовок для прохождения CSRF-проверки на бэкенде
+    'x-requested-with': 'XMLHttpRequest',
   },
 });
 

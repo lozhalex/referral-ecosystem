@@ -8,25 +8,65 @@ import ticketsRoutes from './routes/tickets';
 import scannerRoutes from './routes/scanner';
 import statsRoutes from './routes/stats';
 import alertsRoutes from './routes/alerts';
-import membershipRoutes from './routes/membership'; // 👈 ДОБАВЛЕНО
+import membershipRoutes from './routes/membership';
 
 const app = express();
 const PORT: number = Number(process.env.PORT) || 3000;
 
-app.use(cors({ origin: true, credentials: true }));
+// ПУНКТ 16: Строгая настройка CORS (запрет wildcard *)
+const allowedOrigins = [
+  'http://localhost:5173', // Локальная разработка Vite
+  'http://177.177.212.220', // Текущий сервер
+  // 'https://your-domain.com' // Раскомментировать при покупке домена
+];
+
+app.use(cors({ 
+  origin: function(origin, callback) {
+    // Разрешаем запросы без origin (например, мобильные приложения, curl или сервер-сервер) 
+    // и из белого списка
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Не разрешенный источник (CORS)'));
+    }
+  },
+  credentials: true 
+}));
+
 app.use(express.json());
 
-const authLimiter = rateLimit({ windowMs: 60 * 1000, max: 5, message: 'Слишком много попыток. Попробуйте позже.' });
+// ПУНКТ 16: Базовая защита от CSRF для мутационных запросов
+const csrfProtection = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+    if (req.headers['x-requested-with'] !== 'XMLHttpRequest') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'CSRF validation failed: Missing required header' 
+      });
+    }
+  }
+  next();
+};
+
+// Применяем защиту ко всем маршрутам
+app.use(csrfProtection);
+
+const authLimiter = rateLimit({ 
+  windowMs: 60 * 1000, 
+  max: 5, 
+  message: { success: false, message: 'Слишком много попыток. Попробуйте позже.' } 
+});
 
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/admin/membership', membershipRoutes); // 👈 ДОБАВЛЕНО
+app.use('/api/admin/membership', membershipRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/tickets', ticketsRoutes);
 app.use('/api/scanner', scannerRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/admin/alerts', alertsRoutes);
 
+// Health check освобождаем от CSRF для удобства мониторинга
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'OK', timestamp: new Date().toISOString() });
 });

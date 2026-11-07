@@ -7,8 +7,16 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('📦 Начинаю экспорт базы данных...');
 
+  const rawUsers = await prisma.user.findMany();
+  
+  // ПУНКТ 15: Удаляем хеши паролей из бэкапа для безопасности
+  const safeUsers = rawUsers.map(user => ({
+    ...user,
+    passwordHash: '[REDACTED]'
+  }));
+
   const data = {
-    users: await prisma.user.findMany(),
+    users: safeUsers,
     wallets: await prisma.wallet.findMany(),
     transactions: await prisma.transaction.findMany(),
     events: await prisma.event.findMany(),
@@ -17,7 +25,6 @@ async function main() {
     auditLogs: await prisma.treeAuditLog.findMany(),
   };
 
-  // Преобразуем даты в строки для корректного JSON
   const jsonString = JSON.stringify(data, (key, value) => {
     if (value instanceof Date) return value.toISOString();
     return value;

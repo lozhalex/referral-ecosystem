@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const fs = require('fs');
 const path = require('path');
+const bcrypt = require('bcryptjs'); // Добавлено для хеширования временных паролей
 
 const prisma = new PrismaClient();
 
@@ -16,15 +17,33 @@ async function main() {
   const rawData = fs.readFileSync(filePath, 'utf8');
   const data = JSON.parse(rawData);
 
-  // 1. Пользователи (upsert сохраняет связи referredById)
+  const tempPasswordsLog = [];
+
+  // 1. Пользователи
   for (const user of data.users) {
+    let userToUpsert = { ...user };
+    
+    // ПУНКТ 15: Если пароль был удален при экспорте, генерируем временный
+    if (user.passwordHash === '[REDACTED]' || user.passwordHash === null) {
+      const tempPass = Math.random().toString(36).slice(-6).toUpperCase(); // Случайные 6 символов
+      userToUpsert.passwordHash = await bcrypt.hash(tempPass, 10);
+      tempPasswordsLog.push(`📱 Телефон: ${user.phone} | 🔑 Временный пароль: ${tempPass}`);
+    }
+
     await prisma.user.upsert({
       where: { id: user.id },
-      update: user,
-      create: user,
+      update: userToUpsert,
+      create: userToUpsert,
     });
   }
   console.log(`✅ Восстановлено ${data.users.length} пользователей`);
+
+  // Выводим список временных паролей для админа
+  if (tempPasswordsLog.length > 0) {
+    console.log('\n⚠️ ВНИМАНИЕ! Сгенерированы временные пароли для пользователей без хеша:');
+    tempPasswordsLog.forEach(log => console.log(log));
+    console.log('Скопируйте эти данные и передайте пользователям для первого входа.\n');
+  }
 
   // 2. Кошельки
   for (const wallet of data.wallets) {
