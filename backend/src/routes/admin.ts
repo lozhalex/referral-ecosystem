@@ -9,6 +9,43 @@ const prisma = new PrismaClient();
 const ROOT_PHONE = '+79503278027'; // Защита корневого пользователя
 
 // ==========================================
+// ПУНКТ 7: Защита от циклических ссылок (Утилита)
+// ==========================================
+/**
+ * Проверяет, создаст ли назначение newReferredById родителем для targetUserId цикл в дереве.
+ * Возвращает true, если цикл будет создан (т.е. targetUserId уже является предком newReferredById).
+ */
+const checkForCycle = async (tx: any, targetUserId: number, newReferredById: number): Promise<boolean> => {
+  if (newReferredById === null) return false;
+
+  // Используем BFS (поиск в ширину) для безопасного обхода дерева без риска переполнения стека
+  const queue: number[] = [newReferredById];
+  const visited = new Set<number>();
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()!;
+    
+    if (currentId === targetUserId) {
+      return true; // Цикл обнаружен!
+    }
+    if (visited.has(currentId)) continue;
+    visited.add(currentId);
+
+    // Находим всех прямых потомков текущего узла
+    const children = await tx.user.findMany({
+      where: { referredById: currentId },
+      select: { id: true }
+    });
+
+    for (const child of children) {
+      queue.push(child.id);
+    }
+  }
+
+  return false; // Циклов не найдено, изменение безопасно
+};
+
+// ==========================================
 // ПОЛЬЗОВАТЕЛИ
 // ==========================================
 
@@ -31,7 +68,7 @@ router.get('/users', requireAdmin, async (req: Request, res: Response) => {
       id: u.id,
       phone: u.phone,
       role: u.role,
-      isPaidMember: u.isPaidMember, // 👈 ДОБАВЛЕНО: теперь фронтенд увидит это поле
+      isPaidMember: u.isPaidMember,
       balance: u.wallet?.balance ?? 0,
       referralCount: u._count.referrals,
       createdAt: u.createdAt
@@ -64,7 +101,7 @@ router.get('/users/:id', requireAdmin, async (req: Request, res: Response) => {
         id: user.id,
         phone: user.phone,
         role: user.role,
-        isPaidMember: user.isPaidMember, // 👈 ДОБАВЛЕНО: для модального окна деталей
+        isPaidMember: user.isPaidMember,
         createdAt: user.createdAt,
         balance: user.wallet?.balance ?? 0,
         referredBy: user.referredBy,
@@ -99,17 +136,41 @@ router.post('/users/:id/wallet/adjust', requireAdmin, async (req: Request, res: 
       walletId = newWallet.id;
     }
 
+    // Пункт 14: Атомарная проверка gte при списании (если amount отрицательный)
+    const updateData: any = { balance: { increment: amount } };
+    if (amount < 0) {
+      updateData.balance = { increment: amount, gte: Math.abs(amount) };
+    }
+
     await prisma.$transaction(async (tx) => {
-      await tx.wallet.update({ where: { id: walletId }, data: { balance: { increment: amount } } });
+      const updatedWallet = await tx.wallet.update({ 
+        where: { id: walletId, ...(amount < 0 ? { balance: { gte: Math.abs(amount) } } : {}) }, 
+        data: { balance: { increment: amount } } 
+      });
+      
+      if (!updatedWallet && amount < 0) {
+        throw new Error('Недостаточно средств на балансе для списания');
+      }
+
       await tx.transaction.create({
-        data: { walletId, amount, type: type || 'MANUAL_ADJUSTMENT', description: description.trim(), referenceId: referenceId || null }
+        data: { 
+          walletId, 
+          amount, 
+          type: type || 'MANUAL_ADJUSTMENT', 
+          description: description.trim(), 
+          referenceId: referenceId || null,
+          status: 'AVAILABLE'
+        }
       });
     });
 
     console.log(`[ADMIN ACTION] Admin (ID: ${req.user?.userId}) adjusted wallet of user ${userId} by ${amount}.`);
     res.json({ success: true, message: 'Баланс успешно обновлен' });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Admin wallet adjust error:', err);
+    if (err.message === 'Недостаточно средств на балансе для списания') {
+      return res.status(400).json({ success: false, message: err.message });
+    }
     res.status(500).json({ success: false, message: 'Ошибка сервера при изменении баланса' });
   }
 });
@@ -123,7 +184,7 @@ router.put('/users/:id/role', requireAdmin, async (req: Request, res: Response) 
     const userId = Number(req.params.id);
     const { role } = req.body;
     const adminId = req.user!.userId;
-    const currentAdminRole = req.user!.role; // Получаем роль того, кто делает запрос
+    const currentAdminRole = req.user!.role;
 
     const validRoles = ['user', 'admin', 'controller', 'SUPER_ADMIN'];
     if (!validRoles.includes(role)) {
@@ -133,23 +194,14 @@ router.put('/users/:id/role', requireAdmin, async (req: Request, res: Response) 
     const targetUser = await prisma.user.findUnique({ where: { id: userId } });
     if (!targetUser) return res.status(404).json({ success: false, message: 'Пользователь не найден' });
 
-    // 🛡️ ЗАЩИТА 1: Никто (даже SUPER_ADMIN) не может изменить роль SUPER_ADMIN через API
     if (targetUser.role === 'SUPER_ADMIN') {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Роль SUPER_ADMIN не может быть изменена через интерфейс.' 
-      });
+      return res.status(403).json({ success: false, message: 'Роль SUPER_ADMIN не может быть изменена через интерфейс.' });
     }
 
-    // 🛡️ ЗАЩИТА 2: Обычный admin НЕ может менять роли других admin или SUPER_ADMIN
     if (currentAdminRole === 'admin' && (targetUser.role === 'admin' || targetUser.role === 'SUPER_ADMIN')) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Недостаточно прав для изменения роли этого пользователя.' 
-      });
+      return res.status(403).json({ success: false, message: 'Недостаточно прав для изменения роли этого пользователя.' });
     }
 
-    // 🛡️ ЗАЩИТА 3: Оставляем твою изначальную защиту корневого телефона (двойная защита не повредит)
     if (targetUser.phone === ROOT_PHONE) {
       return res.status(403).json({ success: false, message: 'Нельзя изменить роль корневого администратора' });
     }
@@ -159,7 +211,10 @@ router.put('/users/:id/role', requireAdmin, async (req: Request, res: Response) 
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: userId },
-        data: { role }
+        data: { 
+          role,
+          tokenVersion: { increment: 1 } // 👈 ПУНКТ 6: Отзыв всех текущих токенов пользователя при смене роли
+        }
       });
 
       await tx.treeAuditLog.create({
@@ -199,7 +254,10 @@ router.post('/users/:id/reset-password', requireAdmin, async (req: Request, res:
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: userId },
-        data: { passwordHash: newPasswordHash }
+        data: { 
+          passwordHash: newPasswordHash,
+          tokenVersion: { increment: 1 } // 👈 ПУНКТ 6: Отзыв всех текущих токенов пользователя при сбросе пароля
+        }
       });
 
       await tx.treeAuditLog.create({
@@ -248,6 +306,15 @@ router.post('/tree/move', requireAdmin, async (req: Request, res: Response) => {
     if (newReferredById !== null) {
       const newReferrer = await prisma.user.findUnique({ where: { id: newReferredById } });
       if (!newReferrer) return res.status(404).json({ success: false, message: 'Новый реферер не найден' });
+
+      // 👈 ПУНКТ 7: ПРОВЕРКА НА ЦИКЛИЧЕСКИЕ ССЫЛКИ
+      const willCreateCycle = await checkForCycle(prisma, targetUserId, newReferredById);
+      if (willCreateCycle) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Ошибка: нельзя переместить пользователя под его собственного потомка. Это создаст циклическую ссылку и сломает дерево.' 
+        });
+      }
     }
 
     const oldReferredById = targetUser.referredById;
@@ -272,9 +339,9 @@ router.post('/tree/move', requireAdmin, async (req: Request, res: Response) => {
     });
 
     res.json({ success: true, message: 'Реферер успешно изменен' });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Admin tree move error:', err);
-    res.status(500).json({ success: false, message: 'Ошибка сервера при изменении реферера' });
+    res.status(500).json({ success: false, message: err.message || 'Ошибка сервера при изменении реферера' });
   }
 });
 
@@ -362,6 +429,25 @@ router.post('/tree/import', requireAdmin, async (req: Request, res: Response) =>
 
     if (!Array.isArray(treeData)) {
       return res.status(400).json({ success: false, message: 'Неверный формат данных: ожидается массив' });
+    }
+
+    // 👈 ПУНКТ 7: Валидация импортируемого дерева на наличие циклов ДО записи в БД
+    const nodeMap = new Map<number, number | null>();
+    treeData.forEach(node => nodeMap.set(node.id, node.referredById));
+
+    for (const node of treeData) {
+      let current = node.id;
+      const visited = new Set<number>();
+      while (current !== null) {
+        if (visited.has(current)) {
+          return res.status(400).json({ 
+            success: false, 
+            message: `Ошибка валидации: обнаружена циклическая ссылка, затрагивающая пользователя ID ${current}. Импорт отменен.` 
+          });
+        }
+        visited.add(current);
+        current = nodeMap.get(current) ?? null;
+      }
     }
 
     const userIdsInDb = await prisma.user.findMany({ select: { id: true } });
