@@ -3,135 +3,93 @@ import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
+import { authenticateToken } from '../middleware/authenticateToken'; // 👈 Импортируем из middleware
 
 const router = Router();
 const prisma = new PrismaClient();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
-const JWT_EXPIRES_IN = '30d'; // PROJECT_PLAN п. 3.3
-const ROOT_PHONE = '+79503278027'; // PROJECT_PLAN п. 3.1
-const DEFAULT_PASSWORD = '1234'; // PROJECT_PLAN п. 3.1
+const JWT_EXPIRES_IN = '30d';
+const ROOT_PHONE = '+79503278027';
+const DEFAULT_PASSWORD = '1234';
 
 // ==========================================
-// RATE LIMITING (Пункт 8: Защита от брутфорса и спама)
+// RATE LIMITING (Пункт 8: Защита от брутфорса)
 // ==========================================
-
-// Лимитер для входа: макс. 5 попыток в минуту с одного IP
 const loginLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 минута
-  max: 5, // 5 попыток
+  windowMs: 1 * 60 * 1000,
+  max: 5,
   message: { success: false, message: 'Слишком много попыток входа. Пожалуйста, попробуйте снова через 1 минуту.' },
-  standardHeaders: true, // Возвращает информацию о лимите в заголовках RateLimit-*
-  legacyHeaders: false, // Отключает устаревшие заголовки X-RateLimit-*
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
-// Лимитер для регистрации: макс. 3 попытки в 15 минут с одного IP
 const registerLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 минут
-  max: 3, // 3 попытки
+  windowMs: 15 * 60 * 1000,
+  max: 3,
   message: { success: false, message: 'Слишком много попыток регистрации с этого IP. Попробуйте через 15 минут.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 // ==========================================
-// Утилита: нормализация телефона к +7XXXXXXXXXX
+// Утилита: нормализация телефона
 // ==========================================
 const normalizePhone = (raw: unknown): string | null => {
   if (typeof raw !== 'string') return null;
-
   let digits = raw.replace(/\D/g, '');
   if (digits.length === 0) return null;
-
   if (digits.startsWith('8')) digits = '7' + digits.slice(1);
   if (!digits.startsWith('7')) digits = '7' + digits;
-
   if (digits.length !== 11) return null;
   return '+' + digits;
 };
 
-const signToken = (user: { id: number; phone: string; role: string }) =>
-  jwt.sign({ userId: user.id, phone: user.phone, role: user.role }, JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN,
-  });
+// 👈 ДОБАВЛЕНО: tokenVersion в подпись токена (Пункт 6)
+const signToken = (user: { id: number; phone: string; role: string; tokenVersion: number }) =>
+  jwt.sign(
+    { userId: user.id, phone: user.phone, role: user.role, version: user.tokenVersion }, 
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
+  );
 
 // ==========================================
-// Middleware для проверки JWT-токена
-// ==========================================
-const authenticateToken = (req: any, res: Response, next: Function) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ success: false, message: 'Токен не предоставлен' });
-  }
-
-  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
-    if (err) {
-      return res.status(403).json({ success: false, message: 'Неверный или истекший токен' });
-    }
-    req.user = user;
-    next();
-  });
-};
-
-// ==========================================
-// 1. Регистрация (PROJECT_PLAN п. 3.4.А)
+// 1. Регистрация (Пункт 13: Защита от самоприглашения)
 // ==========================================
 router.post('/register', registerLimiter, async (req: Request, res: Response) => {
   try {
     const { phone, referred_by_phone } = req.body;
-    console.log('📩 Регистрация, входные данные:', { phone, referred_by_phone });
 
     const formattedPhone = normalizePhone(phone);
     if (!formattedPhone) {
-      return res.status(400).json({
-        success: false,
-        message: 'Некорректный номер телефона. Формат: +7XXXXXXXXXX',
-      });
+      return res.status(400).json({ success: false, message: 'Некорректный номер телефона. Формат: +7XXXXXXXXXX' });
     }
 
     if (formattedPhone === ROOT_PHONE) {
-      return res.status(400).json({
-        success: false,
-        message: 'Регистрация с этим номером невозможна',
-      });
+      return res.status(400).json({ success: false, message: 'Регистрация с этим номером невозможна' });
     }
 
     const existingUser = await prisma.user.findUnique({ where: { phone: formattedPhone } });
     if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: 'Пользователь с таким номером уже существует',
-      });
+      return res.status(400).json({ success: false, message: 'Пользователь с таким номером уже существует' });
     }
 
     const normalizedRef = normalizePhone(referred_by_phone);
     const referrerPhone = normalizedRef || ROOT_PHONE;
     const isFallbackToRoot = !normalizedRef;
 
-    console.log('🔍 Ищем пригласителя:', referrerPhone, isFallbackToRoot ? '(по умолчанию)' : '(указан пользователем)');
-
+    // 👈 ПУНКТ 13: Запрет самоприглашения
     if (referrerPhone === formattedPhone) {
-      return res.status(400).json({
-        success: false,
-        message: 'Нельзя указать свой собственный номер в качестве пригласителя',
-      });
+      return res.status(400).json({ success: false, message: 'Нельзя указать свой собственный номер в качестве пригласителя' });
     }
 
     const referrer = await prisma.user.findUnique({ where: { phone: referrerPhone } });
     if (!referrer) {
       if (isFallbackToRoot) {
-        console.error('❌ КРИТИЧНО: корневой пользователь не найден в БД:', ROOT_PHONE);
-        return res.status(500).json({
-          success: false,
-          message: 'Системная ошибка: корневой пользователь не найден. Обратитесь к администратору',
-        });
+        return res.status(500).json({ success: false, message: 'Системная ошибка: корневой пользователь не найден.' });
       }
       return res.status(400).json({ success: false, message: 'Пригласитель не найден' });
     }
-
-    console.log('✅ Пригласитель найден, ID:', referrer.id);
 
     const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
 
@@ -141,6 +99,7 @@ router.post('/register', registerLimiter, async (req: Request, res: Response) =>
           phone: formattedPhone,
           passwordHash,
           referredById: referrer.id,
+          // tokenVersion по умолчанию равен 1 (задано в schema.prisma)
         },
       });
 
@@ -173,12 +132,11 @@ router.post('/register', registerLimiter, async (req: Request, res: Response) =>
 });
 
 // ==========================================
-// 2. Вход в систему (PROJECT_PLAN п. 3.4.Б)
+// 2. Вход в систему
 // ==========================================
 router.post('/login', loginLimiter, async (req: Request, res: Response) => {
   try {
     const { phone, password } = req.body;
-
     const formattedPhone = normalizePhone(phone);
     const genericError = 'Неверный номер телефона или пароль';
 
@@ -211,7 +169,7 @@ router.post('/login', loginLimiter, async (req: Request, res: Response) => {
 });
 
 // ==========================================
-// 3. Смена пароля
+// 3. Смена пароля (Пункт 6: Инкремент tokenVersion)
 // ==========================================
 router.post('/change-password', authenticateToken, async (req: any, res: Response) => {
   try {
@@ -224,17 +182,11 @@ router.post('/change-password', authenticateToken, async (req: any, res: Respons
     }
 
     if (user.phone === ROOT_PHONE) {
-      return res.status(403).json({
-        success: false,
-        message: 'Смена пароля корневого пользователя через публичный API запрещена',
-      });
+      return res.status(403).json({ success: false, message: 'Смена пароля корневого пользователя через публичный API запрещена' });
     }
 
     if (typeof new_password !== 'string' || new_password.length < 4) {
-      return res.status(400).json({
-        success: false,
-        message: 'Новый пароль должен содержать не менее 4 символов',
-      });
+      return res.status(400).json({ success: false, message: 'Новый пароль должен содержать не менее 4 символов' });
     }
 
     if (current_password) {
@@ -246,12 +198,16 @@ router.post('/change-password', authenticateToken, async (req: any, res: Respons
 
     const newPasswordHash = await bcrypt.hash(new_password, 10);
 
+    // 👈 ПУНКТ 6: Увеличиваем версию токена, чтобы все старые сессии этого пользователя стали недействительными
     await prisma.user.update({
       where: { id: userId },
-      data: { passwordHash: newPasswordHash },
+      data: { 
+        passwordHash: newPasswordHash,
+        tokenVersion: { increment: 1 } 
+      },
     });
 
-    return res.json({ success: true, message: 'Пароль успешно изменен' });
+    return res.json({ success: true, message: 'Пароль успешно изменен. Вам потребуется войти в систему заново.' });
   } catch (error) {
     console.error('Ошибка смены пароля:', error);
     return res.status(500).json({ success: false, message: 'Ошибка сервера при смене пароля' });
@@ -259,7 +215,7 @@ router.post('/change-password', authenticateToken, async (req: any, res: Respons
 });
 
 // ==========================================
-// 4. Профиль текущего пользователя (PROJECT_PLAN п. 3.4.В)
+// 4. Профиль текущего пользователя
 // ==========================================
 router.get('/me', authenticateToken, async (req: any, res: Response) => {
   try {
@@ -273,14 +229,8 @@ router.get('/me', authenticateToken, async (req: any, res: Response) => {
         role: true,
         referralCount: true,
         createdAt: true,
-        wallet: {
-          select: {
-            balance: true,
-          },
-        },
-        referredBy: {
-          select: { id: true, phone: true },
-        },
+        wallet: { select: { balance: true } },
+        referredBy: { select: { id: true, phone: true } },
         referrals: {
           select: { id: true, phone: true, createdAt: true },
           orderBy: { createdAt: 'desc' },
@@ -294,10 +244,7 @@ router.get('/me', authenticateToken, async (req: any, res: Response) => {
 
     return res.json({
       success: true,
-      user: {
-        ...user,
-        registeredAt: user.createdAt,
-      },
+      user: { ...user, registeredAt: user.createdAt },
     });
   } catch (error) {
     console.error('Ошибка получения профиля:', error);
