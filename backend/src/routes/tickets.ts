@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient, TransactionStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { authenticateToken } from '../middleware/authenticateToken';
 import { randomUUID } from 'crypto';
 
@@ -10,7 +10,7 @@ const prisma = new PrismaClient();
 router.post('/', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const { eventId, bonusAmount = 0 } = req.body; // bonusAmount по умолчанию 0
+    const { eventId, bonusAmount = 0 } = req.body;
 
     if (!eventId) {
       return res.status(400).json({ success: false, message: 'eventId обязателен' });
@@ -30,14 +30,13 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: 'Сумма бонусов не может превышать стоимость билета' });
     }
 
-    // Пункт 5: Пропорциональный расчёт. База для бонуса реферера только реальные деньги.
+    // Пропорциональный расчёт. База для бонуса реферера — только реальные деньги.
     const realMoneyAmount = ticketPrice - bonusAmount;
     
     // Масштабируем бонус реферера пропорционально доле реальной оплаты
-    // (Если realMoneyAmount = 0, бонус тоже будет 0, что защищает от Infinite Money Glitch)
     const referrerBonusAmount = Math.round(event.referrerBonus * (realMoneyAmount / ticketPrice));
 
-    // 🛡️ АТОМАРНАЯ ТРАНЗАКЦИЯ (Пункт 9 и 14)
+    // АТОМАРНАЯ ТРАНЗАКЦИЯ
     const result = await prisma.$transaction(async (tx) => {
       // 1. Проверка на дубликат билета
       const existingTicket = await tx.ticket.findUnique({
@@ -53,12 +52,12 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
         wallet = await tx.wallet.create({ data: { userId, balance: 0 } });
       }
 
-      // 3. Атомарное списание бонусов с защитой от минуса (Пункт 14)
+      // 3. Атомарное списание бонусов с защитой от минуса (gte)
       if (bonusAmount > 0) {
         const updatedWallet = await tx.wallet.update({
           where: { 
             userId,
-            balance: { gte: bonusAmount } // 🔒 Ключевая проверка: обновляем ТОЛЬКО если баланс >= суммы списания
+            balance: { gte: bonusAmount } // Ключевая проверка: обновляем ТОЛЬКО если баланс >= суммы списания
           },
           data: { balance: { decrement: bonusAmount } }
         });
@@ -77,7 +76,7 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
             totalAmount: ticketPrice,
             paidWithBonuses: bonusAmount,
             realMoneyAmount: realMoneyAmount,
-            status: 'AVAILABLE' as TransactionStatus,
+            status: 'AVAILABLE',
             referenceId: `ticket_req_${eventId}`
           }
         });
@@ -109,7 +108,7 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
             data: { balance: { increment: referrerBonusAmount } }
           });
 
-          // Пункт 4: Механика "В ожидании". Разморозка через 14 дней после мероприятия.
+          // Механика "В ожидании". Разморозка через 14 дней после мероприятия.
           const unlockDate = new Date(event.eventDate);
           unlockDate.setDate(unlockDate.getDate() + 14);
 
@@ -122,7 +121,7 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
               totalAmount: ticketPrice,
               paidWithBonuses: bonusAmount,
               realMoneyAmount: realMoneyAmount,
-              status: 'PENDING' as TransactionStatus, // 🔒 Заморожено до наступления unlockDate
+              status: 'PENDING', // Заморожено до наступления unlockDate
               unlockDate: unlockDate,
               referenceId: ticket.id.toString()
             }
@@ -148,7 +147,6 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('Ticket purchase error:', err);
     
-    // Обрабатываем наши кастомные ошибки из транзакции
     if (err.message === 'У вас уже есть билет на это мероприятие' || 
         err.message === 'Недостаточно бонусов на балансе') {
       return res.status(400).json({ success: false, message: err.message });
