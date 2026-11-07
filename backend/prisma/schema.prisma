@@ -3,8 +3,22 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "sqlite" // ⚠️ На этапе масштабирования сменим на "postgresql" (Пункт 9)
   url      = env("DATABASE_URL")
+}
+
+// --- НОВЫЕ ENUMS ---
+enum TransactionStatus {
+  PENDING    // Бонусы начислены, но заморожены (ждут окончания срока возврата) (Пункт 4)
+  AVAILABLE  // Бонусы разморожены и доступны для списания
+  CANCELLED  // Билет возвращен/отменен, бонусы аннулированы
+}
+
+enum RcbStatus {
+  PENDING     // Запрос создан, ждет реакции реферера (Пункт 20)
+  APPROVED    // Реферер подтвердил статус (или подтвержден админом)
+  REJECTED    // Реферер отказался
+  ESCALATED   // Время вышло, запрос перенаправлен выше по дереву
 }
 
 model User {
@@ -12,11 +26,23 @@ model User {
   phone          String    @unique
   passwordHash   String
   role           String    @default("user") // "user", "admin", "controller", "system"
-  isPaidMember   Boolean   @default(false)  // 🆕 Статус платного участия
+  
+  // --- БЕЗОПАСНОСТЬ И ЗАЩИТА ---
+  tokenVersion   Int       @default(1) // Пункт 6: Отзыв JWT-токенов при смене пароля/роли
+  isSuspicious   Boolean   @default(false) // Пункт 13: Защита от накрутки (Sybil-атаки)
+
+  // --- ИНТЕГРАЦИЯ С РЦБ ---
+  rcbId             String?   // Пункт 19: ID или код из РЦБ (например, "XFXMPGZY")
+  isRcbPaid         Boolean   @default(false) // Пункт 19: Флаг платного партнера (подтверждается админом)
+  rcbReferralLink   String?   // Пункт 19: Ссылка для механики "умного мостика"
+
+  isPaidMember   Boolean   @default(false)  // Статус платного участия в RefPro
   referralCount  Int       @default(0)
+  
   referredById   Int?
   referredBy     User?     @relation("UserReferrals", fields: [referredById], references: [id])
   referrals      User[]    @relation("UserReferrals")
+  
   wallet         Wallet?
   auditLogsAsAdmin   TreeAuditLog[] @relation("AuditAdmin")
   auditLogsAsTarget  TreeAuditLog[] @relation("AuditTarget")
@@ -24,6 +50,10 @@ model User {
   tickets            Ticket[]            @relation("TicketOwner")
   scannedTickets     Ticket[]            @relation("ScannerUser")
   eventsAsController EventController[]
+
+  // --- СВЯЗИ ДЛЯ РЦБ ЗАПРОСОВ ---
+  rcbRequestsSent     RcbRequest[] @relation("RcbRequestSender")
+  rcbRequestsReceived RcbRequest[] @relation("RcbRequestReceiver")
   
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -38,14 +68,30 @@ model Wallet {
 }
 
 model Transaction {
-  id          String   @id @default(uuid())
-  walletId    Int
-  amount      Int
-  type        String   // "CASHBACK_TICKET", "REFERRAL_BONUS", "MANUAL_ADJUSTMENT", "RESERVE_FUND"
-  description String
-  referenceId String?
-  createdAt   DateTime @default(now())
-  wallet      Wallet   @relation(fields: [walletId], references: [id])
+  id               String            @id @default(uuid())
+  walletId         Int
+  
+  // Фактическая сумма изменения баланса (положительная для начисления, отрицательная для списания)
+  amount           Int               
+  
+  // --- ПРОПОРЦИОНАЛЬНЫЙ РАСЧЕТ (Задача 1 / Пункт 5) ---
+  totalAmount      Int               @default(0) // Общая стоимость билета/услуги
+  paidWithBonuses  Int               @default(0) // Сколько списано бонусов
+  realMoneyAmount  Int               @default(0) // Сколько оплачено реальными деньгами (база для бонуса рефереру)
+  
+  type             String            // "TICKET_PURCHASE", "REFERRAL_BONUS", "MANUAL_ADJUSTMENT", "RESERVE_FUND" и т.д.
+  description      String
+  
+  // --- МЕХАНИКА "В ОЖИДАНИИ" (Пункт 4) ---
+  status           TransactionStatus @default(AVAILABLE)
+  unlockDate       DateTime?         // Дата, когда PENDING превратится в AVAILABLE
+  
+  referenceId      String?           // ID связанного билета или операции
+  createdAt        DateTime          @default(now())
+  wallet           Wallet            @relation(fields: [walletId], references: [id])
+  
+  @@index([status])
+  @@index([unlockDate])
 }
 
 model TreeAuditLog {
@@ -54,7 +100,7 @@ model TreeAuditLog {
   admin         User     @relation("AuditAdmin", fields: [adminId], references: [id])
   targetUserId  Int?
   targetUser    User?    @relation("AuditTarget", fields: [targetUserId], references: [id])
-  action        String   // "MOVE", "IMPORT", "ROLE_CHANGE", "PASSWORD_RESET", "MEMBERSHIP_TOGGLE"
+  action        String   // "MOVE", "IMPORT", "ROLE_CHANGE", "PASSWORD_RESET", "MEMBERSHIP_TOGGLE", "RCB_VERIFY"
   oldData       String?
   newData       String?
   createdAt     DateTime @default(now())
@@ -66,8 +112,9 @@ model Event {
   description    String?
   location       String?
   eventDate      DateTime
+  price          Int       @default(1000) // 👈 ДОБАВЛЕНО: Стоимость билета в рублях
   cashbackAmount Int       @default(50)
-  referrerBonus  Int       @default(100)
+  referrerBonus  Int       @default(100)  // Максимальный бонус рефереру при 100% оплате деньгами
   isActive       Boolean   @default(true)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -81,7 +128,7 @@ model Ticket {
   userId      Int
   eventId     Int
   qrCode      String    @unique
-  status      String    @default("ACTIVE")
+  status      String    @default("ACTIVE") // "ACTIVE", "USED", "CANCELLED" (Пункт 10)
   scannedAt   DateTime?
   scannedById Int?
   createdAt   DateTime  @default(now())
@@ -106,4 +153,23 @@ model EventController {
   user      User      @relation(fields: [userId], references: [id])
   
   @@unique([eventId, userId])
+}
+
+// --- НОВАЯ МОДЕЛЬ ДЛЯ ЗАПРОСОВ РЦБ (Пункт 20) ---
+model RcbRequest {
+  id              String      @id @default(uuid())
+  userId          Int         // Тот, кто хочет стать партнером (нажимает кнопку)
+  referredById    Int         // Тот, кто должен подтвердить статус, чтобы не потерять ветку
+  
+  status          RcbStatus   @default(PENDING)
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  user            User        @relation("RcbRequestSender", fields: [userId], references: [id])
+  referredBy      User        @relation("RcbRequestReceiver", fields: [referredById], references: [id])
+
+  @@index([userId])
+  @@index([referredById])
+  @@index([status])
 }
