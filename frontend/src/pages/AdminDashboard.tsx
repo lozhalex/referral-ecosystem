@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { apiClient } from '../api/client'; // 👈 ЗАМЕНЕНО: используем наш настроенный клиент
 
 interface User {
   id: number;
@@ -8,7 +8,7 @@ interface User {
   role: string;
   balance: number;
   referralCount: number;
-  isPaidMember: boolean; // 👈 ДОБАВЛЕНО
+  isPaidMember: boolean;
   createdAt: string;
 }
 
@@ -75,7 +75,8 @@ export default function AdminDashboard() {
   const loadUsers = async (phone?: string) => {
     setLoading(true); setError('');
     try {
-      const response = await axios.get('/api/admin/users', { headers: { Authorization: `Bearer ${token}` }, params: phone ? { phone } : undefined });
+      // 👈 Убраны ручные заголовки, apiClient добавит токен и CSRF-заголовок сам
+      const response = await apiClient.get('/api/admin/users', { params: phone ? { phone } : undefined });
       setUsers(response.data.users);
     } catch (err: any) { setError(err.response?.data?.message || 'Ошибка загрузки пользователей'); }
     finally { setLoading(false); }
@@ -84,7 +85,7 @@ export default function AdminDashboard() {
   const loadLogs = async () => {
     setLogsLoading(true); setError('');
     try {
-      const response = await axios.get('/api/admin/tree/logs', { headers: { Authorization: `Bearer ${token}` } });
+      const response = await apiClient.get('/api/admin/tree/logs');
       setLogs(response.data.logs);
     } catch (err: any) { setError(err.response?.data?.message || 'Ошибка загрузки логов'); }
     finally { setLogsLoading(false); }
@@ -92,7 +93,7 @@ export default function AdminDashboard() {
 
   const loadAlerts = async () => {
     try {
-      const response = await axios.get('/api/admin/alerts/balance', { headers: { Authorization: `Bearer ${token}` } });
+      const response = await apiClient.get('/api/admin/alerts/balance');
       if (response.data.success) setAlerts(response.data.alerts);
     } catch (err) { console.error('Failed to load alerts', err); }
   };
@@ -101,7 +102,7 @@ export default function AdminDashboard() {
 
   const loadUserDetail = async (userId: number) => {
     try {
-      const response = await axios.get(`/api/admin/users/${userId}`, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await apiClient.get(`/api/admin/users/${userId}`);
       setSelectedUser(response.data.user);
     } catch (err: any) { setError(err.response?.data?.message || 'Ошибка загрузки деталей'); }
   };
@@ -115,7 +116,11 @@ export default function AdminDashboard() {
 
     setAdjustLoading(true);
     try {
-      await axios.post(`/api/admin/users/${selectedUser.id}/wallet/adjust`, { amount: numAmount, type: adjustForm.type, description: adjustForm.description.trim() }, { headers: { Authorization: `Bearer ${token}` } });
+      await apiClient.post(`/api/admin/users/${selectedUser.id}/wallet/adjust`, { 
+        amount: numAmount, 
+        type: adjustForm.type, 
+        description: adjustForm.description.trim() 
+      });
       alert('Баланс успешно обновлен!');
       setShowAdjustModal(false);
       setAdjustForm({ amount: '', type: 'MANUAL_ADJUSTMENT', description: '' });
@@ -131,7 +136,7 @@ export default function AdminDashboard() {
     const newRefId = moveForm.newReferredId === '' ? null : Number(moveForm.newReferredId);
     setMoveLoading(true);
     try {
-      await axios.post('/api/admin/tree/move', { targetUserId: selectedUser.id, newReferredById: newRefId }, { headers: { Authorization: `Bearer ${token}` } });
+      await apiClient.post('/api/admin/tree/move', { targetUserId: selectedUser.id, newReferredById: newRefId });
       alert('Реферер успешно изменен!');
       setShowMoveModal(false); setMoveForm({ newReferredId: '' });
       await loadUserDetail(selectedUser.id);
@@ -144,7 +149,8 @@ export default function AdminDashboard() {
     if (!selectedUser) return;
     setRoleLoading(true);
     try {
-      await axios.put(`/api/admin/users/${selectedUser.id}/role`, { role: roleForm.role }, { headers: { Authorization: `Bearer ${token}` } });
+      // 👈 ИМЕННО ЭТОТ ЗАПРОС ТЕПЕРЬ БУДЕТ РАБОТАТЬ, так как apiClient добавит x-requested-with
+      await apiClient.put(`/api/admin/users/${selectedUser.id}/role`, { role: roleForm.role });
       alert(`Роль успешно изменена на ${roleForm.role}!`);
       setShowRoleModal(false);
       await loadUserDetail(selectedUser.id);
@@ -158,14 +164,13 @@ export default function AdminDashboard() {
     if (!window.confirm(`Вы уверены, что хотите сбросить пароль для ${selectedUser.phone}?`)) return;
     setResetLoading(true);
     try {
-      const response = await axios.post(`/api/admin/users/${selectedUser.id}/reset-password`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await apiClient.post(`/api/admin/users/${selectedUser.id}/reset-password`, {});
       setGeneratedPassword(response.data.newPassword);
       setShowResetModal(true);
     } catch (err: any) { alert(err.response?.data?.message || 'Ошибка при сбросе пароля'); }
     finally { setResetLoading(false); }
   };
 
-  // 🆕 Обработчик переключения статуса платного участия
   const handleToggleMembership = async () => {
     if (!selectedUser) return;
     
@@ -177,12 +182,12 @@ export default function AdminDashboard() {
     if (!window.confirm(confirmMessage)) return;
 
     try {
-      const response = await axios.post(`/api/admin/membership/${selectedUser.id}/toggle`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await apiClient.post(`/api/admin/membership/${selectedUser.id}/toggle`, {});
       if (response.data.success) {
         alert(response.data.message);
         await loadUserDetail(selectedUser.id);
         loadUsers();
-        loadLogs(); // Обновляем логи, так как туда добавилась запись
+        loadLogs();
       }
     } catch (err: any) {
       alert(err.response?.data?.message || 'Ошибка при смене статуса участия');
@@ -191,7 +196,7 @@ export default function AdminDashboard() {
 
   const handleExportLogs = async () => {
     try {
-      const response = await axios.get('/api/admin/tree/logs/export', { headers: { Authorization: `Bearer ${token}` }, responseType: 'blob' });
+      const response = await apiClient.get('/api/admin/tree/logs/export', { responseType: 'blob' });
       if (response.data.type === 'application/json') {
         const text = await response.data.text();
         const errorJson = JSON.parse(text);
@@ -210,7 +215,7 @@ export default function AdminDashboard() {
 
   const handleExportTree = async () => {
     try {
-      const response = await axios.get('/api/admin/tree/export', { headers: { Authorization: `Bearer ${token}` }, responseType: 'blob' });
+      const response = await apiClient.get('/api/admin/tree/export', { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -232,7 +237,7 @@ export default function AdminDashboard() {
     try {
       const text = await file.text();
       const jsonData = JSON.parse(text);
-      const response = await axios.post('/api/admin/tree/import', jsonData, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
+      const response = await apiClient.post('/api/admin/tree/import', jsonData);
       alert(response.data.message || 'Дерево успешно восстановлено!');
       setShowImportModal(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -250,7 +255,6 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-                {/* 🚨 БЛОК ПРЕДУПРЕЖДЕНИЙ БЕЗОПАСНОСТИ */}
         {alerts && (alerts.largeAdjustments.length > 0 || alerts.frequentChanges.length > 0) && (
           <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg shadow-sm">
             <div className="flex items-start justify-between">
@@ -262,8 +266,6 @@ export default function AdminDashboard() {
                 </div>
                 <div className="flex-1">
                   <h3 className="text-sm font-bold text-red-800 mb-2">⚠️ Обнаружены подозрительные операции с балансом</h3>
-                  
-                  {/* Крупные изменения */}
                   {alerts.largeAdjustments.length > 0 && (
                     <div className="mb-2">
                       <p className="text-sm font-semibold text-red-700 mb-1">💰 Крупные ручные изменения (&gt;5000₽):</p>
@@ -279,8 +281,6 @@ export default function AdminDashboard() {
                       </ul>
                     </div>
                   )}
-                  
-                  {/* Частые изменения */}
                   {alerts.frequentChanges.length > 0 && (
                     <div>
                       <p className="text-sm font-semibold text-red-700 mb-1">🔄 Частые изменения (&gt;3 раз за 24ч):</p>
@@ -295,12 +295,9 @@ export default function AdminDashboard() {
                   )}
                 </div>
               </div>
-              
-              {/* Кнопка "Разобрался" */}
               <button
                 onClick={() => setAlerts(null)}
                 className="ml-4 px-3 py-1 bg-red-200 text-red-800 text-xs font-semibold rounded hover:bg-red-300 transition"
-                title="Скрыть предупреждение (оно появится снова при новых подозрительных операциях)"
               >
                 Разобрался ✓
               </button>
@@ -435,7 +432,6 @@ export default function AdminDashboard() {
                     <button onClick={() => setShowMoveModal(true)} className="py-2 px-4 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition font-medium flex items-center justify-center gap-2">🔄 Реферер</button>
                     <button onClick={() => { setRoleForm({ role: selectedUser.role }); setShowRoleModal(true); }} className="py-2 px-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium flex items-center justify-center gap-2">🛡️ Роль</button>
                     <button onClick={handleResetPassword} disabled={resetLoading} className="py-2 px-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium flex items-center justify-center gap-2 disabled:opacity-50">{resetLoading ? 'Сброс...' : '🔑 Сброс пароля'}</button>
-                    {/* 🆕 Кнопка переключения статуса */}
                     <button 
                       onClick={handleToggleMembership} 
                       className={`py-2 px-4 rounded-lg transition font-medium flex items-center justify-center gap-2 col-span-2 ${
