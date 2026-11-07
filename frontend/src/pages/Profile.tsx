@@ -11,7 +11,14 @@ const Profile: React.FC = () => {
   // Состояния для модальных окон
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showRcbModal, setShowRcbModal] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Состояния для формы РЦБ
+  const [rcbId, setRcbId] = useState('');
+  const [rcbLink, setRcbLink] = useState('');
+  const [rcbLoading, setRcbLoading] = useState(false);
+  const [rcbMessage, setRcbMessage] = useState('');
 
   useEffect(() => {
     loadProfile();
@@ -50,7 +57,6 @@ const Profile: React.FC = () => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      // Фолбэк для старых браузеров
       const textArea = document.createElement('textarea');
       textArea.value = getReferralLink();
       document.body.appendChild(textArea);
@@ -74,10 +80,40 @@ const Profile: React.FC = () => {
       try {
         await navigator.share(shareData);
       } catch (err) {
-        // Пользователь отменил шеринг — ничего не делаем
+        // Пользователь отменил шеринг
       }
     } else {
       await handleCopyLink();
+    }
+  };
+
+  // 🌉 Логика отправки запроса на партнерство РЦБ
+  const handleRcbSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRcbLoading(true);
+    setRcbMessage('');
+
+    try {
+      const response = await apiClient.post('/api/admin/membership/rcb-request', {
+        rcbId: rcbId.trim(),
+        rcbReferralLink: rcbLink.trim()
+      });
+
+      if (response.data.success) {
+        setRcbMessage(response.data.message);
+        setRcbId('');
+        setRcbLink('');
+        // Перезагружаем профиль, чтобы обновить статус (если бэкенд сразу что-то меняет)
+        setTimeout(() => {
+          setShowRcbModal(false);
+          setRcbMessage('');
+          loadProfile();
+        }, 2500);
+      }
+    } catch (err: any) {
+      setRcbMessage(err.response?.data?.message || 'Ошибка при отправке заявки');
+    } finally {
+      setRcbLoading(false);
     }
   };
 
@@ -121,7 +157,6 @@ const Profile: React.FC = () => {
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-md relative">
         
-        {/* Кнопка "На главную" */}
         <button
           onClick={() => navigate('/')}
           className="mb-4 flex items-center gap-1 text-sm text-gray-600 hover:text-blue-600 transition font-medium"
@@ -129,7 +164,6 @@ const Profile: React.FC = () => {
           ← На главную
         </button>
 
-        {/* Шапка профиля */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg">
@@ -147,56 +181,80 @@ const Profile: React.FC = () => {
           </span>
         </div>
 
-        {/* Номер телефона */}
         <div className="bg-gray-50 rounded-lg p-4 mb-4">
           <p className="text-xs text-gray-500 mb-1">Ваш номер телефона</p>
           <p className="text-lg font-semibold text-gray-800">{user.phone}</p>
         </div>
 
-        {/* Баланс баллов */}
         <div className="bg-green-50 border border-green-100 rounded-lg p-4 mb-4">
           <p className="text-sm text-green-600 mb-1">Ваш баланс</p>
           <p className="text-3xl font-bold text-green-700">{user.wallet?.balance || 0} ₽</p>
         </div>
         
-        {/* Статистика рефералов */}
         <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-4">
           <p className="text-sm text-blue-600 mb-1">Всего приглашено</p>
           <p className="text-3xl font-bold text-blue-700">{user.referralCount || 0}</p>
         </div>
 
-        {/* Блок "Мои проекты" */}
-<div className="mb-4">
-  <h2 className="text-sm font-semibold text-gray-700 mb-2">Мои проекты</h2>
-  <div className="space-y-2">
-    <div 
-      onClick={() => navigate('/auto')}
-      className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3 cursor-pointer hover:bg-green-100 transition"
-    >
-      <div className="flex items-center gap-2">
-        <span className="text-xl">🚗</span>
-        <span className="text-sm font-medium text-gray-800">Помощник автомобилиста</span>
-      </div>
-      <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full">
-        ✅ Доступен
-      </span>
-    </div>
-    <div 
-      onClick={() => navigate('/events')}
-      className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3 cursor-pointer hover:bg-green-100 transition"
-    >
-      <div className="flex items-center gap-2">
-        <span className="text-xl">🎟️</span>
-        <span className="text-sm font-medium text-gray-800">Билеты на мероприятия</span>
-      </div>
-      <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full">
-        ✅ Доступен
-      </span>
-    </div>
-  </div>
-</div>
+        {/* 🌉 НОВЫЙ БЛОК: Статус партнерства РЦБ */}
+        <div className={`rounded-lg p-4 mb-4 border ${user.isRcbPaid ? 'bg-green-50 border-green-200' : 'bg-purple-50 border-purple-200'}`}>
+          <div className="flex items-center justify-between mb-2">
+            <p className={`text-sm font-semibold ${user.isRcbPaid ? 'text-green-700' : 'text-purple-700'}`}>
+              Статус в РЦБ
+            </p>
+            {user.isRcbPaid ? (
+              <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full">✅ Подтвержден</span>
+            ) : (
+              <span className="text-xs bg-gray-400 text-white px-2 py-0.5 rounded-full">❌ Не подтвержден</span>
+            )}
+          </div>
+          
+          {user.isRcbPaid ? (
+            <div>
+              <p className="text-xs text-gray-600 mb-1">Ваш ID в системе:</p>
+              <p className="text-sm font-mono font-bold text-gray-800">{user.rcbId || 'Не указан'}</p>
+            </div>
+          ) : (
+            <div>
+              <p className="text-xs text-gray-600 mb-3">
+                Получите доступ к экосистеме, скидкам на СТО и бонусам за рефералов.
+              </p>
+              <button
+                onClick={() => setShowRcbModal(true)}
+                className="w-full py-2 px-4 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition text-sm flex items-center justify-center gap-2"
+              >
+                <span>🚀</span> Стать партнером РЦБ
+              </button>
+            </div>
+          )}
+        </div>
 
-        {/* Мои рефералы (краткий список) */}
+        <div className="mb-4">
+          <h2 className="text-sm font-semibold text-gray-700 mb-2">Мои проекты</h2>
+          <div className="space-y-2">
+            <div 
+              onClick={() => navigate('/auto')}
+              className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3 cursor-pointer hover:bg-green-100 transition"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🚗</span>
+                <span className="text-sm font-medium text-gray-800">Помощник автомобилиста</span>
+              </div>
+              <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full">✅ Доступен</span>
+            </div>
+            <div 
+              onClick={() => navigate('/events')}
+              className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3 cursor-pointer hover:bg-green-100 transition"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🎟️</span>
+                <span className="text-sm font-medium text-gray-800">Билеты на мероприятия</span>
+              </div>
+              <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full">✅ Доступен</span>
+            </div>
+          </div>
+        </div>
+
         <div className="mb-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-2">Мои рефералы</h2>
           {user.referrals && user.referrals.length > 0 ? (
@@ -213,7 +271,6 @@ const Profile: React.FC = () => {
           )}
         </div>
 
-        {/* Кнопки действий */}
         <div className="space-y-2">
           <button
             onClick={() => setShowInviteModal(true)}
@@ -246,7 +303,6 @@ const Profile: React.FC = () => {
           </button>
         </div>
 
-        {/* Toast-уведомление "Скопировано!" */}
         {copied && (
           <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg text-sm z-50 animate-fade-in">
             ✅ Ссылка скопирована!
@@ -261,38 +317,88 @@ const Profile: React.FC = () => {
               <p className="text-sm text-gray-600 mb-4">
                 Отправьте эту ссылку другу. Когда он зарегистрируется, он станет вашим рефералом.
               </p>
-
               <div className="bg-gray-100 rounded-lg p-3 mb-4 break-all text-sm text-gray-700 font-mono">
                 {getReferralLink()}
               </div>
-
               <div className="space-y-2">
                 <button
                   onClick={handleCopyLink}
-                  className={`w-full py-2 px-4 rounded-lg font-medium transition ${
-                    copied ? 'bg-green-500 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'
-                  }`}
+                  className={`w-full py-2 px-4 rounded-lg font-medium transition ${copied ? 'bg-green-500 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
                 >
                   {copied ? '✅ Скопировано!' : '📋 Скопировать ссылку'}
                 </button>
-
                 <button
                   onClick={handleShare}
                   className="w-full py-2 px-4 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition"
                 >
                   📤 Поделиться
                 </button>
-
                 <button
-                  onClick={() => {
-                    setShowInviteModal(false);
-                    setCopied(false);
-                  }}
+                  onClick={() => { setShowInviteModal(false); setCopied(false); }}
                   className="w-full py-2 px-4 text-gray-500 text-sm hover:text-gray-700 transition"
                 >
                   Закрыть
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* 🌉 НОВОЕ Модальное окно "Стать партнером РЦБ" */}
+        {showRcbModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">Стать партнером РЦБ</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Введите ваш ID и реферальную ссылку из приложения РЦБ для верификации администратором.
+              </p>
+              
+              {rcbMessage && (
+                <div className={`p-3 rounded-lg text-sm mb-4 ${rcbMessage.includes('Ошибка') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>
+                  {rcbMessage}
+                </div>
+              )}
+
+              <form onSubmit={handleRcbSubmit} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Ваш ID в РЦБ</label>
+                  <input
+                    type="text"
+                    required
+                    value={rcbId}
+                    onChange={(e) => setRcbId(e.target.value)}
+                    placeholder="Например: XFXMPGZY"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Реферальная ссылка</label>
+                  <input
+                    type="url"
+                    required
+                    value={rcbLink}
+                    onChange={(e) => setRcbLink(e.target.value)}
+                    placeholder="https://rcpay.ru/r/..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                  />
+                </div>
+                <div className="pt-2 space-y-2">
+                  <button
+                    type="submit"
+                    disabled={rcbLoading}
+                    className="w-full py-2.5 px-4 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {rcbLoading ? 'Отправка...' : 'Отправить заявку'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowRcbModal(false); setRcbMessage(''); setRcbId(''); setRcbLink(''); }}
+                    className="w-full py-2 px-4 text-gray-500 text-sm hover:text-gray-700 transition"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
