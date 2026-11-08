@@ -63,7 +63,7 @@ router.post('/rcb-request', authenticateToken, async (req: any, res: Response) =
       await tx.rcbRequest.create({
         data: {
           userId: userId,
-          referredById: (targetReferrerId ?? user.referredById) ?? undefined,
+          referredById: targetReferrerId ?? user.referredById ?? null,
           status: 'PENDING'
         }
       });

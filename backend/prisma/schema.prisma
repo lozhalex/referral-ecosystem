@@ -150,7 +150,7 @@ model EventController {
 model RcbRequest {
   id              String   @id @default(uuid())
   userId          Int      
-  referredById    Int      
+  referredById    Int?     // <-- Стало необязательным (Int?)
   
   // Допустимые значения: "PENDING", "APPROVED", "REJECTED", "ESCALATED"
   status          String   @default("PENDING")
@@ -159,7 +159,7 @@ model RcbRequest {
   updatedAt       DateTime @updatedAt
 
   user            User     @relation("RcbRequestSender", fields: [userId], references: [id])
-  referredBy      User     @relation("RcbRequestReceiver", fields: [referredById], references: [id])
+  referredBy      User?    @relation("RcbRequestReceiver", fields: [referredById], references: [id])
 
   @@index([userId])
   @@index([referredById])
