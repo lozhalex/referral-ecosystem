@@ -336,4 +336,66 @@ router.post('/settings', async (req: any, res: Response) => {
   }
 });
 
+// ==========================================
+// 7. УВЕДОМЛЕНИЯ (Notifications)
+// ==========================================
+
+router.get('/notifications', async (req: any, res: Response) => {
+  try {
+    const notifications = [];
+    
+    // 1. Проверка не введенного пробега
+    const mileageStatus = await prisma.mileageCheck.findMany({
+      where: { 
+        userId: req.user.userId,
+        yearMonth: {
+          gte: new Date().getFullYear() + String(new Date().getMonth() + 1).padStart(2, '0')
+        }
+      }
+    });
+
+    const cars = await prisma.car.findMany({
+      where: { userId: req.user.userId, isDeleted: false }
+    });
+
+    const currentMonth = new Date().getFullYear() * 100 + (new Date().getMonth() + 1);
+    const carsWithoutMileage = cars.filter(car => {
+      const check = mileageStatus.find(m => m.carId === car.id && Math.floor(m.yearMonth / 100) * 100 + (m.yearMonth % 100) === currentMonth);
+      return !check;
+    });
+
+    if (carsWithoutMileage.length > 0) {
+      notifications.push({
+        type: 'mileage',
+        message: `Не введен пробег за ${new Date().toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}`,
+        count: carsWithoutMileage.length,
+        carNames: carsWithoutMileage.map(c => `${c.marka} ${c.model}`).join(', ')
+      });
+    }
+
+    // 2. Проверка восстановленных авто (можно добавить позже)
+    // const restoredCars = await prisma.carRestoreRequest.findMany(...)
+
+    res.json({ 
+      success: true, 
+      notifications,
+      totalCount: notifications.reduce((sum, n) => sum + (n.count || 1), 0)
+    });
+  } catch (err) {
+    console.error('Auto notifications error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
+// Отметить уведомления как прочитанные
+router.post('/notifications/read', async (req: any, res: Response) => {
+  try {
+    // Здесь можно логировать факт прочтения
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Auto notifications read error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
 export default router;

@@ -4,7 +4,6 @@ import ProjectCard from '../components/ProjectCard';
 import { projects } from '../data/projects';
 import { apiClient } from '../api/client';
 
-// Функция для правильного склонения слова "человек"
 const getUserCountText = (count: number) => {
   const lastTwo = count % 100;
   const lastOne = count % 10;
@@ -17,6 +16,7 @@ const getUserCountText = (count: number) => {
 export default function Home() {
   const [showAll, setShowAll] = useState(false);
   const [userCount, setUserCount] = useState<number | null>(null);
+  const [autoNotifications, setAutoNotifications] = useState<number>(0);
 
   const token = localStorage.getItem('token');
   const user = token ? JSON.parse(atob(token.split('.')[1])) : null;
@@ -34,22 +34,49 @@ export default function Home() {
           setUserCount(res.data.count);
         }
       })
-      .catch(() => setUserCount(1247)); // Фолбэк, если сервер недоступен
+      .catch(() => setUserCount(1247));
   }, []);
 
-  // Разделяем проекты по статусам
+  // Загрузка уведомлений Автохелпера
+  useEffect(() => {
+    apiClient.get('/api/auto/notifications')
+      .then((res) => {
+        if (res.data.success) {
+          setAutoNotifications(res.data.totalCount || 0);
+        }
+      })
+      .catch(() => setAutoNotifications(0));
+  }, []);
+
   const available = projects.filter(p => p.status === 'available');
   const development = projects.filter(p => p.status === 'development');
   const planned = projects.filter(p => p.status === 'planned');
 
   const hiddenCount = planned.length;
 
+  // Функция для рендера карточки проекта с бейджем
+  const renderProjectCard = (p: any) => {
+    const hasNotification = p.id === 'auto' && autoNotifications > 0;
+    
+    return (
+      <div key={p.id} className="relative">
+        <ProjectCard project={p} isAuthorized={!!user} />
+        {hasNotification && (
+          <div className="absolute -top-2 -right-2 z-10">
+            <div className="bg-red-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse">
+              {autoNotifications > 9 ? '9+' : autoNotifications}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header user={user} onLogout={handleLogout} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Hero-секция */}
         <section className="text-center mb-10">
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">
             Добро пожаловать в экосистему!
@@ -59,7 +86,6 @@ export default function Home() {
           </p>
         </section>
 
-        {/* Счётчик пользователей (реальный) */}
         <section className="text-center mb-8">
           <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-full px-5 py-2">
             <span className="text-blue-600 font-semibold">
@@ -72,7 +98,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Доступны сейчас */}
         {available.length > 0 && (
           <section className="mb-10">
             <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -80,14 +105,11 @@ export default function Home() {
               Доступны сейчас
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {available.map(p => (
-                <ProjectCard key={p.id} project={p} isAuthorized={!!user} />
-              ))}
+              {available.map(renderProjectCard)}
             </div>
           </section>
         )}
 
-        {/* В разработке */}
         {development.length > 0 && (
           <section className="mb-10">
             <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -95,14 +117,11 @@ export default function Home() {
               В разработке
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {development.map(p => (
-                <ProjectCard key={p.id} project={p} isAuthorized={!!user} />
-              ))}
+              {development.map(renderProjectCard)}
             </div>
           </section>
         )}
 
-        {/* Кнопка "Показать ещё" */}
         {!showAll && hiddenCount > 0 && (
           <section className="text-center mb-10">
             <button
@@ -114,7 +133,6 @@ export default function Home() {
           </section>
         )}
 
-        {/* В планах (скрыты по умолчанию) */}
         {showAll && planned.length > 0 && (
           <section className="mb-10">
             <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -122,14 +140,11 @@ export default function Home() {
               В планах
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {planned.map(p => (
-                <ProjectCard key={p.id} project={p} isAuthorized={!!user} />
-              ))}
+              {planned.map(renderProjectCard)}
             </div>
           </section>
         )}
 
-        {/* Секция "Как это работает" */}
         <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sm:p-8 mb-10">
           <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">
             Как работает экосистема
@@ -165,7 +180,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Футер */}
         <footer className="text-center text-sm text-gray-500 pb-8">
           <p>© 2026 Краски жизни · Один аккаунт — все сервисы</p>
         </footer>
