@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getDashboard, getCars } from '../../api/auto';
-import { CATEGORIES, getCategoryName } from './categories';
+import { getCategoryName } from './categories';
 
 interface DashboardProps {
   selectedCarId: number | null;
