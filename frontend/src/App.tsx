@@ -9,7 +9,8 @@ import ProjectStub from './pages/ProjectStub';
 import Events from './pages/Events';
 import Tickets from './pages/Tickets';
 import Scanner from './pages/Scanner';
-import AdminEvents from './pages/AdminEvents'; // 👈 ДОБАВЛЕНО
+import AdminEvents from './pages/AdminEvents';
+import AutoHelper from './pages/AutoHelper'; // 👈 ДОБАВЛЕНО: Импорт модуля Автохелпера
 
 function App() {
   return (
@@ -21,15 +22,17 @@ function App() {
         <Route path="/profile" element={<Profile />} />
         <Route path="/change-password" element={<ChangePassword />} />
         <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/admin/events" element={<AdminEvents />} /> {/* 👈 ДОБАВЛЕНО */}
+        <Route path="/admin/events" element={<AdminEvents />} />
         
         {/* Проект "Билеты" */}
         <Route path="/events" element={<Events />} />
         <Route path="/tickets" element={<Tickets />} />
         <Route path="/scanner" element={<Scanner />} />
         
+        {/* Проект "Помощник автомобилиста" (ПОЛНОЦЕННЫЙ МОДУЛЬ) */}
+        <Route path="/auto" element={<AutoHelper />} />
+        
         {/* Заглушки для остальных проектов */}
-        <Route path="/auto" element={<ProjectStub />} />
         <Route path="/daylabor" element={<ProjectStub />} />
         <Route path="/poh" element={<ProjectStub />} />
         <Route path="/gruzchiki" element={<ProjectStub />} />
