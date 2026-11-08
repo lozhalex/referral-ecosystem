@@ -39,6 +39,14 @@ model User {
 
   rcbRequestsSent     RcbRequest[] @relation("RcbRequestSender")
   rcbRequestsReceived RcbRequest[] @relation("RcbRequestReceiver")
+
+  // --- НОВОЕ: ПОМОЩНИК АВТОМОБИЛИСТА (Обратные связи) ---
+  cars              Car[]
+  serviceRecords    ServiceRecord[]
+  serviceInterval   ServiceInterval?
+  masters           Master[]
+  mileageChecks     MileageCheck[]
+  autoSettings      UserAutoSettings?
   
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -156,4 +164,103 @@ model RcbRequest {
   @@index([userId])
   @@index([referredById])
   @@index([status])
+}
+
+// =================================================================
+// НОВЫЕ МОДЕЛИ: ПОМОЩНИК АВТОМОБИЛИСТА
+// =================================================================
+
+model Car {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  marka       String    @default("")
+  model       String    @default("")
+  year        String    @default("")
+  gosnomer    String    @default("")
+  vin         String    @default("")
+  mileage     Int       @default(0)
+  isDeleted   Boolean   @default(false)  // Soft delete
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user        User      @relation(fields: [userId], references: [id])
+  records     ServiceRecord[]
+  mileageChecks MileageCheck[]
+
+  @@index([userId, isDeleted])
+}
+
+model ServiceRecord {
+  id          Int       @id @default(autoincrement())
+  carId       Int
+  userId      Int
+  date        String    @default("")  // Формат YYYY-MM-DD
+  mileage     Int       @default(0)
+  category    String    @default("")
+  subcat      String    @default("")
+  work        String    @default("")
+  cost        Int       @default(0)
+  comment     String    @default("")
+  
+  createdAt   DateTime  @default(now())
+
+  car         Car       @relation(fields: [carId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@index([carId, date])
+  @@index([userId])
+}
+
+model ServiceInterval {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @unique
+  // JSON-строка вида: {"to": 10000, "oil_engine": 7500, ...}
+  data        String    @default("{}")
+  
+  updatedAt   DateTime  @updatedAt
+
+  user        User      @relation(fields: [userId], references: [id])
+}
+
+model Master {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  name        String    @default("")
+  contact     String    @default("")  // Телефон / Telegram / email
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model MileageCheck {
+  id          Int       @id @default(autoincrement())
+  carId       Int
+  userId      Int
+  yearMonth   String    // Формат "202611" (YYYYMM)
+  km          Int       @default(0)
+  checkDate   DateTime  @default(now())
+  
+  createdAt   DateTime  @default(now())
+
+  car         Car       @relation(fields: [carId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@unique([carId, yearMonth])
+  @@index([userId])
+}
+
+model UserAutoSettings {
+  id                    Int       @id @default(autoincrement())
+  userId                Int       @unique
+  mileageReminderTime   String    @default("09:00")  // Формат "HH:MM"
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user                  User      @relation(fields: [userId], references: [id])
 }

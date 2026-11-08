@@ -63,7 +63,7 @@ router.post('/rcb-request', authenticateToken, async (req: any, res: Response) =
       await tx.rcbRequest.create({
         data: {
           userId: userId,
-          referredById: targetReferrerId || user.referredById, // Привязываем к бесплатному рефереру (или прямому, если все выше платные)
+          referredById: (targetReferrerId ?? user.referredById) ?? undefined,
           status: 'PENDING'
         }
       });
