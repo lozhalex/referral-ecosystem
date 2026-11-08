@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { requireAdmin } from '../middleware/requireAdmin';
+import { protectFounder } from '../middleware/protectFounder'; // 👈 Импортировано
 import bcrypt from 'bcryptjs';
 
 const router = Router();
@@ -11,14 +12,9 @@ const ROOT_PHONE = '+79503278027'; // Защита корневого польз
 // ==========================================
 // ПУНКТ 7: Защита от циклических ссылок (Утилита)
 // ==========================================
-/**
- * Проверяет, создаст ли назначение newReferredById родителем для targetUserId цикл в дереве.
- * Возвращает true, если цикл будет создан (т.е. targetUserId уже является предком newReferredById).
- */
 const checkForCycle = async (tx: any, targetUserId: number, newReferredById: number): Promise<boolean> => {
   if (newReferredById === null) return false;
 
-  // Используем BFS (поиск в ширину) для безопасного обхода дерева без риска переполнения стека
   const queue: number[] = [newReferredById];
   const visited = new Set<number>();
 
@@ -26,12 +22,11 @@ const checkForCycle = async (tx: any, targetUserId: number, newReferredById: num
     const currentId = queue.shift()!;
     
     if (currentId === targetUserId) {
-      return true; // Цикл обнаружен!
+      return true;
     }
     if (visited.has(currentId)) continue;
     visited.add(currentId);
 
-    // Находим всех прямых потомков текущего узла
     const children = await tx.user.findMany({
       where: { referredById: currentId },
       select: { id: true }
@@ -42,7 +37,7 @@ const checkForCycle = async (tx: any, targetUserId: number, newReferredById: num
     }
   }
 
-  return false; // Циклов не найдено, изменение безопасно
+  return false;
 };
 
 // ==========================================
@@ -69,6 +64,7 @@ router.get('/users', requireAdmin, async (req: Request, res: Response) => {
       phone: u.phone,
       role: u.role,
       isPaidMember: u.isPaidMember,
+      isFounder: u.isFounder, // 👈 Добавлено для отображения бейджа в админке
       balance: u.wallet?.balance ?? 0,
       referralCount: u._count.referrals,
       createdAt: u.createdAt
@@ -102,6 +98,7 @@ router.get('/users/:id', requireAdmin, async (req: Request, res: Response) => {
         phone: user.phone,
         role: user.role,
         isPaidMember: user.isPaidMember,
+        isFounder: user.isFounder, // 👈 Добавлено
         createdAt: user.createdAt,
         balance: user.wallet?.balance ?? 0,
         referredBy: user.referredBy,
@@ -115,7 +112,8 @@ router.get('/users/:id', requireAdmin, async (req: Request, res: Response) => {
   }
 });
 
-router.post('/users/:id/wallet/adjust', requireAdmin, async (req: Request, res: Response) => {
+// 👈 ДОБАВЛЕН protectFounder
+router.post('/users/:id/wallet/adjust', requireAdmin, protectFounder, async (req: Request, res: Response) => {
   try {
     const userId = Number(req.params.id);
     const { amount, type, description, referenceId } = req.body;
@@ -136,7 +134,6 @@ router.post('/users/:id/wallet/adjust', requireAdmin, async (req: Request, res: 
       walletId = newWallet.id;
     }
 
-    // Пункт 14: Атомарная проверка gte при списании (если amount отрицательный)
     const updateData: any = { balance: { increment: amount } };
     if (amount < 0) {
       updateData.balance = { increment: amount, gte: Math.abs(amount) };
@@ -179,7 +176,8 @@ router.post('/users/:id/wallet/adjust', requireAdmin, async (req: Request, res: 
 // УПРАВЛЕНИЕ РОЛЯМИ И ПАРОЛЯМИ
 // ==========================================
 
-router.put('/users/:id/role', requireAdmin, async (req: Request, res: Response) => {
+// 👈 ДОБАВЛЕН protectFounder
+router.put('/users/:id/role', requireAdmin, protectFounder, async (req: Request, res: Response) => {
   try {
     const userId = Number(req.params.id);
     const { role } = req.body;
@@ -213,7 +211,7 @@ router.put('/users/:id/role', requireAdmin, async (req: Request, res: Response) 
         where: { id: userId },
         data: { 
           role,
-          tokenVersion: { increment: 1 } // 👈 ПУНКТ 6: Отзыв всех текущих токенов пользователя при смене роли
+          tokenVersion: { increment: 1 }
         }
       });
 
@@ -236,7 +234,8 @@ router.put('/users/:id/role', requireAdmin, async (req: Request, res: Response) 
   }
 });
 
-router.post('/users/:id/reset-password', requireAdmin, async (req: Request, res: Response) => {
+// 👈 ДОБАВЛЕН protectFounder
+router.post('/users/:id/reset-password', requireAdmin, protectFounder, async (req: Request, res: Response) => {
   try {
     const userId = Number(req.params.id);
     const adminId = req.user!.userId;
@@ -256,7 +255,7 @@ router.post('/users/:id/reset-password', requireAdmin, async (req: Request, res:
         where: { id: userId },
         data: { 
           passwordHash: newPasswordHash,
-          tokenVersion: { increment: 1 } // 👈 ПУНКТ 6: Отзыв всех текущих токенов пользователя при сбросе пароля
+          tokenVersion: { increment: 1 }
         }
       });
 
@@ -288,7 +287,8 @@ router.post('/users/:id/reset-password', requireAdmin, async (req: Request, res:
 // ДЕРЕВО РЕФЕРАЛОВ И АУДИТ
 // ==========================================
 
-router.post('/tree/move', requireAdmin, async (req: Request, res: Response) => {
+// 👈 ДОБАВЛЕН protectFounder (теперь он проверит req.body.targetUserId)
+router.post('/tree/move', requireAdmin, protectFounder, async (req: Request, res: Response) => {
   try {
     const { targetUserId, newReferredById } = req.body;
     const adminId = req.user!.userId;
@@ -307,7 +307,6 @@ router.post('/tree/move', requireAdmin, async (req: Request, res: Response) => {
       const newReferrer = await prisma.user.findUnique({ where: { id: newReferredById } });
       if (!newReferrer) return res.status(404).json({ success: false, message: 'Новый реферер не найден' });
 
-      // 👈 ПУНКТ 7: ПРОВЕРКА НА ЦИКЛИЧЕСКИЕ ССЫЛКИ
       const willCreateCycle = await checkForCycle(prisma, targetUserId, newReferredById);
       if (willCreateCycle) {
         return res.status(400).json({ 
@@ -431,7 +430,6 @@ router.post('/tree/import', requireAdmin, async (req: Request, res: Response) =>
       return res.status(400).json({ success: false, message: 'Неверный формат данных: ожидается массив' });
     }
 
-    // 👈 ПУНКТ 7: Валидация импортируемого дерева на наличие циклов ДО записи в БД
     const nodeMap = new Map<number, number | null>();
     treeData.forEach(node => nodeMap.set(node.id, node.referredById));
 

@@ -11,11 +11,14 @@ model User {
   id             Int       @id @default(autoincrement())
   phone          String    @unique
   passwordHash   String
-  role           String    @default("user") // "user", "admin", "controller", "system"
+  role           String    @default("user")
   
+  // --- НОВОЕ: ЗАЩИТА ОСНОВАТЕЛЕЙ ---
+  isFounder      Boolean   @default(false) 
+
   // --- БЕЗОПАСНОСТЬ И ЗАЩИТА ---
-  tokenVersion   Int       @default(1) // Пункт 6: Отзыв JWT-токенов
-  isSuspicious   Boolean   @default(false) // Пункт 13: Защита от накрутки
+  tokenVersion   Int       @default(1)
+  isSuspicious   Boolean   @default(false)
 
   // --- ИНТЕГРАЦИЯ С РЦБ ---
   rcbId             String?   
@@ -40,7 +43,7 @@ model User {
   rcbRequestsSent     RcbRequest[] @relation("RcbRequestSender")
   rcbRequestsReceived RcbRequest[] @relation("RcbRequestReceiver")
 
-  // --- НОВОЕ: ПОМОЩНИК АВТОМОБИЛИСТА (Обратные связи) ---
+  // --- ПОМОЩНИК АВТОМОБИЛИСТА ---
   cars              Car[]
   serviceRecords    ServiceRecord[]
   serviceInterval   ServiceInterval?
@@ -64,20 +67,13 @@ model Transaction {
   id               String   @id @default(uuid())
   walletId         Int
   amount           Int
-  
-  // --- ПРОПОРЦИОНАЛЬНЫЙ РАСЧЕТ ---
   totalAmount      Int      @default(0) 
   paidWithBonuses  Int      @default(0) 
   realMoneyAmount  Int      @default(0) 
-  
   type             String   
   description      String
-  
-  // --- МЕХАНИКА "В ОЖИДАНИИ" (String вместо enum для SQLite) ---
-  // Допустимые значения: "PENDING", "AVAILABLE", "CANCELLED"
   status           String   @default("AVAILABLE")
   unlockDate       DateTime? 
-  
   referenceId      String?
   createdAt        DateTime @default(now())
   wallet           Wallet   @relation(fields: [walletId], references: [id])
@@ -92,7 +88,7 @@ model TreeAuditLog {
   admin         User     @relation("AuditAdmin", fields: [adminId], references: [id])
   targetUserId  Int?
   targetUser    User?    @relation("AuditTarget", fields: [targetUserId], references: [id])
-  action        String   // "MOVE", "IMPORT", "ROLE_CHANGE", "PASSWORD_RESET", "MEMBERSHIP_TOGGLE", "RCB_VERIFY"
+  action        String
   oldData       String?
   newData       String?
   createdAt     DateTime @default(now())
@@ -104,9 +100,9 @@ model Event {
   description    String?
   location       String?
   eventDate      DateTime
-  price          Int       @default(1000) // Стоимость билета для расчетов
+  price          Int       @default(1000)
   cashbackAmount Int       @default(50)
-  referrerBonus  Int       @default(100)  // Максимальный бонус при 100% оплате деньгами
+  referrerBonus  Int       @default(100)
   isActive       Boolean   @default(true)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -120,7 +116,7 @@ model Ticket {
   userId      Int
   eventId     Int
   qrCode      String    @unique
-  status      String    @default("ACTIVE") // "ACTIVE", "USED", "CANCELLED"
+  status      String    @default("ACTIVE")
   scannedAt   DateTime?
   scannedById Int?
   createdAt   DateTime  @default(now())
@@ -150,11 +146,8 @@ model EventController {
 model RcbRequest {
   id              String   @id @default(uuid())
   userId          Int      
-  referredById    Int?     // <-- Стало необязательным (Int?)
-  
-  // Допустимые значения: "PENDING", "APPROVED", "REJECTED", "ESCALATED"
+  referredById    Int?     
   status          String   @default("PENDING")
-  
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -167,7 +160,7 @@ model RcbRequest {
 }
 
 // =================================================================
-// НОВЫЕ МОДЕЛИ: ПОМОЩНИК АВТОМОБИЛИСТА
+// МОДЕЛИ: ПОМОЩНИК АВТОМОБИЛИСТА
 // =================================================================
 
 model Car {
@@ -179,7 +172,7 @@ model Car {
   gosnomer    String    @default("")
   vin         String    @default("")
   mileage     Int       @default(0)
-  isDeleted   Boolean   @default(false)  // Soft delete
+  isDeleted   Boolean   @default(false)
   
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -195,7 +188,7 @@ model ServiceRecord {
   id          Int       @id @default(autoincrement())
   carId       Int
   userId      Int
-  date        String    @default("")  // Формат YYYY-MM-DD
+  date        String    @default("")
   mileage     Int       @default(0)
   category    String    @default("")
   subcat      String    @default("")
@@ -215,11 +208,8 @@ model ServiceRecord {
 model ServiceInterval {
   id          Int       @id @default(autoincrement())
   userId      Int       @unique
-  // JSON-строка вида: {"to": 10000, "oil_engine": 7500, ...}
   data        String    @default("{}")
-  
   updatedAt   DateTime  @updatedAt
-
   user        User      @relation(fields: [userId], references: [id])
 }
 
@@ -227,13 +217,10 @@ model Master {
   id          Int       @id @default(autoincrement())
   userId      Int
   name        String    @default("")
-  contact     String    @default("")  // Телефон / Telegram / email
-  
+  contact     String    @default("")
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-
   user        User      @relation(fields: [userId], references: [id])
-
   @@index([userId])
 }
 
@@ -241,15 +228,12 @@ model MileageCheck {
   id          Int       @id @default(autoincrement())
   carId       Int
   userId      Int
-  yearMonth   String    // Формат "202611" (YYYYMM)
+  yearMonth   String
   km          Int       @default(0)
   checkDate   DateTime  @default(now())
-  
   createdAt   DateTime  @default(now())
-
   car         Car       @relation(fields: [carId], references: [id])
   user        User      @relation(fields: [userId], references: [id])
-
   @@unique([carId, yearMonth])
   @@index([userId])
 }
@@ -257,10 +241,8 @@ model MileageCheck {
 model UserAutoSettings {
   id                    Int       @id @default(autoincrement())
   userId                Int       @unique
-  mileageReminderTime   String    @default("09:00")  // Формат "HH:MM"
-  
+  mileageReminderTime   String    @default("09:00")
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
-
   user                  User      @relation(fields: [userId], references: [id])
 }
