@@ -5,14 +5,12 @@ import { authenticateToken } from '../middleware/authenticateToken';
 const router = Router();
 const prisma = new PrismaClient();
 
-// Применяем middleware авторизации ко всем роутам в этом файле
 router.use(authenticateToken);
 
 // ==========================================
 // 1. АВТОМОБИЛИ (Cars)
 // ==========================================
 
-// GET /api/auto/cars — список авто пользователя
 router.get('/cars', async (req: any, res: Response) => {
   try {
     const cars = await prisma.car.findMany({
@@ -26,7 +24,6 @@ router.get('/cars', async (req: any, res: Response) => {
   }
 });
 
-// POST /api/auto/cars — добавить авто
 router.post('/cars', async (req: any, res: Response) => {
   try {
     const { marka, model, year, gosnomer, vin, mileage } = req.body;
@@ -48,7 +45,6 @@ router.post('/cars', async (req: any, res: Response) => {
   }
 });
 
-// PUT /api/auto/cars/:id — обновить авто
 router.put('/cars/:id', async (req: any, res: Response) => {
   try {
     const { marka, model, year, gosnomer, vin, mileage } = req.body;
@@ -70,7 +66,6 @@ router.put('/cars/:id', async (req: any, res: Response) => {
   }
 });
 
-// POST /api/auto/cars/:id/delete — мягкое удаление (soft delete)
 router.post('/cars/:id/delete', async (req: any, res: Response) => {
   try {
     await prisma.car.updateMany({
@@ -88,7 +83,6 @@ router.post('/cars/:id/delete', async (req: any, res: Response) => {
 // 2. ЖУРНАЛ ОБСЛУЖИВАНИЯ (Journal)
 // ==========================================
 
-// GET /api/auto/journal — записи журнала (можно фильтровать по carId)
 router.get('/journal', async (req: any, res: Response) => {
   try {
     const carId = req.query.carId ? Number(req.query.carId) : undefined;
@@ -106,12 +100,10 @@ router.get('/journal', async (req: any, res: Response) => {
   }
 });
 
-// POST /api/auto/journal — добавить запись
 router.post('/journal', async (req: any, res: Response) => {
   try {
     const { carId, date, mileage, category, subcat, work, cost, comment } = req.body;
     
-    // Создаем запись в журнале
     const record = await prisma.serviceRecord.create({
       data: {
         userId: req.user.userId,
@@ -126,10 +118,14 @@ router.post('/journal', async (req: any, res: Response) => {
       }
     });
 
-    // Если пробег в записи больше текущего пробега авто — обновляем авто
+    // Обновляем пробег авто, если новый пробег больше текущего
     if (carId && mileage) {
       await prisma.car.updateMany({
-        where: { id: Number(carId), userId: req.user.userId, mileage: { lt: Number(mileage) } },
+        where: { 
+          id: Number(carId), 
+          userId: req.user.userId,
+          mileage: { lt: Number(mileage) }
+        },
         data: { mileage: Number(mileage) }
       });
     }
@@ -145,7 +141,6 @@ router.post('/journal', async (req: any, res: Response) => {
 // 3. ИНТЕРВАЛЫ И ПРОГНОЗ (Reminders / Intervals)
 // ==========================================
 
-// GET /api/auto/intervals — получить настройки интервалов
 router.get('/intervals', async (req: any, res: Response) => {
   try {
     const interval = await prisma.serviceInterval.findUnique({
@@ -161,7 +156,6 @@ router.get('/intervals', async (req: any, res: Response) => {
   }
 });
 
-// POST /api/auto/intervals — сохранить настройки интервалов
 router.post('/intervals', async (req: any, res: Response) => {
   try {
     const data = JSON.stringify(req.body.intervals || {});
@@ -177,26 +171,167 @@ router.post('/intervals', async (req: any, res: Response) => {
   }
 });
 
-// GET /api/auto/dashboard — данные для главной (плитки прогноза)
+// ==========================================
+// 4. ВВОД ПРОБЕГА (Mileage Check)
+// ==========================================
+
+router.post('/mileage-check', async (req: any, res: Response) => {
+  try {
+    const { carId, km } = req.body;
+    const now = new Date();
+    const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    // Проверяем, что новый пробег не меньше последнего
+    const lastCheck = await prisma.mileageCheck.findFirst({
+      where: { carId: Number(carId), userId: req.user.userId },
+      orderBy: { yearMonth: 'desc' }
+    });
+
+    if (lastCheck && Number(km) < lastCheck.km) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Новый пробег не может быть меньше последнего (${lastCheck.km} км)` 
+      });
+    }
+
+    // Сохраняем отметку
+    await prisma.mileageCheck.upsert({
+      where: { 
+        carId_yearMonth: { 
+          carId: Number(carId), 
+          yearMonth 
+        }
+      },
+      update: { km: Number(km) },
+      create: {
+        carId: Number(carId),
+        userId: req.user.userId,
+        yearMonth,
+        km: Number(km)
+      }
+    });
+
+    // Обновляем пробег авто
+    await prisma.car.updateMany({
+      where: { 
+        id: Number(carId), 
+        userId: req.user.userId,
+        mileage: { lt: Number(km) }
+      },
+      data: { mileage: Number(km) }
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Auto mileage check error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
+router.get('/mileage-check/status', async (req: any, res: Response) => {
+  try {
+    const cars = await prisma.car.findMany({
+      where: { userId: req.user.userId, isDeleted: false }
+    });
+
+    const now = new Date();
+    const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    const checks = await prisma.mileageCheck.findMany({
+      where: { 
+        userId: req.user.userId,
+        yearMonth
+      }
+    });
+
+    const checkedCarIds = new Set(checks.map(c => c.carId));
+    const uncheckedCars = cars.filter(car => !checkedCarIds.has(car.id));
+
+    res.json({ 
+      success: true, 
+      uncheckedCars,
+      totalCars: cars.length,
+      checkedCount: checks.length
+    });
+  } catch (err) {
+    console.error('Auto mileage check status error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
+// ==========================================
+// 5. ДАШБОРД (все данные для главной)
+// ==========================================
+
 router.get('/dashboard', async (req: any, res: Response) => {
   try {
     const carId = req.query.carId ? Number(req.query.carId) : undefined;
     
-    // Получаем авто, журнал и интервалы одним запросом
-    const [cars, records, intervalRow] = await Promise.all([
-      prisma.car.findMany({ where: { userId: req.user.userId, isDeleted: false } }),
+    const [cars, records, intervalRow, mileageChecks] = await Promise.all([
+      prisma.car.findMany({ 
+        where: { userId: req.user.userId, isDeleted: false } 
+      }),
       prisma.serviceRecord.findMany({ 
         where: { userId: req.user.userId, ...(carId && { carId }) },
         orderBy: { date: 'desc' }
       }),
-      prisma.serviceInterval.findUnique({ where: { userId: req.user.userId } })
+      prisma.serviceInterval.findUnique({ 
+        where: { userId: req.user.userId } 
+      }),
+      prisma.mileageCheck.findMany({
+        where: { userId: req.user.userId },
+        orderBy: { yearMonth: 'desc' }
+      })
     ]);
 
     const intervals = intervalRow ? JSON.parse(intervalRow.data) : {};
 
-    res.json({ success: true, cars, records, intervals });
+    res.json({ 
+      success: true, 
+      cars, 
+      records, 
+      intervals,
+      mileageChecks
+    });
   } catch (err) {
     console.error('Auto dashboard error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
+// ==========================================
+// 6. НАСТРОЙКИ ПОЛЬЗОВАТЕЛЯ
+// ==========================================
+
+router.get('/settings', async (req: any, res: Response) => {
+  try {
+    const settings = await prisma.userAutoSettings.findUnique({
+      where: { userId: req.user.userId }
+    });
+    res.json({ 
+      success: true, 
+      settings: settings || { mileageReminderTime: '09:00' }
+    });
+  } catch (err) {
+    console.error('Auto settings get error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
+router.post('/settings', async (req: any, res: Response) => {
+  try {
+    const { mileageReminderTime } = req.body;
+    await prisma.userAutoSettings.upsert({
+      where: { userId: req.user.userId },
+      update: { mileageReminderTime: mileageReminderTime || '09:00' },
+      create: { 
+        userId: req.user.userId, 
+        mileageReminderTime: mileageReminderTime || '09:00' 
+      }
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Auto settings save error:', err);
     res.status(500).json({ success: false, message: 'Ошибка сервера' });
   }
 });
