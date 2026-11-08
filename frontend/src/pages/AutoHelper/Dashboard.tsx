@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getDashboard, getCars, getMileageCheckStatus, submitMileageCheck } from '../../api/auto';
-import { getCategoryName, getPredictableCategories, CATEGORIES } from './categories';
+import { getPredictableCategories } from './categories';
 
 interface DashboardProps {
   selectedCarId: number | null;
@@ -25,7 +25,7 @@ interface ServiceTile {
   currentMileage: number;
   interval: number;
   isTimeBased: boolean;
-  remaining: number; // км или месяцев
+  remaining: number;
   percentUsed: number;
   avgPerMonth: number;
   color: 'green' | 'yellow' | 'red';
@@ -73,7 +73,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
             currentCar.mileage
           );
           
-          // Гибридная логика отбора плиток
           const { topTiles, otherTiles: others } = selectTopTiles(calculatedTiles);
           setTiles(topTiles);
           setOtherTiles(others);
@@ -90,7 +89,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
     }
   };
 
-  // 🧠 УМНЫЙ РАСЧЕТ ПРОГНОЗА
   const calculateSmartForecast = (
     records: any[],
     intervals: Record<string, number>,
@@ -110,7 +108,7 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
 
     for (const catConfig of predictableCats) {
       const lastRec = byCategory[catConfig.key];
-      if (!lastRec) continue; // Нет записей — пропускаем
+      if (!lastRec) continue;
 
       const interval = Number(intervals[catConfig.key]) || catConfig.defaultInterval;
       if (interval <= 0) continue;
@@ -123,14 +121,11 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
       let avgPerMonth: number = 0;
 
       if (catConfig.isTimeBased) {
-        // Для категорий по времени
         const lastDateObj = new Date(lastRec.date + 'T00:00:00');
         const monthsDiff = Math.max(1, (today.getFullYear() - lastDateObj.getFullYear()) * 12 + (today.getMonth() - lastDateObj.getMonth()));
-        const monthsPassed = monthsDiff;
-        remaining = interval - monthsPassed;
-        percentUsed = Math.round((monthsPassed / interval) * 100);
+        remaining = interval - monthsDiff;
+        percentUsed = Math.round((monthsDiff / interval) * 100);
       } else {
-        // Для категорий по пробегу
         const daysDiff = Math.max(1, Math.floor((today.getTime() - new Date(lastRec.date + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24)));
         const avgPerDay = kmPassed / daysDiff;
         avgPerMonth = Math.round(avgPerDay * 30);
@@ -138,7 +133,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         percentUsed = Math.round((kmPassed / interval) * 100);
       }
 
-      // Определяем цвет
       let color: 'green' | 'yellow' | 'red';
       if (catConfig.isTimeBased) {
         if (remaining <= 0) color = 'red';
@@ -166,7 +160,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
       });
     }
 
-    // Сортировка по срочности
     tiles.sort((a, b) => {
       if (a.remaining < 0 && b.remaining >= 0) return -1;
       if (b.remaining < 0 && a.remaining >= 0) return 1;
@@ -176,9 +169,7 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
     return tiles;
   };
 
-  // Гибридная логика отбора плиток
   const selectTopTiles = (allTiles: ServiceTile[]) => {
-    // Шаг 1: Отбираем срочные (remaining < 3000 ИЛИ percentUsed > 80%)
     const urgent = allTiles.filter(t => 
       (t.isTimeBased ? t.remaining <= 1 : t.remaining < 3000) || t.percentUsed > 80
     );
@@ -186,7 +177,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
     urgent.sort((a, b) => b.percentUsed - a.percentUsed);
     const topUrgent = urgent.slice(0, 8);
     
-    // Шаг 2: Если срочных меньше 6, дополняем
     if (topUrgent.length < 6) {
       const remaining = allTiles.filter(t => !topUrgent.includes(t));
       remaining.sort((a, b) => b.percentUsed - a.percentUsed);
@@ -194,7 +184,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
       topUrgent.push(...remaining.slice(0, needToAdd));
     }
     
-    // Шаг 3: Остальные — под кнопку
     const others = allTiles.filter(t => !topUrgent.includes(t));
     
     return { topTiles: topUrgent, otherTiles: others };
@@ -246,7 +235,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
 
   return (
     <div className="space-y-4">
-      {/* Баннер о не введенном пробеге */}
       {uncheckedCars.length > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
           <p className="text-sm text-yellow-800">
@@ -258,7 +246,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         </div>
       )}
 
-      {/* Селектор автомобиля */}
       <div className="bg-white rounded-lg shadow-sm p-4">
         <label className="block text-sm font-medium text-gray-700 mb-2">Выберите автомобиль</label>
         <select
@@ -274,7 +261,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         </select>
       </div>
 
-      {/* Карточка ввода пробега */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div className="flex items-center justify-between">
           <div>
@@ -292,7 +278,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         </div>
       </div>
 
-      {/* Умные плитки прогноза */}
       <div>
         <h2 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
           🧠 Умный прогноз ТО
@@ -327,7 +312,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
               ))}
             </div>
 
-            {/* Кнопка "Другие категории" */}
             {otherTiles.length > 0 && (
               <button
                 onClick={() => setShowOthers(!showOthers)}
@@ -337,7 +321,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
               </button>
             )}
 
-            {/* Раскрывающийся блок "Другие категории" */}
             {showOthers && otherTiles.length > 0 && (
               <div className="grid grid-cols-2 gap-3 mt-3">
                 {otherTiles.map(tile => (
@@ -355,7 +338,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         )}
       </div>
 
-      {/* Модальное окно ввода пробега */}
       {showMileageModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm">
