@@ -12,6 +12,7 @@ import scannerRoutes from './routes/scanner';
 import statsRoutes from './routes/stats';
 import alertsRoutes from './routes/alerts';
 import membershipRoutes from './routes/membership';
+import autoRoutes from './routes/auto'; // 👈 ДОБАВЛЕНО
 
 const app = express();
 const PORT: number = Number(process.env.PORT) || 3000;
@@ -66,6 +67,7 @@ app.use('/api/tickets', ticketsRoutes);
 app.use('/api/scanner', scannerRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/admin/alerts', alertsRoutes);
+app.use('/api/auto', autoRoutes); // 👈 ДОБАВЛЕНО
 
 // Health check освобождаем от CSRF для удобства мониторинга
 app.get('/api/health', (req, res) => {
