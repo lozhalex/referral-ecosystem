@@ -118,7 +118,6 @@ router.post('/journal', async (req: any, res: Response) => {
       }
     });
 
-    // Обновляем пробег авто, если новый пробег больше текущего
     if (carId && mileage) {
       await prisma.car.updateMany({
         where: { 
@@ -181,7 +180,6 @@ router.post('/mileage-check', async (req: any, res: Response) => {
     const now = new Date();
     const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    // Проверяем, что новый пробег не меньше последнего
     const lastCheck = await prisma.mileageCheck.findFirst({
       where: { carId: Number(carId), userId: req.user.userId },
       orderBy: { yearMonth: 'desc' }
@@ -194,7 +192,6 @@ router.post('/mileage-check', async (req: any, res: Response) => {
       });
     }
 
-    // Сохраняем отметку
     await prisma.mileageCheck.upsert({
       where: { 
         carId_yearMonth: { 
@@ -211,7 +208,6 @@ router.post('/mileage-check', async (req: any, res: Response) => {
       }
     });
 
-    // Обновляем пробег авто
     await prisma.car.updateMany({
       where: { 
         id: Number(carId), 
@@ -343,38 +339,37 @@ router.post('/settings', async (req: any, res: Response) => {
 router.get('/notifications', async (req: any, res: Response) => {
   try {
     const notifications = [];
+    const now = new Date();
     
-    // 1. Проверка не введенного пробега
-    const mileageStatus = await prisma.mileageCheck.findMany({
-      where: { 
-        userId: req.user.userId,
-        yearMonth: {
-          gte: new Date().getFullYear() + String(new Date().getMonth() + 1).padStart(2, '0')
-        }
-      }
-    });
+    // Форматируем текущий месяц как строку "YYYYMM" (например, "202611")
+    const currentYearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
 
     const cars = await prisma.car.findMany({
       where: { userId: req.user.userId, isDeleted: false }
     });
 
-    const currentMonth = new Date().getFullYear() * 100 + (new Date().getMonth() + 1);
-    const carsWithoutMileage = cars.filter(car => {
-      const check = mileageStatus.find(m => m.carId === car.id && Math.floor(m.yearMonth / 100) * 100 + (m.yearMonth % 100) === currentMonth);
-      return !check;
+    // Ищем только те записи, которые сделаны за текущий месяц
+    const mileageStatus = await prisma.mileageCheck.findMany({
+      where: { 
+        userId: req.user.userId,
+        yearMonth: currentYearMonth
+      }
     });
+
+    // Собираем ID машин, для которых пробег уже введен в этом месяце
+    const checkedCarIds = new Set(mileageStatus.map(m => m.carId));
+    
+    // Фильтруем машины, для которых пробег НЕ введен
+    const carsWithoutMileage = cars.filter(car => !checkedCarIds.has(car.id));
 
     if (carsWithoutMileage.length > 0) {
       notifications.push({
         type: 'mileage',
-        message: `Не введен пробег за ${new Date().toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}`,
+        message: `Не введен пробег за ${now.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}`,
         count: carsWithoutMileage.length,
         carNames: carsWithoutMileage.map(c => `${c.marka} ${c.model}`).join(', ')
       });
     }
-
-    // 2. Проверка восстановленных авто (можно добавить позже)
-    // const restoredCars = await prisma.carRestoreRequest.findMany(...)
 
     res.json({ 
       success: true, 
@@ -387,10 +382,9 @@ router.get('/notifications', async (req: any, res: Response) => {
   }
 });
 
-// Отметить уведомления как прочитанные
 router.post('/notifications/read', async (req: any, res: Response) => {
   try {
-    // Здесь можно логировать факт прочтения
+    // Здесь можно логировать факт прочтения, если потребуется
     res.json({ success: true });
   } catch (err) {
     console.error('Auto notifications read error:', err);
