@@ -63,7 +63,7 @@ export const createRecord = async (data: {
 };
 
 // ==========================================
-// ИНТЕРВАЛЫ И ПРОГНОЗ
+// ИНТЕРВАЛЫ
 // ==========================================
 
 export const getIntervals = async () => {
@@ -77,7 +77,35 @@ export const saveIntervals = async (intervals: Record<string, number>) => {
 };
 
 // ==========================================
-// ДАШБОРД (все данные для главной)
+// ВВОД ПРОБЕГА (Mileage Check)
+// ==========================================
+
+export const submitMileageCheck = async (carId: number, km: number) => {
+  const response = await apiClient.post('/api/auto/mileage-check', { carId, km });
+  return response.data;
+};
+
+export const getMileageCheckStatus = async () => {
+  const response = await apiClient.get('/api/auto/mileage-check/status');
+  return response.data;
+};
+
+// ==========================================
+// НАСТРОЙКИ
+// ==========================================
+
+export const getSettings = async () => {
+  const response = await apiClient.get('/api/auto/settings');
+  return response.data;
+};
+
+export const saveSettings = async (mileageReminderTime: string) => {
+  const response = await apiClient.post('/api/auto/settings', { mileageReminderTime });
+  return response.data;
+};
+
+// ==========================================
+// ДАШБОРД
 // ==========================================
 
 export const getDashboard = async (carId?: number) => {
