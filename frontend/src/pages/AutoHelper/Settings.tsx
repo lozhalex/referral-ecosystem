@@ -43,6 +43,12 @@ const Settings: React.FC = () => {
     }));
   };
 
+  const handleReset = () => {
+    if (window.confirm('Вы уверены, что хотите сбросить все интервалы к значениям по умолчанию?')) {
+      setIntervals(DEFAULT_INTERVALS);
+    }
+  };
+
   if (loading) return <div className="text-center py-10 text-gray-500">Загрузка...</div>;
 
   return (
@@ -80,8 +86,8 @@ const Settings: React.FC = () => {
       </div>
       
       <button
-        onClick={() => setIntervals(DEFAULT_INTERVALS)}
-        className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 transition"
+        onClick={handleReset}
+        className="w-full py-2 text-sm text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition"
       >
         Сбросить к значениям по умолчанию
       </button>

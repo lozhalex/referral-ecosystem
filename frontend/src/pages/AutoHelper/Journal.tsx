@@ -56,6 +56,19 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
     }
   };
 
+  const handleOpenModal = () => {
+    const car = cars.find(c => c.id === selectedCarId);
+    setFormData({
+      date: new Date().toISOString().split('T')[0],
+      mileage: String(car?.mileage || ''),
+      category: 'to',
+      work: '',
+      cost: '',
+      comment: ''
+    });
+    setIsModalOpen(true);
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCarId) return alert('Выберите автомобиль');
@@ -68,14 +81,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         cost: Number(formData.cost) || 0
       });
       setIsModalOpen(false);
-      setFormData({
-        date: new Date().toISOString().split('T')[0],
-        mileage: '',
-        category: 'to',
-        work: '',
-        cost: '',
-        comment: ''
-      });
       loadData();
     } catch (err) {
       alert('Ошибка сохранения записи');
@@ -98,11 +103,7 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
       <div className="flex justify-between items-center">
         <h2 className="text-lg font-bold text-gray-800">Журнал обслуживания</h2>
         <button
-          onClick={() => {
-            const car = cars.find(c => c.id === selectedCarId);
-            setFormData(prev => ({ ...prev, mileage: String(car?.mileage || '') }));
-            setIsModalOpen(true);
-          }}
+          onClick={handleOpenModal}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
         >
           + Добавить запись
@@ -110,8 +111,18 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
       </div>
 
       {records.length === 0 ? (
-        <div className="bg-white rounded-lg p-6 text-center text-gray-500 shadow-sm">
-          Записей пока нет. Добавьте первое обслуживание.
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+          <div className="text-3xl mb-2">📓</div>
+          <p className="text-gray-800 font-medium mb-2">Записей пока нет</p>
+          <p className="text-sm text-gray-600 mb-4">
+            💡 <strong>Совет:</strong> Вы можете добавлять записи задним числом. Просто укажите прошлую дату и пробег, чтобы перенести историю обслуживания из вашего блокнота.
+          </p>
+          <button
+            onClick={handleOpenModal}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
+          >
+            Добавить первую запись
+          </button>
         </div>
       ) : (
         <div className="space-y-3">
@@ -131,7 +142,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         </div>
       )}
 
-      {/* Модальное окно добавления записи */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -142,36 +152,35 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
             <form onSubmit={handleSave} className="p-4 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-gray-500">Дата</label>
+                  <label className="text-xs text-gray-500 font-medium">Дата обслуживания</label>
                   <input required type="date" className="input-field w-full" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500">Пробег (км)</label>
-                  <input required type="number" className="input-field w-full" value={formData.mileage} onChange={e => setFormData({...formData, mileage: e.target.value})} />
+                  <label className="text-xs text-gray-500 font-medium">Пробег на момент обслуживания (км)</label>
+                  <input required type="number" className="input-field w-full" value={formData.mileage} onChange={e => setFormData({...formData, mileage: e.target.value})} placeholder="Напр. 195000" />
+                  <p className="text-[10px] text-gray-400 mt-1">Укажите пробег из блокнота на эту дату</p>
                 </div>
               </div>
               
               <div>
-                <label className="text-xs text-gray-500">Категория</label>
+                <label className="text-xs text-gray-500 font-medium">Категория</label>
                 <select className="input-field w-full" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
                   {CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.name}</option>)}
                 </select>
               </div>
 
               <div>
-                <label className="text-xs text-gray-500">Выполненные работы</label>
+                <label className="text-xs text-gray-500 font-medium">Выполненные работы</label>
                 <textarea required rows={2} className="input-field w-full" value={formData.work} onChange={e => setFormData({...formData, work: e.target.value})} placeholder="Например: Замена масла и фильтра" />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-gray-500">Стоимость (₽)</label>
-                  <input type="number" className="input-field w-full" value={formData.cost} onChange={e => setFormData({...formData, cost: e.target.value})} />
-                </div>
+              <div>
+                <label className="text-xs text-gray-500 font-medium">Стоимость (₽)</label>
+                <input type="number" className="input-field w-full" value={formData.cost} onChange={e => setFormData({...formData, cost: e.target.value})} placeholder="0" />
               </div>
 
               <div>
-                <label className="text-xs text-gray-500">Комментарий (необязательно)</label>
+                <label className="text-xs text-gray-500 font-medium">Комментарий (необязательно)</label>
                 <input className="input-field w-full" value={formData.comment} onChange={e => setFormData({...formData, comment: e.target.value})} placeholder="Например: Масло Shell 5W-30" />
               </div>
               
