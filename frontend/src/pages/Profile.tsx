@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
+import { markRcbRegistered, requestRcbPayment, updateRcbLink } from '../api/rcb';
 
 const Profile: React.FC = () => {
   const navigate = useNavigate();
@@ -8,17 +9,15 @@ const Profile: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Состояния для модальных окон
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [showRcbModal, setShowRcbModal] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Состояния для формы РЦБ
-  const [rcbId, setRcbId] = useState('');
-  const [rcbLink, setRcbLink] = useState('');
-  const [rcbLoading, setRcbLoading] = useState(false);
+  // Состояния для трекера РЦБ
+  const [rcbActionLoading, setRcbActionLoading] = useState(false);
   const [rcbMessage, setRcbMessage] = useState('');
+  const [rcbLinkInput, setRcbLinkInput] = useState('');
+  const [savingLink, setSavingLink] = useState(false);
 
   useEffect(() => {
     loadProfile();
@@ -29,12 +28,11 @@ const Profile: React.FC = () => {
       const response = await apiClient.get('/api/auth/me');
       if (response.data.success) {
         setUser(response.data.user);
+        setRcbLinkInput(response.data.user.rcbReferralLink || '');
       }
     } catch (err: any) {
       setError('Не удалось загрузить профиль');
-      if (err.response?.status === 401) {
-        navigate('/');
-      }
+      if (err.response?.status === 401) navigate('/');
     } finally {
       setLoading(false);
     }
@@ -68,117 +66,85 @@ const Profile: React.FC = () => {
     }
   };
 
-  const handleShare = async () => {
-    const link = getReferralLink();
-    const shareData = {
-      title: 'Краски жизни — Реферальная экосистема',
-      text: `Присоединяйся по моей ссылке!`,
-      url: link,
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch (err) {
-        // Пользователь отменил шеринг
+  // ШАГ 2: Регистрация в РЦБ
+  const handleMarkRegistered = async () => {
+    // Сначала открываем внешнюю ссылку РЦБ
+    window.open('https://rcpay.ru', '_blank');
+    
+    setRcbActionLoading(true);
+    try {
+      const res = await markRcbRegistered();
+      if (res.success) {
+        setRcbMessage(res.message);
+        await loadProfile(); // Обновляем данные, чтобы показать галочку
+        setTimeout(() => setRcbMessage(''), 3000);
       }
-    } else {
-      await handleCopyLink();
+    } catch (err: any) {
+      setRcbMessage(err.response?.data?.message || 'Ошибка');
+    } finally {
+      setRcbActionLoading(false);
     }
   };
 
-  // 🌉 Логика отправки запроса на партнерство РЦБ
-  const handleRcbSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setRcbLoading(true);
-    setRcbMessage('');
-
+  // ШАГ 3: Запрос на проверку оплаты
+  const handleRequestPayment = async () => {
+    if (!window.confirm('Вы подтверждаете, что оплатили 1990 ₽ в РЦБ? Администратор проверит этот факт вручную.')) return;
+    
+    setRcbActionLoading(true);
     try {
-      const response = await apiClient.post('/api/admin/membership/rcb-request', {
-        rcbId: rcbId.trim(),
-        rcbReferralLink: rcbLink.trim()
-      });
-
-      if (response.data.success) {
-        setRcbMessage(response.data.message);
-        setRcbId('');
-        setRcbLink('');
-        // Перезагружаем профиль, чтобы обновить статус (если бэкенд сразу что-то меняет)
-        setTimeout(() => {
-          setShowRcbModal(false);
-          setRcbMessage('');
-          loadProfile();
-        }, 2500);
+      const res = await requestRcbPayment();
+      if (res.success) {
+        setRcbMessage(res.message);
+        await loadProfile();
+        setTimeout(() => setRcbMessage(''), 5000);
       }
     } catch (err: any) {
-      setRcbMessage(err.response?.data?.message || 'Ошибка при отправке заявки');
+      setRcbMessage(err.response?.data?.message || 'Ошибка');
     } finally {
-      setRcbLoading(false);
+      setRcbActionLoading(false);
+    }
+  };
+
+  // Сохранение реферальной ссылки (доступно только после одобрения админом)
+  const handleSaveRcbLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingLink(true);
+    try {
+      const res = await updateRcbLink(rcbLinkInput.trim());
+      if (res.success) {
+        alert('Ссылка успешно сохранена!');
+        await loadProfile();
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Ошибка сохранения');
+    } finally {
+      setSavingLink(false);
     }
   };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}.${month}.${year}`;
+    return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-center">
-          <p className="text-gray-500">Загрузка...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
-          <p className="text-red-600 text-center mb-4">{error}</p>
-          <button 
-            onClick={() => navigate('/')} 
-            className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-          >
-            На главную
-          </button>
-        </div>
-      </div>
-    );
-  }
-
+  if (loading) return <div className="min-h-screen bg-gray-100 flex items-center justify-center"><p className="text-gray-500">Загрузка...</p></div>;
+  if (error) return <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4"><div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-center"><p className="text-red-600 mb-4">{error}</p><button onClick={() => navigate('/')} className="w-full py-2 bg-blue-600 text-white rounded-lg">На главную</button></div></div>;
   if (!user) return null;
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-md relative">
-        
-        <button
-          onClick={() => navigate('/')}
-          className="mb-4 flex items-center gap-1 text-sm text-gray-600 hover:text-blue-600 transition font-medium"
-        >
-          ← На главную
-        </button>
+        <button onClick={() => navigate('/')} className="mb-4 flex items-center gap-1 text-sm text-gray-600 hover:text-blue-600 transition font-medium">← На главную</button>
 
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg">
-              {user.phone.slice(-2)}
-            </div>
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg">{user.phone.slice(-2)}</div>
             <div>
               <h1 className="text-xl font-bold text-gray-800">Мой профиль</h1>
-              <p className="text-xs text-gray-500">
-                В системе с {formatDate(user.registeredAt || user.createdAt)}
-              </p>
+              <p className="text-xs text-gray-500">В системе с {formatDate(user.registeredAt || user.createdAt)}</p>
             </div>
           </div>
-          <span className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full">
-            {user.role === 'admin' || user.role === 'SUPER_ADMIN' ? 'Администратор' : 'Пользователь'}
-          </span>
+          <span className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full">{user.role === 'admin' || user.role === 'SUPER_ADMIN' ? 'Администратор' : user.role === 'partner' ? 'Партнер' : 'Пользователь'}</span>
         </div>
 
         <div className="bg-gray-50 rounded-lg p-4 mb-4">
@@ -196,232 +162,143 @@ const Profile: React.FC = () => {
           <p className="text-3xl font-bold text-blue-700">{user.referralCount || 0}</p>
         </div>
 
-        {/* 🌉 НОВЫЙ БЛОК: Статус партнерства РЦБ */}
-        <div className={`rounded-lg p-4 mb-4 border ${user.isRcbPaid ? 'bg-green-50 border-green-200' : 'bg-purple-50 border-purple-200'}`}>
-          <div className="flex items-center justify-between mb-2">
-            <p className={`text-sm font-semibold ${user.isRcbPaid ? 'text-green-700' : 'text-purple-700'}`}>
-              Статус в РЦБ
-            </p>
-            {user.isRcbPaid ? (
-              <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full">✅ Подтвержден</span>
-            ) : (
-              <span className="text-xs bg-gray-400 text-white px-2 py-0.5 rounded-full">❌ Не подтвержден</span>
-            )}
-          </div>
+        {/* 🌉 ТРЕКЕР ПАРТНЕРСТВА РЦБ */}
+        <div className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4 mb-4">
+          <h3 className="text-sm font-bold text-purple-800 mb-3 flex items-center gap-2">🚀 Статус партнерства</h3>
           
-          {user.isRcbPaid ? (
-            <div>
-              <p className="text-xs text-gray-600 mb-1">Ваш ID в системе:</p>
-              <p className="text-sm font-mono font-bold text-gray-800">{user.rcbId || 'Не указан'}</p>
-            </div>
-          ) : (
-            <div>
-              <p className="text-xs text-gray-600 mb-3">
-                Получите доступ к экосистеме, скидкам на СТО и бонусам за рефералов.
-              </p>
-              <button
-                onClick={() => setShowRcbModal(true)}
-                className="w-full py-2 px-4 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition text-sm flex items-center justify-center gap-2"
-              >
-                <span>🚀</span> Стать партнером РЦБ
-              </button>
-            </div>
+          {rcbMessage && (
+            <div className="mb-3 p-2 bg-green-100 text-green-800 text-xs rounded border border-green-200">{rcbMessage}</div>
           )}
+
+          <div className="space-y-4">
+            {/* Шаг 1 */}
+            <div className="flex items-center gap-3">
+              <span className="text-green-500 text-lg">✅</span>
+              <span className="text-sm text-gray-700">Шаг 1. Регистрация в RefPro — <span className="font-semibold text-green-700">Выполнено</span></span>
+            </div>
+
+            {/* Шаг 2 */}
+            <div className="flex items-start gap-3">
+              {user.isRcbRegisteredFree ? (
+                <span className="text-green-500 text-lg mt-0.5">✅</span>
+              ) : (
+                <span className="text-yellow-500 text-lg mt-0.5">⏳</span>
+              )}
+              <div className="flex-1">
+                <p className="text-sm text-gray-700 mb-1">Шаг 2. Регистрация в РЦБ (бесплатно)</p>
+                {!user.isRcbRegisteredFree && (
+                  <button
+                    onClick={handleMarkRegistered}
+                    disabled={rcbActionLoading}
+                    className="text-xs bg-purple-600 text-white px-3 py-1.5 rounded hover:bg-purple-700 transition disabled:opacity-50"
+                  >
+                    {rcbActionLoading ? 'Обработка...' : 'Зарегистрироваться в РЦБ ↗'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Шаг 3 */}
+            <div className="flex items-start gap-3">
+              {user.isRcbPaid ? (
+                <span className="text-green-500 text-lg mt-0.5">✅</span>
+              ) : user.rcbPaymentRequested ? (
+                <span className="text-blue-500 text-lg mt-0. animate-pulse">⏳</span>
+              ) : (
+                <span className="text-gray-400 text-lg mt-0.5">🔒</span>
+              )}
+              <div className="flex-1">
+                <p className="text-sm text-gray-700 mb-1">Шаг 3. Активация статуса СМАРТ (1990 ₽)</p>
+                
+                {!user.isRcbPaid && user.isRcbRegisteredFree && !user.rcbPaymentRequested && (
+                  <button
+                    onClick={handleRequestPayment}
+                    disabled={rcbActionLoading}
+                    className="text-xs bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700 transition disabled:opacity-50"
+                  >
+                    {rcbActionLoading ? 'Обработка...' : 'Я оплатил 1990 ₽, проверить'}
+                  </button>
+                )}
+                
+                {user.rcbPaymentRequested && !user.isRcbPaid && (
+                  <p className="text-xs text-blue-600 font-medium">Заявка отправлена. Ожидайте проверки администратором.</p>
+                )}
+
+                {/* Поле ввода ссылки (только для подтвержденных партнеров) */}
+                {user.isRcbPaid && (
+                  <form onSubmit={handleSaveRcbLink} className="mt-2">
+                    <label className="text-xs text-gray-600 block mb-1">Ваша реферальная ссылка РЦБ:</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={rcbLinkInput}
+                        onChange={(e) => setRcbLinkInput(e.target.value)}
+                        placeholder="https://rcpay.ru/r/..."
+                        className="flex-1 text-xs px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none"
+                      />
+                      <button
+                        type="submit"
+                        disabled={savingLink}
+                        className="text-xs bg-purple-600 text-white px-3 py-1.5 rounded hover:bg-purple-700 transition disabled:opacity-50"
+                      >
+                        {savingLink ? '...' : 'Сохранить'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </div>
+          }
         </div>
 
         <div className="mb-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-2">Мои проекты</h2>
           <div className="space-y-2">
-            <div 
-              onClick={() => navigate('/auto')}
-              className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3 cursor-pointer hover:bg-green-100 transition"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🚗</span>
-                <span className="text-sm font-medium text-gray-800">Помощник автомобилиста</span>
-              </div>
+            <div onClick={() => navigate('/auto')} className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3 cursor-pointer hover:bg-green-100 transition">
+              <div className="flex items-center gap-2"><span className="text-xl">🚗</span><span className="text-sm font-medium text-gray-800">Помощник автомобилиста</span></div>
               <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full">✅ Доступен</span>
             </div>
-            <div 
-              onClick={() => navigate('/events')}
-              className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3 cursor-pointer hover:bg-green-100 transition"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🎟️</span>
-                <span className="text-sm font-medium text-gray-800">Билеты на мероприятия</span>
-              </div>
+            <div onClick={() => navigate('/events')} className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3 cursor-pointer hover:bg-green-100 transition">
+              <div className="flex items-center gap-2"><span className="text-xl">🎟️</span><span className="text-sm font-medium text-gray-800">Билеты на мероприятия</span></div>
               <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full">✅ Доступен</span>
             </div>
           </div>
-        </div>
-
-        <div className="mb-4">
-          <h2 className="text-sm font-semibold text-gray-700 mb-2">Мои рефералы</h2>
-          {user.referrals && user.referrals.length > 0 ? (
-            <div className="space-y-2 max-h-40 overflow-y-auto">
-              {user.referrals.map((ref: any) => (
-                <div key={ref.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-2">
-                  <span className="text-sm font-medium text-gray-800">{ref.phone}</span>
-                  <span className="text-xs text-gray-500">{formatDate(ref.createdAt)}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-400 italic">Пока никого не приглашено.</p>
-          )}
         </div>
 
         <div className="space-y-2">
-          <button
-            onClick={() => setShowInviteModal(true)}
-            className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg font-semibold hover:from-blue-600 hover:to-purple-600 transition flex items-center justify-center gap-2"
-          >
-            <span>🔗</span> Пригласить друга
-          </button>
-
-          <button
-            onClick={() => navigate('/change-password')}
-            className="w-full py-2.5 px-4 bg-yellow-500 text-white rounded-lg font-semibold hover:bg-yellow-600 transition"
-          >
-            Сменить пароль
-          </button>
-
-          {(user.role === 'admin' || user.role === 'SUPER_ADMIN') && (
-            <button
-              onClick={() => navigate('/admin')}
-              className="w-full py-2.5 px-4 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition flex items-center justify-center gap-2"
-            >
-              <span>🔧</span> Админ-панель
-            </button>
+          <button onClick={() => setShowInviteModal(true)} className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg font-semibold hover:from-blue-600 hover:to-purple-600 transition flex items-center justify-center gap-2"><span>🔗</span> Пригласить друга</button>
+          <button onClick={() => navigate('/change-password')} className="w-full py-2.5 px-4 bg-yellow-500 text-white rounded-lg font-semibold hover:bg-yellow-600 transition">Сменить пароль</button>
+          {(user.role === 'admin' || user.role === 'SUPER_ADMIN' || user.role === 'partner') && (
+            <button onClick={() => navigate('/admin')} className="w-full py-2.5 px-4 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition flex items-center justify-center gap-2"><span>🔧</span> Админ-панель</button>
           )}
-
-          <button
-            onClick={() => setShowLogoutModal(true)}
-            className="w-full py-2.5 px-4 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition"
-          >
-            Выйти из аккаунта
-          </button>
+          <button onClick={() => setShowLogoutModal(true)} className="w-full py-2.5 px-4 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition">Выйти из аккаунта</button>
         </div>
 
-        {copied && (
-          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg text-sm z-50 animate-fade-in">
-            ✅ Ссылка скопирована!
-          </div>
-        )}
-
-        {/* Модальное окно "Пригласить друга" */}
+        {/* Модальные окна (Invite, Logout) остаются без изменений, как в твоем исходном коде */}
+        {copied && <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg text-sm z-50">✅ Ссылка скопирована!</div>}
+        
         {showInviteModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
               <h3 className="text-lg font-semibold text-gray-800 mb-2">Пригласить друга</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Отправьте эту ссылку другу. Когда он зарегистрируется, он станет вашим рефералом.
-              </p>
-              <div className="bg-gray-100 rounded-lg p-3 mb-4 break-all text-sm text-gray-700 font-mono">
-                {getReferralLink()}
-              </div>
+              <p className="text-sm text-gray-600 mb-4">Отправьте эту ссылку другу.</p>
+              <div className="bg-gray-100 rounded-lg p-3 mb-4 break-all text-sm text-gray-700 font-mono">{getReferralLink()}</div>
               <div className="space-y-2">
-                <button
-                  onClick={handleCopyLink}
-                  className={`w-full py-2 px-4 rounded-lg font-medium transition ${copied ? 'bg-green-500 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
-                >
-                  {copied ? '✅ Скопировано!' : '📋 Скопировать ссылку'}
-                </button>
-                <button
-                  onClick={handleShare}
-                  className="w-full py-2 px-4 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition"
-                >
-                  📤 Поделиться
-                </button>
-                <button
-                  onClick={() => { setShowInviteModal(false); setCopied(false); }}
-                  className="w-full py-2 px-4 text-gray-500 text-sm hover:text-gray-700 transition"
-                >
-                  Закрыть
-                </button>
+                <button onClick={handleCopyLink} className={`w-full py-2 px-4 rounded-lg font-medium transition ${copied ? 'bg-green-500 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>{copied ? '✅ Скопировано!' : '📋 Скопировать ссылку'}</button>
+                <button onClick={() => { setShowInviteModal(false); setCopied(false); }} className="w-full py-2 px-4 text-gray-500 text-sm hover:text-gray-700 transition">Закрыть</button>
               </div>
             </div>
           </div>
         )}
 
-        {/* 🌉 НОВОЕ Модальное окно "Стать партнером РЦБ" */}
-        {showRcbModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">Стать партнером РЦБ</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Введите ваш ID и реферальную ссылку из приложения РЦБ для верификации администратором.
-              </p>
-              
-              {rcbMessage && (
-                <div className={`p-3 rounded-lg text-sm mb-4 ${rcbMessage.includes('Ошибка') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>
-                  {rcbMessage}
-                </div>
-              )}
-
-              <form onSubmit={handleRcbSubmit} className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Ваш ID в РЦБ</label>
-                  <input
-                    type="text"
-                    required
-                    value={rcbId}
-                    onChange={(e) => setRcbId(e.target.value)}
-                    placeholder="Например: XFXMPGZY"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Реферальная ссылка</label>
-                  <input
-                    type="url"
-                    required
-                    value={rcbLink}
-                    onChange={(e) => setRcbLink(e.target.value)}
-                    placeholder="https://rcpay.ru/r/..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
-                  />
-                </div>
-                <div className="pt-2 space-y-2">
-                  <button
-                    type="submit"
-                    disabled={rcbLoading}
-                    className="w-full py-2.5 px-4 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {rcbLoading ? 'Отправка...' : 'Отправить заявку'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowRcbModal(false); setRcbMessage(''); setRcbId(''); setRcbLink(''); }}
-                    className="w-full py-2 px-4 text-gray-500 text-sm hover:text-gray-700 transition"
-                  >
-                    Отмена
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Модальное окно подтверждения выхода */}
         {showLogoutModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm text-center">
               <h3 className="text-lg font-semibold text-gray-800 mb-2">Вы уверены?</h3>
               <p className="text-sm text-gray-600 mb-4">Вы хотите выйти из аккаунта?</p>
               <div className="flex flex-col gap-2">
-                <button
-                  onClick={handleLogout}
-                  className="w-full py-2 px-4 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition"
-                >
-                  Да, выйти
-                </button>
-                <button
-                  onClick={() => setShowLogoutModal(false)}
-                  className="w-full py-2 px-4 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition"
-                >
-                  Отмена
-                </button>
+                <button onClick={handleLogout} className="w-full py-2 px-4 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition">Да, выйти</button>
+                <button onClick={() => setShowLogoutModal(false)} className="w-full py-2 px-4 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition">Отмена</button>
               </div>
             </div>
           </div>

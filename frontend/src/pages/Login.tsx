@@ -117,6 +117,45 @@ const Login: React.FC = () => {
           </button>
         </form>
 
+        {/* 🔒 БЛОК ВОССТАНОВЛЕНИЯ ПАРОЛЯ (ВАРИАНТ 4) */}
+        <div className="mt-8 pt-6 border-t border-gray-200">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xl">🔒</span>
+            <h3 className="text-sm font-semibold text-gray-800">Забыли пароль?</h3>
+          </div>
+          <p className="text-xs text-gray-600 mb-4 leading-relaxed">
+            Пароль будет выслан в ручном режиме администратором, это займет какое-то время. 
+            Пожалуйста, напишите нам <strong>с того номера</strong>, на который зарегистрирован аккаунт.
+          </p>
+          
+          <div className="grid grid-cols-3 gap-2">
+            <a 
+              href="https://t.me/your_admin_telegram" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1 py-2 px-1 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition text-xs font-medium border border-blue-200"
+            >
+              <span>✈️</span> Telegram
+            </a>
+            <a 
+              href="https://wa.me/79000000000" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1 py-2 px-1 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition text-xs font-medium border border-green-200"
+            >
+              <span>💬</span> WhatsApp
+            </a>
+            <a 
+              href="https://max.me/your_admin_max" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1 py-2 px-1 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition text-xs font-medium border border-purple-200"
+            >
+              <span>📱</span> Max
+            </a>
+          </div>
+        </div>
+
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-500">
             Нет аккаунта?{' '}

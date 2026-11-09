@@ -13,17 +13,19 @@ model User {
   passwordHash   String
   role           String    @default("user")
   
-  // --- НОВОЕ: ЗАЩИТА ОСНОВАТЕЛЕЙ ---
+  // --- ЗАЩИТА ОСНОВАТЕЛЕЙ ---
   isFounder      Boolean   @default(false) 
 
   // --- БЕЗОПАСНОСТЬ И ЗАЩИТА ---
   tokenVersion   Int       @default(1)
   isSuspicious   Boolean   @default(false)
 
-  // --- ИНТЕГРАЦИЯ С РЦБ ---
-  rcbId             String?   
-  isRcbPaid         Boolean   @default(false) 
-  rcbReferralLink   String?   
+  // --- ИНТЕГРАЦИЯ С РЦБ (УМНЫЙ МОСТИК) ---
+  rcbId                String?   
+  isRcbPaid            Boolean   @default(false) 
+  rcbReferralLink      String?   
+  isRcbRegisteredFree  Boolean   @default(false) // Шаг 2: зарегистрировался как ФРИ
+  rcbPaymentRequested  Boolean   @default(false) // Шаг 3: запросил проверку оплаты 1990
 
   isPaidMember   Boolean   @default(false)
   referralCount  Int       @default(0)
@@ -158,10 +160,6 @@ model RcbRequest {
   @@index([referredById])
   @@index([status])
 }
-
-// =================================================================
-// МОДЕЛИ: ПОМОЩНИК АВТОМОБИЛИСТА
-// =================================================================
 
 model Car {
   id          Int       @id @default(autoincrement())

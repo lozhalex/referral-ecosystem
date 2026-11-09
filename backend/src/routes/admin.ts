@@ -511,4 +511,55 @@ router.post('/tree/import', requireAdmin, async (req: Request, res: Response) =>
   }
 });
 
+// ==========================================
+// ЗАЯВКИ РЦБ (УМНЫЙ МОСТИК)
+// ==========================================
+
+router.get('/rcb-requests', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const requests = await prisma.user.findMany({
+      where: { rcbPaymentRequested: true, isRcbPaid: false },
+      select: { id: true, phone: true, rcbId: true, rcbReferralLink: true, createdAt: true },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json({ success: true, requests });
+  } catch (err) {
+    console.error('Admin rcb requests error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
+router.post('/rcb-requests/:id/approve', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const userId = Number(req.params.id);
+    const adminId = req.user!.userId;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { 
+          isRcbPaid: true, 
+          rcbPaymentRequested: false,
+          role: 'partner' // Присваиваем статус партнера
+        }
+      });
+
+      await tx.treeAuditLog.create({
+        data: {
+          adminId,
+          targetUserId: userId,
+          action: 'RCB_APPROVE',
+          oldData: JSON.stringify({ isRcbPaid: false }),
+          newData: JSON.stringify({ isRcbPaid: true, role: 'partner' })
+        }
+      });
+    });
+
+    res.json({ success: true, message: 'Пользователь успешно переведен в статус Партнера РЦБ' });
+  } catch (err) {
+    console.error('Admin rcb approve error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
 export default router;

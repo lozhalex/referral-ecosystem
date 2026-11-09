@@ -67,6 +67,7 @@ app.use('/api/tickets', ticketsRoutes);
 app.use('/api/scanner', scannerRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/admin/alerts', alertsRoutes);
+app.use('/api/rcb', rcbRoutes);
 app.use('/api/auto', autoRoutes); // 👈 ДОБАВЛЕНО
 
 // Health check освобождаем от CSRF для удобства мониторинга
