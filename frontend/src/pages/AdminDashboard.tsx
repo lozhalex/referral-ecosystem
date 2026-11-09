@@ -72,7 +72,6 @@ export default function AdminDashboard() {
 
   const [alerts, setAlerts] = useState<{ largeAdjustments: any[]; frequentChanges: any[] } | null>(null);
 
-  // Состояния для РЦБ
   const [rcbRequests, setRcbRequests] = useState<RcbRequest[]>([]);
   const [rcbLoading, setRcbLoading] = useState(false);
   const [rcbApprovingId, setRcbApprovingId] = useState<number | null>(null);
@@ -84,7 +83,6 @@ export default function AdminDashboard() {
     if (activeTab === 'users') loadUsers();
     else if (activeTab === 'logs') loadLogs();
     else if (activeTab === 'rcb') loadRcbRequests();
-    
     loadAlerts();
   }, [token, navigate, activeTab]);
 
@@ -117,14 +115,13 @@ export default function AdminDashboard() {
 
   const handleApproveRcb = async (userId: number, userPhone: string) => {
     if (!window.confirm(`Подтвердить оплату 1990 ₽ для ${userPhone} и присвоить статус Партнера?`)) return;
-    
     setRcbApprovingId(userId);
     try {
       const res = await approveAdminRcbRequest(userId);
       if (res.success) {
         alert(res.message);
-        loadRcbRequests(); // Обновляем список
-        loadLogs(); // Обновляем логи
+        loadRcbRequests();
+        loadLogs();
       }
     } catch (err: any) {
       alert(err.response?.data?.message || 'Ошибка при одобрении');
@@ -301,7 +298,6 @@ export default function AdminDashboard() {
                 </div>
                 <div className="flex-1">
                   <h3 className="text-sm font-bold text-red-800 mb-2">⚠️ Обнаружены подозрительные операции с балансом</h3>
-                  {/* ... (код алертов без изменений для краткости) ... */}
                 </div>
               </div>
               <button onClick={() => setAlerts(null)} className="ml-4 px-3 py-1 bg-red-200 text-red-800 text-xs font-semibold rounded hover:bg-red-300 transition">Разобрался ✓</button>
@@ -335,7 +331,6 @@ export default function AdminDashboard() {
                 <button type="button" onClick={() => { setSearchPhone(''); loadUsers(); }} className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Сбросить</button>
               </form>
             </div>
-            {/* ... (таблица пользователей без изменений) ... */}
             <div className="bg-white rounded-lg shadow overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -408,7 +403,7 @@ export default function AdminDashboard() {
                           className="px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 transition disabled:opacity-50 flex items-center gap-1"
                         >
                           {rcbApprovingId === req.id ? 'Обработка...' : '✅ Одобрить'}
-                       404
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -420,7 +415,6 @@ export default function AdminDashboard() {
 
         {activeTab === 'logs' && (
           <div className="bg-white rounded-lg shadow overflow-hidden">
-            {/* ... (код логов без изменений) ... */}
             <div className="p-6 border-b border-gray-200 flex flex-wrap gap-3 justify-between items-center">
               <h2 className="text-lg font-semibold text-gray-900">Управление деревом и аудит</h2>
               <div className="flex gap-3">
@@ -458,7 +452,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ... (Все модальные окна: selectedUser, adjust, move, role, reset, import остаются без изменений из твоего исходного кода) ... */}
         {selectedUser && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -515,10 +508,68 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ... (Остальные модалки: showAdjustModal, showMoveModal, showRoleModal, showResetModal, showImportModal - вставь их из своего исходного кода, они не изменились) ... */}
-        
-        {/* Для краткости я не дублирую здесь 200 строк неизмененных модалок. Просто скопируй их из своего исходного AdminDashboard.tsx и вставь сюда перед закрывающим </div> */}
+        {showAdjustModal && selectedUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-gray-900">Изменение баланса</h3><button onClick={() => setShowAdjustModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button></div>
+              <form onSubmit={handleAdjustSubmit} className="space-y-4">
+                <div><label className="block text-sm font-medium text-gray-700 mb-1">Сумма</label><input type="number" required value={adjustForm.amount} onChange={(e) => setAdjustForm({ ...adjustForm, amount: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div>
+                <div><label className="block text-sm font-medium text-gray-700 mb-1">Тип операции</label><select value={adjustForm.type} onChange={(e) => setAdjustForm({ ...adjustForm, type: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg"><option value="MANUAL_ADJUSTMENT">Ручная корректировка</option><option value="BONUS">Бонус / Подарок</option><option value="PENALTY">Штраф / Возврат</option></select></div>
+                <div><label className="block text-sm font-medium text-gray-700 mb-1">Причина (мин. 10 символов)</label><textarea required minLength={10} rows={3} value={adjustForm.description} onChange={(e) => setAdjustForm({ ...adjustForm, description: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div>
+                <div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowAdjustModal(false)} className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" disabled={adjustLoading}>Отмена</button><button type="submit" disabled={adjustLoading} className="flex-1 py-2 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">{adjustLoading ? 'Сохранение...' : 'Сохранить'}</button></div>
+              </form>
+            </div>
+          </div>
+        )}
 
+        {showMoveModal && selectedUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-gray-900">Смена реферера</h3><button onClick={() => setShowMoveModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button></div>
+              <form onSubmit={handleMoveSubmit} className="space-y-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800"><p>Текущий пригласитель: <strong>{selectedUser.referredBy ? selectedUser.referredBy.phone : 'Нет'}</strong></p><p className="mt-1 text-xs">Это действие будет записано в журнал аудита.</p></div>
+                <div><label className="block text-sm font-medium text-gray-700 mb-1">ID нового пригласителя (пусто = корневой)</label><input type="number" value={moveForm.newReferredId} onChange={(e) => setMoveForm({ ...moveForm, newReferredId: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div>
+                <div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowMoveModal(false)} className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" disabled={moveLoading}>Отмена</button><button type="submit" disabled={moveLoading} className="flex-1 py-2 px-4 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50">{moveLoading ? 'Сохранение...' : 'Сохранить'}</button></div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {showRoleModal && selectedUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-gray-900">Смена роли</h3><button onClick={() => setShowRoleModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button></div>
+              <form onSubmit={handleRoleSubmit} className="space-y-4">
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-purple-800"><p>Пользователь: <strong>{selectedUser.phone}</strong></p><p className="mt-1">Текущая роль: <strong>{selectedUser.role}</strong></p></div>
+                <div><label className="block text-sm font-medium text-gray-700 mb-1">Новая роль</label><select value={roleForm.role} onChange={(e) => setRoleForm({ ...roleForm, role: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg"><option value="user">user (Пользователь)</option><option value="admin">admin (Администратор)</option><option value="controller">controller (Контроллер)</option></select></div>
+                <div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowRoleModal(false)} className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" disabled={roleLoading}>Отмена</button><button type="submit" disabled={roleLoading} className="flex-1 py-2 px-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50">{roleLoading ? 'Сохранение...' : 'Сохранить'}</button></div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {showResetModal && selectedUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-gray-900">Пароль сброшен!</h3><button onClick={() => { setShowResetModal(false); setGeneratedPassword(''); }} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button></div>
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4"><p className="text-sm text-green-800 mb-2">Новый временный пароль для <strong>{selectedUser.phone}</strong>:</p><p className="text-3xl font-bold text-green-900 text-center tracking-widest">{generatedPassword}</p><p className="text-xs text-green-700 mt-2 text-center">⚠️ Скопируйте пароль сейчас! Он не будет показан снова.</p></div>
+              <button onClick={() => { setShowResetModal(false); setGeneratedPassword(''); }} className="w-full py-2 px-4 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Закрыть</button>
+            </div>
+          </div>
+        )}
+
+        {showImportModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-gray-900">Восстановление дерева</h3><button onClick={() => { setShowImportModal(false); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button></div>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800 mb-4"><p className="font-bold">⚠️ ВНИМАНИЕ!</p><p className="mt-1">Это действие полностью перезапишет текущие связи `referredById` и пересчитает счетчики рефералов на основе данных из файла.</p></div>
+              <div className="space-y-4">
+                <div><label className="block text-sm font-medium text-gray-700 mb-1">Выберите файл backup дерева (.json)</label><input type="file" ref={fileInputRef} accept=".json" onChange={handleImportTree} className="w-full px-3 py-2 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100" /></div>
+                <div className="flex gap-3 pt-2"><button type="button" onClick={() => { setShowImportModal(false); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" disabled={importLoading}>Отмена</button></div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

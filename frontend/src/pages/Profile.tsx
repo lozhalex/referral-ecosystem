@@ -13,7 +13,6 @@ const Profile: React.FC = () => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Состояния для трекера РЦБ
   const [rcbActionLoading, setRcbActionLoading] = useState(false);
   const [rcbMessage, setRcbMessage] = useState('');
   const [rcbLinkInput, setRcbLinkInput] = useState('');
@@ -66,17 +65,14 @@ const Profile: React.FC = () => {
     }
   };
 
-  // ШАГ 2: Регистрация в РЦБ
   const handleMarkRegistered = async () => {
-    // Сначала открываем внешнюю ссылку РЦБ
     window.open('https://rcpay.ru', '_blank');
-    
     setRcbActionLoading(true);
     try {
       const res = await markRcbRegistered();
       if (res.success) {
         setRcbMessage(res.message);
-        await loadProfile(); // Обновляем данные, чтобы показать галочку
+        await loadProfile();
         setTimeout(() => setRcbMessage(''), 3000);
       }
     } catch (err: any) {
@@ -86,10 +82,8 @@ const Profile: React.FC = () => {
     }
   };
 
-  // ШАГ 3: Запрос на проверку оплаты
   const handleRequestPayment = async () => {
     if (!window.confirm('Вы подтверждаете, что оплатили 1990 ₽ в РЦБ? Администратор проверит этот факт вручную.')) return;
-    
     setRcbActionLoading(true);
     try {
       const res = await requestRcbPayment();
@@ -105,7 +99,6 @@ const Profile: React.FC = () => {
     }
   };
 
-  // Сохранение реферальной ссылки (доступно только после одобрения админом)
   const handleSaveRcbLink = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingLink(true);
@@ -203,7 +196,7 @@ const Profile: React.FC = () => {
               {user.isRcbPaid ? (
                 <span className="text-green-500 text-lg mt-0.5">✅</span>
               ) : user.rcbPaymentRequested ? (
-                <span className="text-blue-500 text-lg mt-0. animate-pulse">⏳</span>
+                <span className="text-blue-500 text-lg mt-0.5 animate-pulse">⏳</span>
               ) : (
                 <span className="text-gray-400 text-lg mt-0.5">🔒</span>
               )}
@@ -224,7 +217,6 @@ const Profile: React.FC = () => {
                   <p className="text-xs text-blue-600 font-medium">Заявка отправлена. Ожидайте проверки администратором.</p>
                 )}
 
-                {/* Поле ввода ссылки (только для подтвержденных партнеров) */}
                 {user.isRcbPaid && (
                   <form onSubmit={handleSaveRcbLink} className="mt-2">
                     <label className="text-xs text-gray-600 block mb-1">Ваша реферальная ссылка РЦБ:</label>
@@ -248,7 +240,7 @@ const Profile: React.FC = () => {
                 )}
               </div>
             </div>
-          }
+          </div>
         </div>
 
         <div className="mb-4">
@@ -274,7 +266,6 @@ const Profile: React.FC = () => {
           <button onClick={() => setShowLogoutModal(true)} className="w-full py-2.5 px-4 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition">Выйти из аккаунта</button>
         </div>
 
-        {/* Модальные окна (Invite, Logout) остаются без изменений, как в твоем исходном коде */}
         {copied && <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg text-sm z-50">✅ Ссылка скопирована!</div>}
         
         {showInviteModal && (
