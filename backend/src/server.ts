@@ -12,6 +12,7 @@ import scannerRoutes from './routes/scanner';
 import statsRoutes from './routes/stats';
 import alertsRoutes from './routes/alerts';
 import membershipRoutes from './routes/membership';
+import rcbRoutes from './routes/rcb';
 import autoRoutes from './routes/auto'; // 👈 ДОБАВЛЕНО
 
 const app = express();
