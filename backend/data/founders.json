@@ -2,16 +2,113 @@
   {
     "phone": "+79274204313",
     "role": "admin",
-    "referredByPhone": null
+    "referredByPhone": null,
+    "rcbId": "founder_root_1",
+    "rcbReferralLink": "https://rcpay.ru/r/9AXH2XX2"
   },
   {
-    "phone": "+79001112233",
+    "phone": "+79503278027",
     "role": "user",
-    "referredByPhone": "+79274204313"
+    "referredByPhone": "+79274204313",
+    "rcbId": null,
+    "rcbReferralLink": null
   },
   {
-    "phone": "+79004445566",
+    "phone": "+79276759165",
     "role": "user",
-    "referredByPhone": "+79274204313"
+    "referredByPhone": "+79274204313",
+    "rcbId": null,
+    "rcbReferralLink": null
+  },
+  {
+    "phone": "+79274452831",
+    "role": "user",
+    "referredByPhone": "+79274204313",
+    "rcbId": null,
+    "rcbReferralLink": null
+  },
+  {
+    "phone": "+79274914120",
+    "role": "user",
+    "referredByPhone": "+79274204313",
+    "rcbId": null,
+    "rcbReferralLink": null
+  },
+  {
+    "phone": "+79678722988",
+    "role": "user",
+    "referredByPhone": "+79274204313",
+    "rcbId": null,
+    "rcbReferralLink": null
+  },
+  {
+    "phone": "+79520307660",
+    "role": "user",
+    "referredByPhone": "+79274204313",
+    "rcbId": null,
+    "rcbReferralLink": null
+  },
+  {
+    "phone": "+79503187187",
+    "role": "user",
+    "referredByPhone": "+79274204313",
+    "rcbId": null,
+    "rcbReferralLink": null
+  },
+  {
+    "phone": "+79178777772",
+    "role": "user",
+    "referredByPhone": "+79274204313",
+    "rcbId": null,
+    "rcbReferralLink": null
+  },
+  {
+    "phone": "+79867151306",
+    "role": "user",
+    "referredByPhone": "+79274204313",
+    "rcbId": null,
+    "rcbReferralLink": null
+  },
+  {
+    "phone": "+79673782323",
+    "role": "user",
+    "referredByPhone": "+79274204313",
+    "rcbId": null,
+    "rcbReferralLink": null
+  },
+  {
+    "phone": "+79534809790",
+    "role": "user",
+    "referredByPhone": "+79274204313",
+    "rcbId": null,
+    "rcbReferralLink": null
+  },
+  {
+    "phone": "+79047635356",
+    "role": "user",
+    "referredByPhone": "+79274204313",
+    "rcbId": null,
+    "rcbReferralLink": null
+  },
+  {
+    "phone": "+79114665777",
+    "role": "user",
+    "referredByPhone": "+79274204313",
+    "rcbId": null,
+    "rcbReferralLink": null
+  },
+  {
+    "phone": "+79276755668",
+    "role": "user",
+    "referredByPhone": "+79274204313",
+    "rcbId": null,
+    "rcbReferralLink": null
+  },
+  {
+    "phone": "+79918461706",
+    "role": "user",
+    "referredByPhone": "+79503278027",
+    "rcbId": null,
+    "rcbReferralLink": null
   }
 ]

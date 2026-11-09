@@ -4,14 +4,14 @@ import * as path from 'path';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
-
-// Путь к файлу founders.json
 const foundersPath = path.join(__dirname, '../../data/founders.json');
 
 interface FounderData {
   phone: string;
   role: string;
   referredByPhone: string | null;
+  rcbId: string | null;
+  rcbReferralLink: string | null;
 }
 
 async function main() {
@@ -23,13 +23,11 @@ async function main() {
   }
 
   const founders: FounderData[] = JSON.parse(fs.readFileSync(foundersPath, 'utf-8'));
-  
-  // Временный пароль для созданных основателей (если их еще нет в базе)
   const tempPassword = 'Founder2026!'; 
   const passwordHash = await bcrypt.hash(tempPassword, 10);
 
   for (const founder of founders) {
-    // 1. Ищем реферера (если указан)
+    // 1. Ищем реферера внутри нашей системы (кто пригласил в RefPro)
     let referredById: number | null = null;
     if (founder.referredByPhone) {
       const referrer = await prisma.user.findUnique({
@@ -42,27 +40,33 @@ async function main() {
       }
     }
 
-    // 2. Upsert (Обновить или Создать)
+    // 2. Upsert (Обновить или Создать) с сохранением данных РЦБ
     const user = await prisma.user.upsert({
       where: { phone: founder.phone },
       update: {
-        isFounder: true, // Гарантируем флаг
+        isFounder: true,
         role: founder.role,
-        referredById: referredById // Обновляем связь, если нужно
+        referredById: referredById,
+        rcbId: founder.rcbId || undefined,
+        rcbReferralLink: founder.rcbReferralLink || undefined,
+        isRcbPaid: true // Раз это основатели из РЦБ, логично сразу пометить их как оплаченных/подтвержденных
       },
       create: {
         phone: founder.phone,
         passwordHash: passwordHash,
         role: founder.role,
         isFounder: true,
-        referredById: referredById
+        referredById: referredById,
+        rcbId: founder.rcbId || undefined,
+        rcbReferralLink: founder.rcbReferralLink || undefined,
+        isRcbPaid: true
       }
     });
 
-    console.log(`✅ Обработан: ${user.phone} (ID: ${user.id}, Founder: ${user.isFounder})`);
+    console.log(`✅ Обработан: ${user.phone} (ID: ${user.id}, РЦБ: ${user.rcbId || 'нет'}, Founder: ${user.isFounder})`);
   }
 
-  console.log('🎉 Все основатели успешно синхронизированы!');
+  console.log('🎉 Все основатели успешно синхронизированы с базой данных!');
 }
 
 main()
