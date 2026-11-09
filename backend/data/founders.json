@@ -1,7 +1,7 @@
 [
   {
     "phone": "+79274204313",
-    "role": "admin",
+    "role": "SUPER_ADMIN",
     "referredByPhone": null,
     "rcbId": "founder_root_1",
     "rcbReferralLink": "https://rcpay.ru/r/9AXH2XX2"
