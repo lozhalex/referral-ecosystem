@@ -13,6 +13,9 @@ model User {
   passwordHash   String
   role           String    @default("user")
   
+  // --- НОВОЕ: Предпочтительный способ связи ---
+  preferredContact String? // "sms", "telegram", "whatsapp", "max"
+
   // --- ЗАЩИТА ОСНОВАТЕЛЕЙ ---
   isFounder      Boolean   @default(false) 
 
