@@ -12,10 +12,11 @@ interface FounderData {
   referredByPhone: string | null;
   rcbId: string | null;
   rcbReferralLink: string | null;
+  isSmart: boolean;
 }
 
 async function main() {
-  console.log('🚀 Запуск скрипта восстановления основателей...');
+  console.log('🚀 Запуск скрипта синхронизации основателей (СМАРТ/ФРИ)...');
 
   if (!fs.existsSync(foundersPath)) {
     console.error('❌ Файл founders.json не найден по пути:', foundersPath);
@@ -27,7 +28,7 @@ async function main() {
   const passwordHash = await bcrypt.hash(tempPassword, 10);
 
   for (const founder of founders) {
-    // 1. Ищем реферера внутри нашей системы (кто пригласил в RefPro)
+    // 1. Ищем реферера внутри нашей системы
     let referredById: number | null = null;
     if (founder.referredByPhone) {
       const referrer = await prisma.user.findUnique({
@@ -40,33 +41,49 @@ async function main() {
       }
     }
 
-    // 2. Upsert (Обновить или Создать) с сохранением данных РЦБ
+    // 2. Определяем статусы на основе поля isSmart
+    const isSmart = founder.isSmart === true;
+    
+    // Если это корневой админ, оставляем SUPER_ADMIN, иначе для СМАРТ ставим 'partner'
+    let finalRole = founder.role;
+    if (isSmart && founder.role !== 'SUPER_ADMIN') {
+      finalRole = 'partner';
+    }
+
+    // 3. Upsert (Обновить или Создать)
     const user = await prisma.user.upsert({
       where: { phone: founder.phone },
       update: {
         isFounder: true,
-        role: founder.role,
+        role: finalRole,
         referredById: referredById,
         rcbId: founder.rcbId || undefined,
         rcbReferralLink: founder.rcbReferralLink || undefined,
-        isRcbPaid: true // Раз это основатели из РЦБ, логично сразу пометить их как оплаченных/подтвержденных
+        // И СМАРТ, и ФРИ уже зарегистрированы в РЦБ (Шаг 2 выполнен)
+        isRcbRegisteredFree: true, 
+        // Оплату 1990 прошли только СМАРТ
+        isRcbPaid: isSmart, 
+        rcbPaymentRequested: false // Сбрасываем флаг заявки, так как статус уже известен
       },
       create: {
         phone: founder.phone,
         passwordHash: passwordHash,
-        role: founder.role,
+        role: finalRole,
         isFounder: true,
         referredById: referredById,
         rcbId: founder.rcbId || undefined,
         rcbReferralLink: founder.rcbReferralLink || undefined,
-        isRcbPaid: true
+        isRcbRegisteredFree: true,
+        isRcbPaid: isSmart,
+        rcbPaymentRequested: false
       }
     });
 
-    console.log(`✅ Обработан: ${user.phone} (ID: ${user.id}, РЦБ: ${user.rcbId || 'нет'}, Founder: ${user.isFounder})`);
+    const statusText = isSmart ? 'СМАРТ (Партнер)' : 'ФРИ';
+    console.log(`✅ Обработан: ${user.phone} | Статус: ${statusText} | Роль: ${user.role}`);
   }
 
-  console.log('🎉 Все основатели успешно синхронизированы с базой данных!');
+  console.log('🎉 Синхронизация статусов основателей успешно завершена!');
 }
 
 main()
