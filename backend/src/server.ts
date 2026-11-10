@@ -19,15 +19,20 @@ const app = express();
 const PORT: number = Number(process.env.PORT) || 3000;
 const prisma = new PrismaClient(); // 👈 ДОБАВЛЕНО: экземпляр клиента для крон-задачи
 
-// ПУНКТ 16: Строгая настройка CORS (запрет wildcard *)
+// ПУНКТ 16: Строгая настройка CORS (добавлен новый домен)
 const allowedOrigins = [
   'http://localhost:5173', // Локальная разработка Vite
-  'http://177.177.212.220', // Текущий сервер
-  // 'https://your-domain.com' // Раскомментировать при покупке домена
+  'http://177.177.212.220', // Текущий сервер (оставляем для обратной совместимости)
+  'http://booomerang.ru',
+  'https://booomerang.ru',
+  'http://www.booomerang.ru',
+  'https://www.booomerang.ru'
 ];
 
 app.use(cors({ 
   origin: function(origin, callback) {
+    // Разрешаем запросы без origin (например, мобильные приложения или Postman) 
+    // или если origin есть в списке разрешенных
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {

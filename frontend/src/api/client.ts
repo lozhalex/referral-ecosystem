@@ -5,7 +5,7 @@ import axios from 'axios';
 const API_BASE_URL = '';
 
 export const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: 'https://booomerang.ru',
   headers: {
     'Content-Type': 'application/json',
     // ПУНКТ 16: Добавлен заголовок для прохождения CSRF-проверки на бэкенде
