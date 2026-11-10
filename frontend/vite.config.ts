@@ -8,32 +8,36 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Краски жизни',
-        short_name: 'RefPro',
-        description: 'Единая экосистема сервисов с кэшбеком и рефералами',
-        theme_color: '#ffffff',
-        background_color: '#ffffff',
+        name: 'Бумеранг — Экосистема', // <-- НОВОЕ ИМЯ (это сломает старый кэш PWA)
+        short_name: 'Бумеранг',        // <-- НОВОЕ ИМЯ
+        description: 'Премиальная экосистема с кэшбеком и рефералами',
+        theme_color: '#0B0F19',        // <-- ТЕМНЫЙ ЦВЕТ (под нашу тему)
+        background_color: '#0B0F19',   // <-- ТЕМНЫЙ ЦВЕТ
         display: 'standalone',
         icons: [
           {
-            src: '/icon-192.png',
+            src: '/icons/icon-192.png',
             sizes: '192x192',
             type: 'image/png',
           },
           {
-            src: '/icon-512.png',
+            src: '/icons/icon-512.png',
             sizes: '512x512',
             type: 'image/png',
           },
         ],
       },
+      workbox: {
+        // Заставляем Service Worker всегда проверять актуальность index.html
+        navigateFallbackDenylist: [/^\/api/],
+      }
     }),
   ],
   server: {
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000', // 👈 ИЗМЕНИЛИ ЗДЕСЬ на локальный сервер
+        target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
       },
