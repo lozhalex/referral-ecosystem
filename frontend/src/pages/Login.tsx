@@ -42,18 +42,22 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-sm">
-        <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">
+    <div className="min-h-screen flex items-center justify-center p-4 relative">
+      {/* Декоративные фоновые пятна для глубины */}
+      <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-neon-purple/10 rounded-full mix-blend-screen filter blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-neon-cyan/10 rounded-full mix-blend-screen filter blur-3xl pointer-events-none"></div>
+
+      <div className="glass w-full max-w-md p-8 border border-white/10 shadow-2xl relative z-10">
+        <h1 className="text-3xl font-bold text-center text-white mb-2 font-display tracking-tight">
           С возвращением!
         </h1>
-        <p className="text-center text-gray-500 mb-6 text-sm">
-          Войдите в свой аккаунт
+        <p className="text-center text-slate-400 mb-8 text-sm">
+          Войдите в экосистему Бумеранг
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">
               Номер телефона
             </label>
             <input
@@ -62,13 +66,13 @@ const Login: React.FC = () => {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="+7 (9XX) XXX-XX-XX"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-4 py-3 bg-dark-900/50 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:ring-1 focus:ring-neon-purple focus:border-neon-purple outline-none transition"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">
               Пароль
             </label>
             <input
@@ -77,18 +81,18 @@ const Login: React.FC = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Введите пароль"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-4 py-3 bg-dark-900/50 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:ring-1 focus:ring-neon-purple focus:border-neon-purple outline-none transition"
               required
             />
           </div>
 
           {error && (
-            <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-200 space-y-3">
+            <div className="bg-red-500/10 text-red-400 text-sm p-4 rounded-xl border border-red-500/20 space-y-3">
               <p>{error}</p>
               <div className="flex gap-2">
                 <Link 
                   to="/register" 
-                  className="flex-1 text-center py-1.5 px-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs font-medium transition"
+                  className="flex-1 text-center py-2 px-3 bg-white/10 text-white rounded-lg hover:bg-white/20 text-xs font-medium transition border border-white/10"
                 >
                   Регистрация
                 </Link>
@@ -98,9 +102,9 @@ const Login: React.FC = () => {
                     setError('');
                     setPassword('');
                   }}
-                  className="flex-1 py-1.5 px-3 border border-red-300 text-red-700 rounded-lg hover:bg-red-100 text-xs font-medium transition"
+                  className="flex-1 py-2 px-3 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30 text-xs font-medium transition border border-red-500/20"
                 >
-                  Повторный вход
+                  Очистить и повторить
                 </button>
               </div>
             </div>
@@ -109,23 +113,28 @@ const Login: React.FC = () => {
           <button
             type="submit"
             disabled={loading}
-            className={`w-full py-2.5 px-4 rounded-lg text-white font-semibold transition ${
-              loading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
-            }`}
+            className={`w-full py-3.5 px-4 rounded-xl text-white font-bold transition btn-neon disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
           >
-            {loading ? 'Вход...' : 'Войти'}
+            {loading ? (
+              <>
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                Вход...
+              </>
+            ) : (
+              'Войти в систему'
+            )}
           </button>
         </form>
 
-        {/* 🔒 БЛОК ВОССТАНОВЛЕНИЯ ПАРОЛЯ (ВАРИАНТ 4) */}
-        <div className="mt-8 pt-6 border-t border-gray-200">
+        {/* 🔒 БЛОК ВОССТАНОВЛЕНИЯ ПАРОЛЯ */}
+        <div className="mt-8 pt-6 border-t border-white/10">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-xl">🔒</span>
-            <h3 className="text-sm font-semibold text-gray-800">Забыли пароль?</h3>
+            <h3 className="text-sm font-semibold text-slate-200 font-display">Забыли пароль?</h3>
           </div>
-          <p className="text-xs text-gray-600 mb-4 leading-relaxed">
-            Пароль будет выслан в ручном режиме администратором, это займет какое-то время. 
-            Пожалуйста, напишите нам <strong>с того номера</strong>, на который зарегистрирован аккаунт.
+          <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+            Пароль будет выслан в ручном режиме администратором. 
+            Пожалуйста, напишите нам <strong className="text-slate-200">с того номера</strong>, на который зарегистрирован акка®,nt.
           </p>
           
           <div className="grid grid-cols-3 gap-2">
@@ -133,7 +142,7 @@ const Login: React.FC = () => {
               href="https://t.me/your_admin_telegram" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1 py-2 px-1 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition text-xs font-medium border border-blue-200"
+              className="flex items-center justify-center gap-1 py-2.5 px-1 bg-blue-500/10 text-blue-400 rounded-lg hover:bg-blue-500/20 transition text-xs font-medium border border-blue-500/20"
             >
               <span>✈️</span> Telegram
             </a>
@@ -141,7 +150,7 @@ const Login: React.FC = () => {
               href="https://wa.me/79000000000" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1 py-2 px-1 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition text-xs font-medium border border-green-200"
+              className="flex items-center justify-center gap-1 py-2.5 px-1 bg-green-500/10 text-green-400 rounded-lg hover:bg-green-500/20 transition text-xs font-medium border border-green-500/20"
             >
               <span>💬</span> WhatsApp
             </a>
@@ -149,17 +158,17 @@ const Login: React.FC = () => {
               href="https://max.me/your_admin_max" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1 py-2 px-1 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition text-xs font-medium border border-purple-200"
+              className="flex items-center justify-center gap-1 py-2.5 px-1 bg-purple-500/10 text-purple-400 rounded-lg hover:bg-purple-500/20 transition text-xs font-medium border border-purple-500/20"
             >
               <span>📱</span> Max
             </a>
           </div>
         </div>
 
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-500">
+        <div className="mt-8 text-center">
+          <p className="text-sm text-slate-400">
             Нет аккаунта?{' '}
-            <Link to="/register" className="text-blue-600 font-medium hover:underline">
+            <Link to="/register" className="text-neon-cyan font-medium hover:text-neon-purple transition">
               Зарегистрироваться
             </Link>
           </p>

@@ -64,13 +64,12 @@ const Register: React.FC = () => {
 
         alert('✅ Регистрация успешна!\nВаш временный пароль: 1234');
 
-        // 🎯 ЛОГИКА РЕДИРЕКТА ПОСЛЕ РЕГИСТРАЦИИ
         const redirectPath = localStorage.getItem('redirectAfterLogin');
         if (redirectPath) {
           localStorage.removeItem('redirectAfterLogin');
           navigate(redirectPath);
         } else {
-          navigate('/profile'); // Стандартный переход в профиль после регистрации
+          navigate('/profile');
         }
       }
     } catch (err: any) {
@@ -111,18 +110,22 @@ const Register: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-sm">
-        <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">
+    <div className="min-h-screen flex items-center justify-center p-4 relative">
+      {/* Декоративные фоновые пятна */}
+      <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-neon-purple/10 rounded-full mix-blend-screen filter blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-neon-cyan/10 rounded-full mix-blend-screen filter blur-3xl pointer-events-none"></div>
+
+      <div className="glass w-full max-w-md p-8 border border-white/10 shadow-2xl relative z-10">
+        <h1 className="text-3xl font-bold text-center text-white mb-2 font-display tracking-tight">
           Создать аккаунт
         </h1>
-        <p className="text-sm text-center text-gray-500 mb-6">
-          Присоединяйтесь к экосистеме
+        <p className="text-sm text-center text-slate-400 mb-8">
+          Присоединяйтесь к экосистеме Бумеранг
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">
               Ваш номер телефона
             </label>
             <input
@@ -131,13 +134,13 @@ const Register: React.FC = () => {
               value={phone}
               onChange={(e) => setPhone(formatPhone(e.target.value))}
               placeholder="+7 (___) ___-__-__"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-4 py-3 bg-dark-900/50 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:ring-1 focus:ring-neon-purple focus:border-neon-purple outline-none transition"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">
               Номер телефона пригласителя
             </label>
             <input
@@ -150,19 +153,21 @@ const Register: React.FC = () => {
               }}
               readOnly={isRefLocked}
               placeholder="+7 (___) ___-__-__"
-              className={`w-full px-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 ${
-                isRefLocked ? 'bg-gray-100 border-gray-300 text-gray-600' : 'border-gray-300'
+              className={`w-full px-4 py-3 border rounded-xl outline-none transition ${
+                isRefLocked 
+                  ? 'bg-dark-800/50 border-white/5 text-slate-400 cursor-not-allowed' 
+                  : 'bg-dark-900/50 border-white/10 text-white focus:ring-1 focus:ring-neon-purple focus:border-neon-purple'
               }`}
             />
             {isRefLocked && (
-              <p className="mt-1 text-xs text-green-600">
-                🔒 Автозаполнено по реферальной ссылке
+              <p className="mt-2 text-xs text-neon-green flex items-center gap-1">
+                <span>🔒</span> Автозаполнено по реферальной ссылке
               </p>
             )}
           </div>
 
           {error && (
-            <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-200">
+            <div className="bg-red-500/10 text-red-400 text-sm p-4 rounded-xl border border-red-500/20">
               {error}
             </div>
           )}
@@ -170,34 +175,40 @@ const Register: React.FC = () => {
           <button
             type="submit"
             disabled={loading}
-            className={`w-full py-2.5 px-4 rounded-lg text-white font-semibold transition ${
-              loading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
-            }`}
+            className="w-full py-3.5 px-4 rounded-xl text-white font-bold transition btn-neon disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {loading ? 'Загрузка...' : 'Зарегистрироваться'}
+            {loading ? (
+              <>
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                Регистрация...
+              </>
+            ) : (
+              'Зарегистрироваться'
+            )}
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-500">
+        <div className="mt-8 text-center">
+          <p className="text-sm text-slate-400">
             Уже есть аккаунт?{' '}
-            <Link to="/login" className="text-blue-600 font-medium hover:underline">
+            <Link to="/login" className="text-neon-cyan font-medium hover:text-neon-purple transition">
               Войти
             </Link>
           </p>
         </div>
 
+        {/* Модальное окно */}
         {showReferrerModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-xs p-6">
-              <p className="text-center text-gray-800 font-medium mb-5">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark-900/80 backdrop-blur-sm px-4">
+            <div className="glass w-full max-w-sm p-6 border border-white/10 shadow-2xl text-center">
+              <p className="text-white font-medium mb-6 font-display text-lg">
                 Необходимо ввести номер телефона пригласителя
               </p>
 
               <button
                 type="button"
                 onClick={handleModalDontKnow}
-                className="w-full py-2.5 px-4 mb-2 rounded-lg text-white font-semibold bg-blue-600 hover:bg-blue-700 transition"
+                className="w-full py-3 mb-3 rounded-xl text-white font-semibold btn-neon transition"
               >
                 Я не знаю номер пригласителя
               </button>
@@ -205,9 +216,9 @@ const Register: React.FC = () => {
               <button
                 type="button"
                 onClick={handleModalOk}
-                className="w-full py-2.5 px-4 rounded-lg font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition"
+                className="w-full py-3 rounded-xl font-semibold text-slate-300 bg-white/5 hover:bg-white/10 transition border border-white/10"
               >
-                OK
+                Вернуться и ввести
               </button>
             </div>
           </div>
