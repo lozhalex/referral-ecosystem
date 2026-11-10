@@ -3,7 +3,7 @@ import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
-import { authenticateToken } from '../middleware/authenticateToken'; // 👈 Импортируем из middleware
+import { authenticateToken } from '../middleware/authenticateToken';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -99,7 +99,6 @@ router.post('/register', registerLimiter, async (req: Request, res: Response) =>
           phone: formattedPhone,
           passwordHash,
           referredById: referrer.id,
-          // tokenVersion по умолчанию равен 1 (задано в schema.prisma)
         },
       });
 
@@ -198,7 +197,6 @@ router.post('/change-password', authenticateToken, async (req: any, res: Respons
 
     const newPasswordHash = await bcrypt.hash(new_password, 10);
 
-    // 👈 ПУНКТ 6: Увеличиваем версию токена, чтобы все старые сессии этого пользователя стали недействительными
     await prisma.user.update({
       where: { id: userId },
       data: { 
@@ -229,6 +227,13 @@ router.get('/me', authenticateToken, async (req: any, res: Response) => {
         role: true,
         referralCount: true,
         createdAt: true,
+        // 👇 ДОБАВЛЕНО: Поля для Умного мостика РЦБ
+        isRcbPaid: true,
+        isRcbRegisteredFree: true,
+        rcbPaymentRequested: true,
+        rcbReferralLink: true,
+        rcbId: true,
+        // 👆
         wallet: { select: { balance: true } },
         referredBy: { select: { id: true, phone: true } },
         referrals: {
