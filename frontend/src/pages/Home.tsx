@@ -26,24 +26,18 @@ export default function Home() {
     window.location.reload();
   };
 
-  // Загрузка реального количества пользователей
   useEffect(() => {
     apiClient.get('/api/stats/total-users')
       .then((res) => {
-        if (res.data.success) {
-          setUserCount(res.data.count);
-        }
+        if (res.data.success) setUserCount(res.data.count);
       })
       .catch(() => setUserCount(1247));
   }, []);
 
-  // Загрузка уведомлений Автохелпера
   useEffect(() => {
     apiClient.get('/api/auto/notifications')
       .then((res) => {
-        if (res.data.success) {
-          setAutoNotifications(res.data.totalCount || 0);
-        }
+        if (res.data.success) setAutoNotifications(res.data.totalCount || 0);
       })
       .catch(() => setAutoNotifications(0));
   }, []);
@@ -51,19 +45,16 @@ export default function Home() {
   const available = projects.filter(p => p.status === 'available');
   const development = projects.filter(p => p.status === 'development');
   const planned = projects.filter(p => p.status === 'planned');
-
   const hiddenCount = planned.length;
 
-  // Функция для рендера карточки проекта с бейджем
   const renderProjectCard = (p: any) => {
     const hasNotification = p.id === 'auto' && autoNotifications > 0;
-    
     return (
-      <div key={p.id} className="relative">
+      <div key={p.id} className="relative group">
         <ProjectCard project={p} isAuthorized={!!user} />
         {hasNotification && (
           <div className="absolute -top-2 -right-2 z-10">
-            <div className="bg-red-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse">
+            <div className="bg-red-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-dark-900">
               {autoNotifications > 9 ? '9+' : autoNotifications}
             </div>
           </div>
@@ -73,22 +64,26 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-dark-900 relative">
+      {/* Декоративные фоновые пятна */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-neon-purple/10 rounded-full mix-blend-screen filter blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-neon-cyan/10 rounded-full mix-blend-screen filter blur-3xl pointer-events-none"></div>
+
       <Header user={user} onLogout={handleLogout} />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
         <section className="text-center mb-10">
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">
-            Добро пожаловать в экосистему!
+          <h1 className="text-4xl sm:text-5xl font-bold text-white mb-4 font-display tracking-tight">
+            Добро пожаловать в <span className="text-neon-gradient">Бумеранг</span>
           </h1>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+          <p className="text-lg text-slate-400 max-w-2xl mx-auto">
             Один аккаунт — доступ ко всем сервисам. Приглашай друзей и получай бонусы за каждое действие.
           </p>
         </section>
 
-        <section className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-full px-5 py-2">
-            <span className="text-blue-600 font-semibold">
+        <section className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 glass px-6 py-3 border border-neon-cyan/20">
+            <span className="text-neon-cyan font-semibold font-display text-lg">
               {userCount !== null ? (
                 <>👥 Нас уже {userCount.toLocaleString('ru-RU')} {getUserCountText(userCount)}</>
               ) : (
@@ -99,34 +94,34 @@ export default function Home() {
         </section>
 
         {available.length > 0 && (
-          <section className="mb-10">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-green-500"></span>
+          <section className="mb-12">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3 font-display">
+              <span className="w-3 h-3 rounded-full bg-neon-green shadow-[0_0_10px_#10B981]"></span>
               Доступны сейчас
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {available.map(renderProjectCard)}
             </div>
           </section>
         )}
 
         {development.length > 0 && (
-          <section className="mb-10">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
+          <section className="mb-12">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3 font-display">
+              <span className="w-3 h-3 rounded-full bg-yellow-400 shadow-[0_0_10px_#FACC15]"></span>
               В разработке
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {development.map(renderProjectCard)}
             </div>
           </section>
         )}
 
         {!showAll && hiddenCount > 0 && (
-          <section className="text-center mb-10">
+          <section className="text-center mb-12">
             <button
               onClick={() => setShowAll(true)}
-              className="px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+              className="px-8 py-3 glass text-slate-300 rounded-xl hover:bg-white/10 hover:text-white transition font-medium border border-white/10"
             >
               Показать ещё {hiddenCount} проектов ▼
             </button>
@@ -134,54 +129,54 @@ export default function Home() {
         )}
 
         {showAll && planned.length > 0 && (
-          <section className="mb-10">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-gray-400"></span>
+          <section className="mb-12">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3 font-display">
+              <span className="w-3 h-3 rounded-full bg-slate-500"></span>
               В планах
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {planned.map(renderProjectCard)}
             </div>
           </section>
         )}
 
-        <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sm:p-8 mb-10">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">
+        <section className="glass rounded-2xl border border-white/5 p-8 sm:p-10 mb-12">
+          <h2 className="text-2xl font-bold text-white mb-8 text-center font-display">
             Как работает экосистема
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <div className="text-center">
-              <div className="w-12 h-12 mx-auto mb-3 bg-blue-100 rounded-full flex items-center justify-center text-2xl">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+            <div className="text-center p-4 rounded-xl bg-white/5 border border-white/5">
+              <div className="w-14 h-14 mx-auto mb-4 bg-neon-purple/10 rounded-full flex items-center justify-center text-3xl border border-neon-purple/20">
                 📱
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">1. Регистрируешься</h3>
-              <p className="text-sm text-gray-600">
+              <h3 className="font-semibold text-white mb-2 font-display">1. Регистрируешься</h3>
+              <p className="text-sm text-slate-400">
                 Один аккаунт по номеру телефона работает во всех проектах экосистемы
               </p>
             </div>
-            <div className="text-center">
-              <div className="w-12 h-12 mx-auto mb-3 bg-green-100 rounded-full flex items-center justify-center text-2xl">
+            <div className="text-center p-4 rounded-xl bg-white/5 border border-white/5">
+              <div className="w-14 h-14 mx-auto mb-4 bg-neon-cyan/10 rounded-full flex items-center justify-center text-3xl border border-neon-cyan/20">
                 🎁
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">2. Приглашаешь друзей</h3>
-              <p className="text-sm text-gray-600">
+              <h3 className="font-semibold text-white mb-2 font-display">2. Приглашаешь друзей</h3>
+              <p className="text-sm text-slate-400">
                 Делись своей ссылкой — получай бонусы за каждого приглашённого
               </p>
             </div>
-            <div className="text-center">
-              <div className="w-12 h-12 mx-auto mb-3 bg-purple-100 rounded-full flex items-center justify-center text-2xl">
+            <div className="text-center p-4 rounded-xl bg-white/5 border border-white/5">
+              <div className="w-14 h-14 mx-auto mb-4 bg-neon-green/10 rounded-full flex items-center justify-center text-3xl border border-neon-green/20">
                 💰
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">3. Получаешь кэшбек</h3>
-              <p className="text-sm text-gray-600">
+              <h3 className="font-semibold text-white mb-2 font-display">3. Получаешь кэшбек</h3>
+              <p className="text-sm text-slate-400">
                 Используй сервисы — получай баллы на единый кошелёк экосистемы
               </p>
             </div>
           </div>
         </section>
 
-        <footer className="text-center text-sm text-gray-500 pb-8">
-          <p>© 2026 Краски жизни · Один аккаунт — все сервисы</p>
+        <footer className="text-center text-sm text-slate-500 pb-8 border-t border-white/5 pt-8">
+          <p>© 2026 Бумеранг · Один аккаунт — все сервисы</p>
         </footer>
       </main>
     </div>
