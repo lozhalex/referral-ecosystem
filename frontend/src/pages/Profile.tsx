@@ -83,7 +83,7 @@ const Profile: React.FC = () => {
   };
 
   const handleRequestPayment = async () => {
-    if (!window.confirm('Вы подтверждаете, что оплатили 1990 ₽ в РЦБ? Администратор проверит этот факт вручную.')) return;
+    if (!window.confirm('Вы подтверждаете, что оплатили тариф СМАРТ (1990 ₽) в РЦБ? Администратор проверит этот факт вручную.')) return;
     setRcbActionLoading(true);
     try {
       const res = await requestRcbPayment();
@@ -155,92 +155,108 @@ const Profile: React.FC = () => {
           <p className="text-3xl font-bold text-blue-700">{user.referralCount || 0}</p>
         </div>
 
-        {/* 🌉 ТРЕКЕР ПАРТНЕРСТВА РЦБ */}
-        <div className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4 mb-4">
-          <h3 className="text-sm font-bold text-purple-800 mb-3 flex items-center gap-2">🚀 Статус партнерства</h3>
+        {/* 🌉 АДАПТИВНЫЙ ТРЕКЕР ПАРТНЕРСТВА РЦБ */}
+        <div className={`rounded-lg p-4 mb-4 border ${user.isRcbPaid ? 'bg-green-50 border-green-200' : 'bg-purple-50 border-purple-200'}`}>
+          <h3 className="text-sm font-bold text-purple-800 mb-3 flex items-center gap-2">
+            {user.isRcbPaid ? '🏆 Ваш статус: Партнер СМАРТ' : '🚀 Путь партнера РЦБ'}
+          </h3>
           
           {rcbMessage && (
             <div className="mb-3 p-2 bg-green-100 text-green-800 text-xs rounded border border-green-200">{rcbMessage}</div>
           )}
 
-          <div className="space-y-4">
-            {/* Шаг 1 */}
-            <div className="flex items-center gap-3">
-              <span className="text-green-500 text-lg">✅</span>
-              <span className="text-sm text-gray-700">Шаг 1. Регистрация в RefPro — <span className="font-semibold text-green-700">Выполнено</span></span>
-            </div>
-
-            {/* Шаг 2 */}
-            <div className="flex items-start gap-3">
-              {user.isRcbRegisteredFree ? (
-                <span className="text-green-500 text-lg mt-0.5">✅</span>
-              ) : (
-                <span className="text-yellow-500 text-lg mt-0.5">⏳</span>
-              )}
-              <div className="flex-1">
-                <p className="text-sm text-gray-700 mb-1">Шаг 2. Регистрация в РЦБ (бесплатно)</p>
-                {!user.isRcbRegisteredFree && (
+          {/* ВАРИАНТ А: Пользователь уже СМАРТ */}
+          {user.isRcbPaid ? (
+            <div className="space-y-3">
+              <p className="text-sm text-green-700">
+                Поздравляем! Вы активировали статус партнера. Теперь вы можете приглашать участников и получать бонусы.
+              </p>
+              <form onSubmit={handleSaveRcbLink} className="mt-2">
+                <label className="text-xs text-gray-600 block mb-1">Ваша реферальная ссылка РЦБ:</label>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={rcbLinkInput}
+                    onChange={(e) => setRcbLinkInput(e.target.value)}
+                    placeholder="https://rcpay.ru/r/..."
+                    className="flex-1 text-sm px-3 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-green-500 outline-none bg-white"
+                  />
                   <button
-                    onClick={handleMarkRegistered}
-                    disabled={rcbActionLoading}
-                    className="text-xs bg-purple-600 text-white px-3 py-1.5 rounded hover:bg-purple-700 transition disabled:opacity-50"
+                    type="submit"
+                    disabled={savingLink}
+                    className="text-sm bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition disabled:opacity-50 whitespace-nowrap"
                   >
-                    {rcbActionLoading ? 'Обработка...' : 'Зарегистрироваться в РЦБ ↗'}
+                    {savingLink ? '...' : 'Сохранить'}
                   </button>
-                )}
+                </div>
+              </form>
+            </div>
+          ) : (
+            /* ВАРИАНТ Б: Пользователь еще не СМАРТ (показываем шаги) */
+            <div className="space-y-4">
+              {/* Шаг 1 */}
+              <div className="flex items-center gap-3">
+                <span className="text-green-500 text-lg">✅</span>
+                <span className="text-sm text-gray-700">Регистрация в RefPro — <span className="font-semibold text-green-700">Выполнено</span></span>
               </div>
-            </div>
 
-            {/* Шаг 3 */}
-            <div className="flex items-start gap-3">
-              {user.isRcbPaid ? (
-                <span className="text-green-500 text-lg mt-0.5">✅</span>
-              ) : user.rcbPaymentRequested ? (
-                <span className="text-blue-500 text-lg mt-0.5 animate-pulse">⏳</span>
-              ) : (
-                <span className="text-gray-400 text-lg mt-0.5">🔒</span>
-              )}
-              <div className="flex-1">
-                <p className="text-sm text-gray-700 mb-1">Шаг 3. Активация статуса СМАРТ (1990 ₽)</p>
-                
-                {!user.isRcbPaid && user.isRcbRegisteredFree && !user.rcbPaymentRequested && (
-                  <button
-                    onClick={handleRequestPayment}
-                    disabled={rcbActionLoading}
-                    className="text-xs bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700 transition disabled:opacity-50"
-                  >
-                    {rcbActionLoading ? 'Обработка...' : 'Я оплатил 1990 ₽, проверить'}
-                  </button>
+              {/* Шаг 2 */}
+              <div className="flex items-start gap-3">
+                {user.isRcbRegisteredFree ? (
+                  <span className="text-green-500 text-lg mt-0.5">✅</span>
+                ) : (
+                  <span className="text-yellow-500 text-lg mt-0.5">⏳</span>
                 )}
-                
-                {user.rcbPaymentRequested && !user.isRcbPaid && (
-                  <p className="text-xs text-blue-600 font-medium">Заявка отправлена. Ожидайте проверки администратором.</p>
-                )}
+                <div className="flex-1">
+                  <p className="text-sm text-gray-700 mb-1">Регистрация в РЦБ (бесплатно)</p>
+                  {!user.isRcbRegisteredFree ? (
+                    <button
+                      onClick={handleMarkRegistered}
+                      disabled={rcbActionLoading}
+                      className="text-xs bg-purple-600 text-white px-3 py-1.5 rounded hover:bg-purple-700 transition disabled:opacity-50"
+                    >
+                      {rcbActionLoading ? 'Обработка...' : 'Перейти к регистрации в РЦБ ↗'}
+                    </button>
+                  ) : (
+                    <span className="text-xs text-green-600 font-medium">Аккаунт в РЦБ создан</span>
+                  )}
+                </div>
+              </div>
 
-                {user.isRcbPaid && (
-                  <form onSubmit={handleSaveRcbLink} className="mt-2">
-                    <label className="text-xs text-gray-600 block mb-1">Ваша реферальная ссылка РЦБ:</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="url"
-                        value={rcbLinkInput}
-                        onChange={(e) => setRcbLinkInput(e.target.value)}
-                        placeholder="https://rcpay.ru/r/..."
-                        className="flex-1 text-xs px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none"
-                      />
+              {/* Шаг 3 */}
+              <div className="flex items-start gap-3">
+                {user.rcbPaymentRequested ? (
+                  <span className="text-blue-500 text-lg mt-0.5 animate-pulse">⏳</span>
+                ) : (
+                  <span className="text-gray-400 text-lg mt-0.5">🔒</span>
+                )}
+                <div className="flex-1">
+                  <p className="text-sm text-gray-700 mb-1">Активация тарифа СМАРТ (1990 ₽)</p>
+                  
+                  {!user.rcbPaymentRequested && user.isRcbRegisteredFree && (
+                    <>
+                      <p className="text-xs text-gray-600 mb-2">
+                        Для получения статуса партнера и вашей личной реферальной ссылки, пожалуйста, внесите оплату тарифа СМАРТ в приложении РЦБ.
+                      </p>
                       <button
-                        type="submit"
-                        disabled={savingLink}
-                        className="text-xs bg-purple-600 text-white px-3 py-1.5 rounded hover:bg-purple-700 transition disabled:opacity-50"
+                        onClick={handleRequestPayment}
+                        disabled={rcbActionLoading}
+                        className="text-xs bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700 transition disabled:opacity-50"
                       >
-                        {savingLink ? '...' : 'Сохранить'}
+                        {rcbActionLoading ? 'Обработка...' : 'Я оплатил тариф СМАРТ, проверить'}
                       </button>
-                    </div>
-                  </form>
-                )}
+                    </>
+                  )}
+                  
+                  {user.rcbPaymentRequested && (
+                    <p className="text-xs text-blue-600 font-medium bg-blue-50 p-2 rounded border border-blue-100">
+                      📨 Заявка на проверку оплаты отправлена администратору. Мы свяжемся с вами в ближайшее время.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="mb-4">
