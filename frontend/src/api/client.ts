@@ -1,15 +1,10 @@
 import axios from 'axios';
 
-// ПУСТАЯ строка означает "использовать текущий домен". 
-// Nginx перехватит запросы к /api и перенаправит их на localhost:3000
-const API_BASE_URL = '';
-
 export const apiClient = axios.create({
-  baseURL: 'https://booomerang.ru',
+  baseURL: 'https://booomerang.ru', // 👈 Строго HTTPS домен
   headers: {
     'Content-Type': 'application/json',
-    // ПУНКТ 16: Добавлен заголовок для прохождения CSRF-проверки на бэкенде
-    'x-requested-with': 'XMLHttpRequest',
+    'x-requested-with': 'XMLHttpRequest', // Для CSRF-защиты на бэкенде
   },
 });
 
@@ -28,11 +23,9 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // При истечении токена (или невалидном) очищаем хранилище
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      // Опционально: можно сделать редирект на страницу входа
-      // window.location.href = '/';
+      // window.location.href = '/'; // Раскомментируй, если нужен авто-редирект на логин
     }
     return Promise.reject(error);
   }
