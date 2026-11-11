@@ -9,7 +9,7 @@ export default function Header({ user, onLogout }: HeaderProps) {
   const navigate = useNavigate();
 
   return (
-    <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
+    <header className="glass border-b border-white/10 sticky top-0 z-40 backdrop-blur-xl bg-dark-800/80">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Логотип */}
@@ -17,26 +17,26 @@ export default function Header({ user, onLogout }: HeaderProps) {
             className="flex items-center gap-2 cursor-pointer"
             onClick={() => navigate('/')}
           >
-            <span className="text-2xl">🎨</span>
-            <span className="text-xl font-bold text-gray-900">Краски жизни</span>
+            <span className="text-2xl">🪃</span>
+            <span className="text-xl font-bold text-white font-display">Бумеранг</span>
           </div>
 
           {/* Кнопки */}
           <div className="flex items-center gap-3">
             {user ? (
               <>
-                <span className="hidden sm:block text-sm text-gray-600">
+                <span className="hidden sm:block text-sm text-slate-300">
                   Привет, {user.phone}
                 </span>
                 <button
                   onClick={() => navigate('/profile')}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                  className="px-4 py-2 text-sm font-medium text-slate-300 glass hover:bg-white/10 rounded-xl transition border border-white/10"
                 >
                   Профиль
                 </button>
                 <button
                   onClick={onLogout}
-                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition"
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-500/10 hover:bg-red-500/20 rounded-xl transition border border-red-500/20"
                 >
                   Выйти
                 </button>
@@ -45,13 +45,13 @@ export default function Header({ user, onLogout }: HeaderProps) {
               <>
                 <button
                   onClick={() => navigate('/login')}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                  className="px-4 py-2 text-sm font-medium text-slate-300 glass hover:bg-white/10 rounded-xl transition border border-white/10"
                 >
                   Войти
                 </button>
                 <button
                   onClick={() => navigate('/register')}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
+                  className="px-4 py-2 text-sm font-medium text-white btn-neon rounded-xl"
                 >
                   Регистрация
                 </button>
@@ -59,11 +59,10 @@ export default function Header({ user, onLogout }: HeaderProps) {
             )}
           </div>
         </div>
-
         {/* Слоган */}
         <div className="pb-3 text-center">
-          <p className="text-sm text-gray-500 italic">
-            Все цвета радости. Одна экосистема жизни.
+          <p className="text-sm text-slate-400 italic">
+            Всё возвращается. Одна экосистема жизни.
           </p>
         </div>
       </div>

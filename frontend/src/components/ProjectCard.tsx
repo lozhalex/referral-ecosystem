@@ -9,21 +9,24 @@ interface ProjectCardProps {
 const statusConfig = {
   available: {
     label: 'Доступен',
-    bg: 'bg-green-100',
-    text: 'text-green-800',
-    dot: 'bg-green-500',
+    bg: 'bg-neon-green/10',
+    text: 'text-neon-green',
+    dot: 'bg-neon-green',
+    border: 'border-neon-green/20',
   },
   development: {
     label: 'В разработке',
-    bg: 'bg-yellow-100',
-    text: 'text-yellow-800',
-    dot: 'bg-yellow-500',
+    bg: 'bg-yellow-400/10',
+    text: 'text-yellow-400',
+    dot: 'bg-yellow-400',
+    border: 'border-yellow-400/20',
   },
   planned: {
     label: 'В планах',
-    bg: 'bg-gray-100',
-    text: 'text-gray-600',
-    dot: 'bg-gray-400',
+    bg: 'bg-slate-500/10',
+    text: 'text-slate-400',
+    dot: 'bg-slate-500',
+    border: 'border-slate-500/20',
   },
 };
 
@@ -32,50 +35,49 @@ export default function ProjectCard({ project, isAuthorized }: ProjectCardProps)
   const config = statusConfig[project.status];
 
   const handleClick = () => {
-    // 1. Сначала проверяем статус
     if (project.status === 'planned') {
       alert('Этот проект скоро будет доступен! Следите за обновлениями.');
       return;
     }
 
-    // 2. Для development и available — переходим на страницу проекта
-    // (development покажет заглушку, available — реальный функционал)
     if (project.status === 'available' && !isAuthorized) {
-      // Только для доступных проектов требуем авторизацию
       localStorage.setItem('redirectAfterLogin', project.route);
       navigate('/login');
       return;
     }
 
-    // development — пускаем всех (заглушка покажет прогресс)
-    // available + авторизован — пускаем в проект
     navigate(project.route);
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow flex flex-col h-full">
+    <div
+      className="glass p-5 hover:bg-white/10 transition-all duration-300 flex flex-col h-full border border-white/5 cursor-pointer group"
+      onClick={handleClick}
+    >
       <div className="flex items-start gap-3 mb-3">
         <span className="text-3xl">{project.icon}</span>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-gray-900 truncate">{project.title}</h3>
-          <span className={`inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${config.dot}`}></span>
+          <h3 className="font-semibold text-white truncate font-display">{project.title}</h3>
+          <span
+            className={`inline-flex items-center gap-1.5 mt-1 px-2.5 py-1 rounded-full text-xs font-medium ${config.bg} ${config.text} border ${config.border}`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${config.dot} shadow-[0_0_5px_currentColor]`}></span>
             {config.label}
           </span>
         </div>
       </div>
 
-      <p className="text-sm text-gray-600 mb-4 flex-1">{project.description}</p>
+      <p className="text-sm text-slate-400 mb-4 flex-1">{project.description}</p>
 
       {project.status === 'development' && project.progress !== undefined && (
         <div className="mb-4">
-          <div className="flex justify-between text-xs text-gray-500 mb-1">
+          <div className="flex justify-between text-xs text-slate-400 mb-1">
             <span>Готовность</span>
             <span>{project.progress}%</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-dark-900/50 rounded-full h-2 border border-white/5">
             <div
-              className="bg-yellow-500 h-2 rounded-full transition-all"
+              className="bg-gradient-to-r from-neon-purple to-neon-cyan h-2 rounded-full transition-all shadow-[0_0_10px_rgba(139,92,246,0.5)]"
               style={{ width: `${project.progress}%` }}
             ></div>
           </div>
@@ -83,14 +85,24 @@ export default function ProjectCard({ project, isAuthorized }: ProjectCardProps)
       )}
 
       <button
-        onClick={handleClick}
-        className={`w-full py-2 px-4 rounded-lg text-sm font-medium transition ${
+        onClick={(e) => {
+          e.stopPropagation();
+          handleClick();
+        }}
+        className={`w-full py-2.5 px-4 rounded-xl text-sm font-medium transition flex items-center justify-center gap-2 ${
           project.status === 'available'
-            ? 'bg-blue-600 text-white hover:bg-blue-700'
-            : 'bg-gray-100 text-gray-500 cursor-not-allowed'
+            ? 'btn-neon'
+            : 'bg-white/5 text-slate-400 cursor-not-allowed border border-white/10'
         }`}
       >
-        {project.status === 'available' ? 'Открыть ▶' : 'Скоро'}
+        {project.status === 'available' ? (
+          <>
+            Открыть
+            <span>▶</span>
+          </>
+        ) : (
+          'Скоро'
+        )}
       </button>
     </div>
   );
