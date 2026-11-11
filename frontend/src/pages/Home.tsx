@@ -29,9 +29,16 @@ export default function Home() {
   useEffect(() => {
     apiClient.get('/api/stats/total-users')
       .then((res) => {
-        if (res.data.success) setUserCount(res.data.count);
+        if (res.data.success) {
+          setUserCount(res.data.count);
+        } else {
+          setUserCount(0);
+        }
       })
-      .catch(() => setUserCount(1247));
+      .catch((err) => {
+        console.error('Ошибка загрузки счетчика пользователей:', err);
+        setUserCount(0); // Безопасный фолбэк вместо фейковой 1247
+      });
   }, []);
 
   useEffect(() => {
@@ -39,7 +46,10 @@ export default function Home() {
       .then((res) => {
         if (res.data.success) setAutoNotifications(res.data.totalCount || 0);
       })
-      .catch(() => setAutoNotifications(0));
+      .catch((err) => {
+        console.error('Ошибка загрузки уведомлений:', err);
+        setAutoNotifications(0);
+      });
   }, []);
 
   const available = projects.filter(p => p.status === 'available');
