@@ -27,51 +27,59 @@ const AutoHelper: React.FC = () => {
     }
   };
 
+  const navItems = [
+    { id: 'dashboard', icon: '🏠', label: 'Главная' },
+    { id: 'journal', icon: '📋', label: 'Журнал' },
+    { id: 'cars', icon: '🚗', label: 'Авто' },
+    { id: 'settings', icon: '⚙️', label: 'Настройки' },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-100 pb-20">
-      <div className="bg-white shadow-sm sticky top-0 z-10">
+    <div className="min-h-screen bg-slate-950 text-gray-100 pb-24">
+      {/* Sticky Header */}
+      <div className="bg-slate-900/80 backdrop-blur-md border-b border-white/10 sticky top-0 z-20">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-1 text-sm text-gray-600 hover:text-blue-600 transition"
+            className="flex items-center gap-1 text-sm text-gray-400 hover:text-cyan-400 transition-colors"
           >
             ← Назад
           </button>
-          <h1 className="text-lg font-bold text-gray-800">🚗 Помощник автомобилиста</h1>
+          <h1 className="text-lg font-bold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
+            🚗 Помощник автомобилиста
+          </h1>
           <div className="w-16"></div>
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-4">
+      {/* Content */}
+      <div className="max-w-2xl mx-auto px-4 py-6">
         {renderContent()}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg">
+      {/* Bottom Navigation */}
+      <div className="fixed bottom-0 left-0 right-0 bg-slate-900/90 backdrop-blur-xl border-t border-white/10 shadow-2xl shadow-black/50 z-30">
         <div className="max-w-2xl mx-auto grid grid-cols-4">
-          <button
-            onClick={() => setActiveTab('dashboard')}
-            className={`py-3 px-2 text-xs font-medium transition ${activeTab === 'dashboard' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}
-          >
-            <div className="text-xl mb-1">🏠</div>Главная
-          </button>
-          <button
-            onClick={() => setActiveTab('journal')}
-            className={`py-3 px-2 text-xs font-medium transition ${activeTab === 'journal' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}
-          >
-            <div className="text-xl mb-1">📋</div>Журнал
-          </button>
-          <button
-            onClick={() => setActiveTab('cars')}
-            className={`py-3 px-2 text-xs font-medium transition ${activeTab === 'cars' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}
-          >
-            <div className="text-xl mb-1">🚗</div>Авто
-          </button>
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`py-3 px-2 text-xs font-medium transition ${activeTab === 'settings' ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:bg-gray-50'}`}
-          >
-            <div className="text-xl mb-1">⚙️</div>Настройки
-          </button>
+          {navItems.map((item) => {
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id as Tab)}
+                className={`relative py-3 px-2 text-xs font-medium transition-all duration-300 ${
+                  isActive 
+                    ? 'text-cyan-400 bg-white/5' 
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
+                }`}
+              >
+                {isActive && (
+                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-cyan-500 shadow-[0_0_10px_rgba(34,211,238,0.5)]" />
+                )}
+                <div className="text-xl mb-1">{item.icon}</div>
+                {item.label}
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>

@@ -190,9 +190,9 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
   };
 
   const getTileColorClass = (color: string): string => {
-    if (color === 'red') return 'border-red-500 bg-red-50';
-    if (color === 'yellow') return 'border-yellow-400 bg-yellow-50';
-    return 'border-green-400 bg-green-50';
+    if (color === 'red') return 'border-red-500/50 bg-red-500/10 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.1)]';
+    if (color === 'yellow') return 'border-yellow-500/50 bg-yellow-500/10 text-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.1)]';
+    return 'border-green-500/50 bg-green-500/10 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.1)]';
   };
 
   const handleMileageSubmit = async (e: React.FormEvent) => {
@@ -210,22 +210,22 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center py-20"><div className="text-gray-500">Загрузка...</div></div>;
+    return <div className="flex items-center justify-center py-20"><div className="text-cyan-400 animate-pulse">Загрузка данных...</div></div>;
   }
 
   if (error) {
-    return <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-600 text-center">{error}</div>;
+    return <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-center">{error}</div>;
   }
 
   if (cars.length === 0) {
     return (
-      <div className="text-center py-10">
+      <div className="text-center py-10 bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-2xl p-8">
         <div className="text-6xl mb-4">🚗</div>
-        <h2 className="text-xl font-bold text-gray-800 mb-2">Добавьте ваш автомобиль</h2>
-        <p className="text-gray-600 mb-4">Чтобы начать вести журнал и получать умные прогнозы, добавьте первое авто.</p>
+        <h2 className="text-xl font-bold text-gray-100 mb-2">Добавьте ваш автомобиль</h2>
+        <p className="text-gray-400 mb-6">Чтобы начать вести журнал и получать умные прогнозы, добавьте первое авто.</p>
         <button
           onClick={() => onTabChange('cars')}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+          className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all font-medium"
         >
           Перейти к добавлению авто
         </button>
@@ -236,42 +236,42 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
   return (
     <div className="space-y-4">
       {uncheckedCars.length > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-          <p className="text-sm text-yellow-800">
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 shadow-[0_0_15px_rgba(234,179,8,0.1)]">
+          <p className="text-sm text-yellow-400 font-medium">
             ⚠️ Не введен пробег за {new Date().toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}:
           </p>
-          <p className="text-xs text-yellow-700 mt-1">
+          <p className="text-xs text-yellow-500/80 mt-1">
             {uncheckedCars.map(c => `${c.marka} ${c.model}`).join(', ')}
           </p>
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow-sm p-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Выберите автомобиль</label>
+      <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-4">
+        <label className="block text-sm font-medium text-gray-300 mb-2">Выберите автомобиль</label>
         <select
           value={selectedCarId || ''}
           onChange={(e) => onCarChange(Number(e.target.value))}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+          className="w-full px-3 py-2.5 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all"
         >
           {cars.map(car => (
-            <option key={car.id} value={car.id}>
+            <option key={car.id} value={car.id} className="bg-slate-800">
               {car.marka} {car.model} {car.gosnomer} ({car.mileage} км)
             </option>
           ))}
         </select>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 shadow-[0_0_15px_rgba(168,85,247,0.1)]">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-blue-800">📍 Ввести пробег</h3>
-            <p className="text-xs text-blue-600 mt-1">
+            <h3 className="font-semibold text-purple-300">📍 Ввести пробег</h3>
+            <p className="text-xs text-purple-400/80 mt-1">
               {new Date().toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}
             </p>
           </div>
           <button
             onClick={() => setShowMileageModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
+            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all text-sm font-medium"
           >
             Ввести
           </button>
@@ -279,21 +279,21 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
       </div>
 
       <div>
-        <h2 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+        <h2 className="text-lg font-bold text-gray-100 mb-3 flex items-center gap-2">
           🧠 Умный прогноз ТО
-          <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">на основе вашего пробега</span>
+          <span className="text-xs font-normal text-gray-400 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">на основе вашего пробега</span>
         </h2>
         
         {tiles.length === 0 ? (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+          <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-6 text-center shadow-[0_0_15px_rgba(34,197,94,0.1)]">
             <div className="text-4xl mb-2">✅</div>
-            <p className="text-gray-800 font-medium mb-1">Все системы в норме!</p>
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-gray-100 font-medium mb-1">Все системы в норме!</p>
+            <p className="text-sm text-gray-400 mb-4">
               Пока нет категорий, приближающихся к сроку обслуживания.
             </p>
             <button
               onClick={() => onTabChange('journal')}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
+              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all text-sm font-medium"
             >
               Добавить запись в журнал
             </button>
@@ -305,9 +305,12 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
                 <div
                   key={tile.cat}
                   onClick={() => onTabChange('journal')}
-                  className={`border-2 rounded-xl p-3 cursor-pointer hover:shadow-md transition ${getTileColorClass(tile.color)}`}
+                  className={`border rounded-xl p-3 cursor-pointer hover:scale-[1.02] transition-all duration-300 ${getTileColorClass(tile.color)}`}
                 >
-                  <div className="font-semibold text-sm text-gray-800">{tile.name}</div>
+                  <div className="font-semibold text-sm">{tile.name}</div>
+                  <div className="text-xs mt-1 opacity-80">
+                    {tile.isTimeBased ? `Осталось: ${tile.remaining} мес.` : `Осталось: ${tile.remaining} км`}
+                  </div>
                 </div>
               ))}
             </div>
@@ -315,7 +318,7 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
             {otherTiles.length > 0 && (
               <button
                 onClick={() => setShowOthers(!showOthers)}
-                className="w-full mt-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                className="w-full mt-3 py-2 text-sm text-cyan-400 hover:bg-white/5 rounded-lg transition-all border border-transparent hover:border-white/10"
               >
                 {showOthers ? '▲ Скрыть' : '▼'} Другие категории ({otherTiles.length})
               </button>
@@ -327,9 +330,12 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
                   <div
                     key={tile.cat}
                     onClick={() => onTabChange('journal')}
-                    className={`border-2 rounded-xl p-3 cursor-pointer hover:shadow-md transition ${getTileColorClass(tile.color)}`}
+                    className={`border rounded-xl p-3 cursor-pointer hover:scale-[1.02] transition-all duration-300 ${getTileColorClass(tile.color)}`}
                   >
-                    <div className="font-semibold text-sm text-gray-800">{tile.name}</div>
+                    <div className="font-semibold text-sm">{tile.name}</div>
+                    <div className="text-xs mt-1 opacity-80">
+                      {tile.isTimeBased ? `Осталось: ${tile.remaining} мес.` : `Осталось: ${tile.remaining} км`}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -339,15 +345,15 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
       </div>
 
       {showMileageModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm">
-            <div className="p-4 border-b border-gray-100 flex justify-between items-center">
-              <h3 className="font-bold text-gray-800">Введите пробег</h3>
-              <button onClick={() => setShowMileageModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="p-4 border-b border-white/10 flex justify-between items-center">
+              <h3 className="font-bold text-gray-100">Введите пробег</h3>
+              <button onClick={() => setShowMileageModal(false)} className="text-gray-400 hover:text-white text-xl transition-colors">&times;</button>
             </div>
-            <form onSubmit={handleMileageSubmit} className="p-4 space-y-3">
-              <p className="text-sm text-gray-600">
-                Текущий пробег: <strong>{cars.find(c => c.id === selectedCarId)?.mileage} км</strong>
+            <form onSubmit={handleMileageSubmit} className="p-4 space-y-4">
+              <p className="text-sm text-gray-400">
+                Текущий пробег: <strong className="text-cyan-400">{cars.find(c => c.id === selectedCarId)?.mileage} км</strong>
               </p>
               <input
                 type="number"
@@ -355,11 +361,11 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
                 value={mileageInput}
                 onChange={(e) => setMileageInput(e.target.value)}
                 placeholder="Введите текущий пробег"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                className="w-full px-3 py-2.5 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all placeholder-gray-500"
               />
               <button
                 type="submit"
-                className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition"
+                className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
               >
                 Сохранить
               </button>

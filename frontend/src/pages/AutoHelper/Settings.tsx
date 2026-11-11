@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getIntervals, saveIntervals, getSettings, saveSettings } from '../../api/auto';
-import { CATEGORIES, DEFAULT_INTERVALS } from './categories';
+import { getPredictableCategories } from './categories';
 
 const Settings: React.FC = () => {
   const [intervals, setIntervals] = useState<Record<string, number>>({});
@@ -19,11 +19,21 @@ const Settings: React.FC = () => {
         getIntervals(),
         getSettings()
       ]);
-      setIntervals(intervalsRes.intervals || DEFAULT_INTERVALS);
+      
+      const defaultIntervals: Record<string, number> = {};
+      getPredictableCategories().forEach(c => {
+        defaultIntervals[c.key] = c.defaultInterval;
+      });
+
+      setIntervals(intervalsRes.intervals || defaultIntervals);
       setSettings(settingsRes.settings || { mileageReminderTime: '09:00' });
     } catch (err) {
       console.error('Ошибка загрузки настроек:', err);
-      setIntervals(DEFAULT_INTERVALS);
+      const defaultIntervals: Record<string, number> = {};
+      getPredictableCategories().forEach(c => {
+        defaultIntervals[c.key] = c.defaultInterval;
+      });
+      setIntervals(defaultIntervals);
     } finally {
       setLoading(false);
     }
@@ -53,65 +63,72 @@ const Settings: React.FC = () => {
 
   const handleReset = () => {
     if (window.confirm('Вы уверены, что хотите сбросить все интервалы к значениям по умолчанию?')) {
-      setIntervals(DEFAULT_INTERVALS);
+      const defaultIntervals: Record<string, number> = {};
+      getPredictableCategories().forEach(c => {
+        defaultIntervals[c.key] = c.defaultInterval;
+      });
+      setIntervals(defaultIntervals);
     }
   };
 
-  // Получаем единицу измерения для категории
   const getUnit = (categoryKey: string): string => {
-    const category = CATEGORIES.find(c => c.key === categoryKey);
+    const category = getPredictableCategories().find(c => c.key === categoryKey);
     return category?.isTimeBased ? 'мес.' : 'км';
   };
 
-  if (loading) return <div className="text-center py-10 text-gray-500">Загрузка...</div>;
+  const inputClass = "w-full px-3 py-2.5 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all placeholder-gray-500";
+
+  if (loading) return <div className="text-center py-10 text-cyan-400 animate-pulse">Загрузка...</div>;
 
   return (
     <div className="space-y-6">
-      {/* Время напоминания о пробеге */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <h3 className="font-semibold text-gray-800 mb-3">⏰ Время напоминания о пробеге</h3>
+      <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-4">
+        <h3 className="font-semibold text-gray-100 mb-3 flex items-center gap-2">
+          ⏰ Время напоминания о пробеге
+        </h3>
         <div className="flex items-center gap-3">
           <input
             type="time"
             value={settings.mileageReminderTime}
             onChange={(e) => setSettings({ ...settings, mileageReminderTime: e.target.value })}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            className={inputClass}
           />
-          <span className="text-sm text-gray-600">
+          <span className="text-sm text-gray-400">
             Ежемесячное напоминание (1-го числа)
           </span>
         </div>
       </div>
 
-      {/* Интервалы обслуживания */}
       <div>
         <div className="flex justify-between items-center mb-3">
-          <h3 className="font-semibold text-gray-800">Интервалы обслуживания</h3>
+          <h3 className="font-semibold text-gray-100 flex items-center gap-2">
+            ⚙️ Интервалы обслуживания
+          </h3>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-medium disabled:opacity-50"
+            className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-emerald-500/25 transition-all text-sm font-medium disabled:opacity-50"
           >
             {saving ? 'Сохранение...' : 'Сохранить'}
           </button>
         </div>
-
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800 mb-4">
+        
+        <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-3 text-sm text-cyan-300 mb-4 shadow-[0_0_15px_rgba(34,211,238,0.1)]">
           Укажите интервалы для каждого вида обслуживания. Для категорий по времени (тормозная жидкость, антифриз) интервал указывается в месяцах.
         </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y divide-gray-200">
-          {CATEGORIES.map(cat => (
-            <div key={cat.key} className="flex items-center justify-between p-4">
-              <span className="text-gray-700 font-medium">{cat.name}</span>
+        
+        <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl divide-y divide-white/10">
+          {getPredictableCategories().map(cat => (
+            <div key={cat.key} className="flex items-center justify-between p-4 hover:bg-white/5 transition-colors">
+              <span className="text-gray-300 font-medium">{cat.name}</span>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
-                  className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className="w-24 px-3 py-1.5 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg text-right focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all"
                   value={intervals[cat.key] || 0}
                   onChange={(e) => handleChange(cat.key, e.target.value)}
                 />
-                <span className="text-sm text-gray-500 w-12">
+                <span className="text-sm text-gray-400 w-12 text-right">
                   {getUnit(cat.key)}
                 </span>
               </div>
@@ -121,7 +138,7 @@ const Settings: React.FC = () => {
         
         <button
           onClick={handleReset}
-          className="w-full mt-3 py-2 text-sm text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition"
+          className="w-full mt-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 rounded-lg transition-all"
         >
           Сбросить к значениям по умолчанию
         </button>
