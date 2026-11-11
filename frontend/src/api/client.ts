@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 export const apiClient = axios.create({
-  baseURL: 'https://booomerang.ru', // 👈 Строго HTTPS домен
+  baseURL: 'http://booomerang.ru', // 👈 Пока HTTP, пока не настроим HTTPS
   headers: {
     'Content-Type': 'application/json',
     'x-requested-with': 'XMLHttpRequest', // Для CSRF-защиты на бэкенде
