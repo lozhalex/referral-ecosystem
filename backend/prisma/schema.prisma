@@ -68,6 +68,7 @@ model User {
   
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  serviceAccessQrsClient ServiceAccessQR[] @relation("ServiceAccessQRClient")
 }
 
 model Wallet {
@@ -193,6 +194,7 @@ model Car {
   mileageChecks MileageCheck[]
 
   @@index([userId, isDeleted])
+  serviceAccessQrs ServiceAccessQR[]
 }
 
 model ServiceRecord {
@@ -214,6 +216,8 @@ model ServiceRecord {
 
   @@index([carId, date])
   @@index([userId])
+  source   String @default("owner") // "owner" | "service_master"
+  authorId Int?
 }
 
 model ServiceInterval {
@@ -269,4 +273,17 @@ model PushSubscription {
   user      User     @relation(fields: [userId], references: [id])
   
   @@index([userId])
+}
+
+model ServiceAccessQR {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  carId     Int
+  clientId  Int
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  
+  car       Car      @relation(fields: [carId], references: [id])
+  client    User     @relation("ServiceAccessQRClient", fields: [clientId], references: [id])
 }
