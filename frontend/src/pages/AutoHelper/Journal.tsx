@@ -22,7 +22,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
   const [records, setRecords] = useState<Record[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     mileage: '',
@@ -45,7 +44,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
       ]);
       setCars(carsRes.cars || []);
       setRecords(journalRes.records || []);
-      
       if (!selectedCarId && carsRes.cars?.length > 0) {
         onCarChange(carsRes.cars[0].id);
       }
@@ -72,7 +70,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCarId) return alert('Выберите автомобиль');
-    
     try {
       await createRecord({
         carId: selectedCarId,
@@ -102,6 +99,10 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
     );
   }
 
+  // 🆕 Берём только ПОСЛЕДНЮЮ запись о пробеге (records уже отсортированы по дате desc)
+  const lastMileageRecord = records.find(rec => rec.category === 'mileage');
+  const otherRecords = records.filter(rec => rec.category !== 'mileage');
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -130,19 +131,54 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         </div>
       ) : (
         <div className="space-y-3">
-          {records.map(rec => (
-            <div key={rec.id} className="bg-slate-900/60 backdrop-blur-md rounded-xl p-4 border border-white/10 hover:border-cyan-500/30 transition-all duration-300">
-              <div className="flex justify-between items-start mb-1">
-                <span className="font-bold text-gray-100">{getCategoryName(rec.category)}</span>
-                <span className="font-semibold text-cyan-400">{rec.cost} ₽</span>
+          {/* 🆕 Только ПОСЛЕДНЯЯ запись о пробеге — вверху списка */}
+          {lastMileageRecord && (
+            <>
+              <h3 className="text-sm font-semibold text-cyan-400 uppercase tracking-wider mt-2">
+                📍 Последний ввод пробега
+              </h3>
+              <div className="bg-cyan-500/10 backdrop-blur-md rounded-xl p-4 border border-cyan-500/30">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">📍</span>
+                    <div>
+                      <div className="font-bold text-gray-100">Ввод пробега</div>
+                      <div className="text-sm text-gray-400">
+                        {new Date(lastMileageRecord.date).toLocaleDateString('ru-RU')}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-cyan-400">
+                      {lastMileageRecord.mileage.toLocaleString('ru-RU')} км
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="text-sm text-gray-400 mb-1">
-                {new Date(rec.date).toLocaleDateString('ru-RU')} • {rec.mileage} км
-              </div>
-              {rec.work && <div className="text-sm text-gray-300">{rec.work}</div>}
-              {rec.comment && <div className="text-xs text-gray-500 mt-1 italic">"{rec.comment}"</div>}
-            </div>
-          ))}
+            </>
+          )}
+
+          {/* Остальные записи журнала */}
+          {otherRecords.length > 0 && (
+            <>
+              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mt-4">
+                🔧 Обслуживание
+              </h3>
+              {otherRecords.map(rec => (
+                <div key={rec.id} className="bg-slate-900/60 backdrop-blur-md rounded-xl p-4 border border-white/10 hover:border-cyan-500/30 transition-all duration-300">
+                  <div className="flex justify-between items-start mb-1">
+                    <span className="font-bold text-gray-100">{getCategoryName(rec.category)}</span>
+                    <span className="font-semibold text-cyan-400">{rec.cost} ₽</span>
+                  </div>
+                  <div className="text-sm text-gray-400 mb-1">
+                    {new Date(rec.date).toLocaleDateString('ru-RU')} • {rec.mileage} км
+                  </div>
+                  {rec.work && <div className="text-sm text-gray-300">{rec.work}</div>}
+                  {rec.comment && <div className="text-xs text-gray-500 mt-1 italic">"{rec.comment}"</div>}
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
 
@@ -165,29 +201,24 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
                   <p className="text-[10px] text-gray-500 mt-1">Укажите пробег из блокнота на эту дату</p>
                 </div>
               </div>
-              
               <div>
                 <label className="text-xs text-gray-400 mb-1 block">Категория</label>
                 <select className={inputClass} value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
                   {CATEGORIES.map(c => <option key={c.key} value={c.key} className="bg-slate-800">{c.name}</option>)}
                 </select>
               </div>
-
               <div>
                 <label className="text-xs text-gray-400 mb-1 block">Выполненные работы</label>
                 <textarea required rows={2} className={inputClass} value={formData.work} onChange={e => setFormData({...formData, work: e.target.value})} placeholder="Например: Замена масла и фильтра" />
               </div>
-
               <div>
                 <label className="text-xs text-gray-400 mb-1 block">Стоимость (₽)</label>
                 <input type="number" className={inputClass} value={formData.cost} onChange={e => setFormData({...formData, cost: e.target.value})} placeholder="0" />
               </div>
-
               <div>
                 <label className="text-xs text-gray-400 mb-1 block">Комментарий (необязательно)</label>
                 <input className={inputClass} value={formData.comment} onChange={e => setFormData({...formData, comment: e.target.value})} placeholder="Например: Масло Shell 5W-30" />
               </div>
-
               <button type="submit" className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all mt-2">
                 Сохранить запись
               </button>

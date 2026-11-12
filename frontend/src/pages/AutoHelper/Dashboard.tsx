@@ -30,6 +30,11 @@ interface ServiceTile {
   lastDate?: string;
 }
 
+interface LastMileageCheck {
+  date: string;
+  km: number;
+}
+
 const DEFAULT_AVG_PER_MONTH = 1500;
 
 const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTabChange }) => {
@@ -39,6 +44,7 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isMileageEntered, setIsMileageEntered] = useState(false);
+  const [lastMileageCheck, setLastMileageCheck] = useState<LastMileageCheck | null>(null);
   const [showMileageModal, setShowMileageModal] = useState(false);
   const [mileageInput, setMileageInput] = useState('');
   const [tiles, setTiles] = useState<ServiceTile[]>([]);
@@ -88,6 +94,17 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
           const currentYearMonth = `${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}`;
           const entered = checks.some((c: any) => c.yearMonth === currentYearMonth);
           setIsMileageEntered(entered);
+          
+          // Сохраняем данные о последнем вводе пробега
+          if (checks.length > 0) {
+            const lastCheck = checks[checks.length - 1];
+            setLastMileageCheck({
+              date: lastCheck.checkDate,
+              km: lastCheck.km
+            });
+          } else {
+            setLastMileageCheck(null);
+          }
           
           const calculatedAvg = calculateAvgPerMonth(checks);
           setAvgPerMonth(calculatedAvg.avg);
@@ -320,6 +337,18 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
     
     try {
       await submitMileageCheck(selectedCarId, Number(mileageInput));
+      
+      // Создаём запись в журнале о пробеге
+      await createRecord({
+        carId: selectedCarId,
+        category: 'mileage',
+        date: new Date().toISOString().split('T')[0],
+        mileage: Number(mileageInput),
+        work: `Ввод пробега: ${Number(mileageInput).toLocaleString('ru-RU')} км`,
+        cost: 0,
+        comment: ''
+      });
+      
       setShowMileageModal(false);
       setMileageInput('');
       await markNotificationsRead(['mileage']);
@@ -401,6 +430,11 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
     }
   };
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center py-20"><div className="text-cyan-400 animate-pulse">Загрузка данных...</div></div>;
   }
@@ -439,7 +473,7 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
           >
             {cars.map(car => (
               <option key={car.id} value={car.id} className="bg-slate-800">
-                {car.marka} {car.model} {car.gosnomer} ({car.mileage} км)
+                {car.marka} {car.model} {car.gosnomer}
               </option>
             ))}
           </select>
@@ -503,7 +537,7 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         >
           {cars.map(car => (
             <option key={car.id} value={car.id} className="bg-slate-800">
-              {car.marka} {car.model} {car.gosnomer} ({car.mileage} км)
+              {car.marka} {car.model} {car.gosnomer}
             </option>
           ))}
         </select>
@@ -515,22 +549,27 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         )}
       </div>
 
-      <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 shadow-[0_0_15px_rgba(168,85,247,0.1)]">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-semibold text-purple-300">📍 Ввести пробег</h3>
-            <p className="text-xs text-purple-400/80 mt-1">
-              {new Date().toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}
-            </p>
+      {/* 🆕 Информационная карточка о последнем вводе пробега */}
+      {lastMileageCheck && (
+        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 shadow-[0_0_15px_rgba(34,197,94,0.1)]">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-green-300 flex items-center gap-2">
+                ✅ Последний ввод пробега
+              </h3>
+              <p className="text-sm text-gray-300 mt-1">
+                {formatDate(lastMileageCheck.date)} · <span className="text-cyan-400 font-bold">{lastMileageCheck.km.toLocaleString('ru-RU')} км</span>
+              </p>
+            </div>
+            <button
+              onClick={() => onTabChange('journal')}
+              className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-all text-sm font-medium border border-white/10"
+            >
+              Обновить
+            </button>
           </div>
-          <button
-            onClick={() => setShowMileageModal(true)}
-            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all text-sm font-medium"
-          >
-            Ввести
-          </button>
         </div>
-      </div>
+      )}
 
       <div>
         <h2 className="text-lg font-bold text-gray-100 mb-3 flex items-center gap-2">
@@ -701,7 +740,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         </div>
       )}
 
-      {/* 🆕 НОВОЕ: Модалка ошибки уменьшения пробега */}
       {showMileageErrorModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
