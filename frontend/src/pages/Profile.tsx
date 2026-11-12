@@ -26,7 +26,6 @@ const Profile: React.FC = () => {
   const [validatedCar, setValidatedCar] = useState<any>(null);
   const [validatedClient, setValidatedClient] = useState<any>(null);
   const [recentRecords, setRecentRecords] = useState<any[]>([]);
-  const [currentQrId, setCurrentQrId] = useState<number | null>(null);
   const [currentToken, setCurrentToken] = useState<string>('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSessionClosed, setIsSessionClosed] = useState(false);
@@ -45,7 +44,6 @@ const Profile: React.FC = () => {
 
   useEffect(() => {
     loadProfile();
-    // Очистка сканера при размонтировании
     return () => {
       if (scannerRef.current) {
         scannerRef.current.stop().catch(() => {});
@@ -156,14 +154,13 @@ const Profile: React.FC = () => {
         { facingMode: 'environment' },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         async (decodedText) => {
-          // Успешное сканирование
           await scanner.stop();
           scanner.clear();
           scannerRef.current = null;
           setIsScanning(false);
           await validateToken(decodedText);
         },
-        (errorMessage) => {
+        (_errorMessage) => {
           // Игнорируем ошибки сканирования (это нормально)
         }
       );
@@ -194,11 +191,9 @@ const Profile: React.FC = () => {
         setValidatedCar(res.data.car);
         setValidatedClient(res.data.client);
         setRecentRecords(res.data.recentRecords || []);
-        setCurrentQrId(res.data.qrId);
         setCurrentToken(token);
         setIsFormOpen(true);
         setIsSessionClosed(false);
-        // Сброс формы
         setServiceFormData({
           date: new Date().toISOString().split('T')[0],
           category: 'oil_engine',
@@ -235,7 +230,6 @@ const Profile: React.FC = () => {
       });
       if (res.data.success) {
         setServiceMessage('✅ Запись успешно внесена в журнал клиента');
-        // Сброс формы для следующей записи
         setServiceFormData({
           date: new Date().toISOString().split('T')[0],
           category: 'oil_engine',
@@ -265,13 +259,11 @@ const Profile: React.FC = () => {
     setValidatedClient(null);
     setRecentRecords([]);
     setCurrentToken('');
-    setCurrentQrId(null);
     setServiceMessage('');
   };
 
   const handleToggleServicePanel = () => {
     if (showServicePanel) {
-      // Закрываем панель — останавливаем сканер если работает
       stopScanner();
       setShowServicePanel(false);
     } else {
@@ -349,7 +341,7 @@ const Profile: React.FC = () => {
       </div>
 
       {/* Системная роль */}
-      {hasRole(user.role, ['admin', 'SUPER_ADMIN', 'cashier', 'controller', 'service_master']) && (
+      {hasRole(user.role, ['admin', 'SUPER_ADMIN', 'cashier', 'controller', 'service_master' as any]) && (
         <div className="glass p-4 mb-6 border border-neon-purple/20">
           <p className="text-xs text-slate-400 mb-1 uppercase tracking-wider">Системная роль</p>
           <p className="text-lg font-semibold text-neon-purple font-display capitalize">{user.role}</p>
@@ -383,7 +375,6 @@ const Profile: React.FC = () => {
                 </div>
               )}
 
-              {/* Если форма не открыта и сессия не закрыта — показываем сканер */}
               {!isFormOpen && !isSessionClosed && (
                 <>
                   <button
@@ -425,7 +416,6 @@ const Profile: React.FC = () => {
                 </>
               )}
 
-              {/* Если сессия закрыта */}
               {isSessionClosed && !isFormOpen && (
                 <div className="text-center py-4">
                   <p className="text-sm text-slate-400 mb-3">Сессия завершена</p>
@@ -441,10 +431,8 @@ const Profile: React.FC = () => {
                 </div>
               )}
 
-              {/* Если форма открыта — показываем данные авто и форму */}
               {isFormOpen && validatedCar && (
                 <div className="space-y-4">
-                  {/* Карточка авто */}
                   <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-4">
                     <p className="text-xs text-cyan-400 uppercase tracking-wider mb-1">Автомобиль клиента</p>
                     <p className="text-lg font-bold text-white">
@@ -460,7 +448,6 @@ const Profile: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Последние 3 записи */}
                   {recentRecords.length > 0 && (
                     <div>
                       <p className="text-xs text-slate-400 uppercase tracking-wider mb-2">Последние записи журнала</p>
@@ -483,7 +470,6 @@ const Profile: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Форма внесения ТО */}
                   <form onSubmit={handleServiceSave} className="space-y-3 bg-white/5 border border-white/10 rounded-xl p-4">
                     <p className="text-xs text-slate-400 uppercase tracking-wider">Новая запись в журнал</p>
                     
@@ -555,7 +541,6 @@ const Profile: React.FC = () => {
                     </button>
                   </form>
 
-                  {/* Кнопка завершения сессии */}
                   <button
                     onClick={handleEndSession}
                     className="w-full py-2.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg font-medium hover:bg-red-500/30 transition-all text-sm"
@@ -703,7 +688,7 @@ const Profile: React.FC = () => {
             className="w-full py-3 bg-neon-purple/10 text-neon-purple rounded-xl font-medium hover:bg-neon-purple/20 transition border border-neon-purple/20 text-sm"
           >
             🔧 Админ-панель
-        </button>
+          </button>
         )}
         <button onClick={() => setShowLogoutModal(true)} className="w-full py-3 bg-red-500/10 text-red-400 rounded-xl font-medium hover:bg-red-500/20 transition border border-red-500/20 text-sm mt-6">
           Выйти из аккаунта
