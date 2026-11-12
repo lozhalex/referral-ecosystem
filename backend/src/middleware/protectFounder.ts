@@ -3,30 +3,47 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-export const protectFounder = async (req: Request, res: Response, next: NextFunction) => {
+export const protectFounder = async (req: any, res: Response, next: NextFunction) => {
   try {
-    // Ищем ID пользователя, которого пытаются изменить/удалить/переместить
-    // Поддерживаем как req.params.id (для /users/:id), так и req.body.targetUserId (для /tree/move)
-    const targetUserId = Number(req.params.id) || Number(req.body.targetUserId);
+    // Определяем ID целевого пользователя (из params или body)
+    const targetUserId = req.params.id ? Number(req.params.id) : req.body.userId;
     
     if (!targetUserId) {
-      return next();
+      return next(); // Если ID нет, пропускаем (валидация произойдет в другом месте)
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: targetUserId }
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { isFounder: true, phone: true }
     });
 
-    if (user && user.isFounder) {
+    if (targetUser?.isFounder) {
+      // ✅ ИСКЛЮЧЕНИЕ ДЛЯ SUPER_ADMIN: разрешаем, но логируем
+      if (req.user?.role === 'SUPER_ADMIN') {
+        await prisma.treeAuditLog.create({
+          data: {
+            userId: req.user.userId,
+            action: 'FOUNDER_MODIFICATION_ALLOWED',
+            details: `SUPER_ADMIN (ID: ${req.user.userId}) изменил данные основателя (ID: ${targetUserId}, Phone: ${targetUser.phone}). Изменения: ${JSON.stringify(req.body)}`,
+            ipAddress: req.ip || req.headers['x-forwarded-for'] || 'unknown'
+          }
+        });
+        
+        console.log(`[AUDIT] SUPER_ADMIN modified founder ${targetUserId}`);
+        return next(); // Пропускаем запрос дальше
+      }
+      
+      // ❌ ЖЕСТКИЙ ЗАПРЕТ для admin, cashier, controller и обычных user
       return res.status(403).json({ 
         success: false, 
-        message: '🛡️ Действие отклонено: нельзя изменить, удалить или переместить основателя экосистемы' 
+        message: 'Доступ запрещен: нельзя изменять данные, роль или баланс основателей (founders).' 
       });
     }
 
+    // Если пользователь не основатель, просто пропускаем
     next();
   } catch (error) {
-    console.error('protectFounder error:', error);
-    next(); // В случае ошибки проверки пропускаем, чтобы не ломать админку, но логируем
+    console.error('protectFounder middleware error:', error);
+    res.status(500).json({ success: false, message: 'Ошибка проверки прав основателя' });
   }
 };

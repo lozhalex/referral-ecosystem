@@ -11,28 +11,35 @@ model User {
   id             Int       @id @default(autoincrement())
   phone          String    @unique
   passwordHash   String
-  role           String    @default("user")
   
-  // --- НОВОЕ: Предпочтительный способ связи ---
-  preferredContact String? // "sms", "telegram", "whatsapp", "max"
-
-  // --- ЗАЩИТА ОСНОВАТЕЛЕЙ ---
-  isFounder      Boolean   @default(false) 
-
-  // --- БЕЗОПАСНОСТЬ И ЗАЩИТА ---
-  tokenVersion   Int       @default(1)
-  isSuspicious   Boolean   @default(false)
-
-  // --- ИНТЕГРАЦИЯ С РЦБ (УМНЫЙ МОСТИК) ---
-  rcbId                String?   
+  // ==========================================
+  // 1. СИСТЕМНЫЕ РОЛИ И ПРАВА ДОСТУПА
+  // ==========================================
+  role           String    @default("user") // "user", "cashier", "controller", "admin", "SUPER_ADMIN"
+  permissions    String[]  @default([])     // Гибкий RBAC на будущее (напр. ["manage_cash", "approve_requests"])
+  
+  // ==========================================
+  // 2. БИЗНЕС-СТАТУС (Платный / Бесплатный)
+  // ==========================================
   isRcbPaid            Boolean   @default(false) 
+  rcbId                String?   
   rcbReferralLink      String?   
-  isRcbRegisteredFree  Boolean   @default(false) // Шаг 2: зарегистрировался как ФРИ
-  rcbPaymentRequested  Boolean   @default(false) // Шаг 3: запросил проверку оплаты 1990
-
-  isPaidMember   Boolean   @default(false)
-  referralCount  Int       @default(0)
+  isRcbRegisteredFree  Boolean   @default(false) 
+  rcbPaymentRequested  Boolean   @default(false) 
+  isPaidMember         Boolean   @default(false)
+  referralCount        Int       @default(0)
   
+  // ==========================================
+  // 3. ЗАЩИТА И БЕЗОПАСНОСТЬ
+  // ==========================================
+  isFounder          Boolean   @default(false) 
+  tokenVersion       Int       @default(1)
+  isSuspicious       Boolean   @default(false)
+  preferredContact   String?   // "sms", "telegram", "whatsapp", "max"
+
+  // ==========================================
+  // 4. СВЯЗИ И ОТНОШЕНИЯ
+  // ==========================================
   referredById   Int?
   referredBy     User?     @relation("UserReferrals", fields: [referredById], references: [id])
   referrals      User[]    @relation("UserReferrals")
@@ -93,7 +100,7 @@ model TreeAuditLog {
   admin         User     @relation("AuditAdmin", fields: [adminId], references: [id])
   targetUserId  Int?
   targetUser    User?    @relation("AuditTarget", fields: [targetUserId], references: [id])
-  action        String
+  action        String   // Напр: "FOUNDER_MODIFICATION_ALLOWED", "ROLE_CHANGED"
   oldData       String?
   newData       String?
   createdAt     DateTime @default(now())
