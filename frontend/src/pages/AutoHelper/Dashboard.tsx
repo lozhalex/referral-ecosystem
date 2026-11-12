@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getDashboard, getCars, getMileageCheckStatus, submitMileageCheck, getMileageChecks, createRecord, markNotificationsRead } from '../../api/auto';
-import { CATEGORIES, getCategoryName, getPredictableCategories } from './categories';
+import { getDashboard, getCars, submitMileageCheck, getMileageChecks, createRecord, markNotificationsRead } from '../../api/auto';
+import { getCategoryName, getPredictableCategories } from './categories';
 
 interface DashboardProps {
   selectedCarId: number | null;
@@ -15,15 +15,15 @@ interface Car {
   year: string;
   gosnomer: string;
   mileage: number;
-  isFwd?: boolean; // полный привод
+  isFwd?: boolean;
 }
 
 interface ServiceTile {
   cat: string;
   name: string;
   color: 'red' | 'yellow' | 'green' | 'gray';
-  message?: string; // текст для красных/желтых
-  forecastDate?: Date; // для сортировки
+  message?: string;
+  forecastDate?: Date;
   interval: number;
   isTimeBased: boolean;
   lastMileage?: number;
@@ -37,24 +37,19 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
-  // Пробег
-  const [mileageChecks, setMileageChecks] = useState<any[]>([]);
   const [isMileageEntered, setIsMileageEntered] = useState(false);
   const [showMileageModal, setShowMileageModal] = useState(false);
   const [mileageInput, setMileageInput] = useState('');
   
-  // Прогноз
   const [tiles, setTiles] = useState<ServiceTile[]>([]);
   const [avgPerMonth, setAvgPerMonth] = useState(DEFAULT_AVG_PER_MONTH);
   const [isDefaultTempo, setIsDefaultTempo] = useState(true);
   const [showOthers, setShowOthers] = useState(false);
   
-  // ОСАГО
   const [osagoStatus, setOsagoStatus] = useState<'ok' | 'warning' | 'expired' | 'none'>('none');
   const [showOsagoModal, setShowOsagoModal] = useState(false);
   const [osagoDateInput, setOsagoDateInput] = useState(new Date().toISOString().split('T')[0]);
   
-  // Модалка для серой плитки
   const [showGrayModal, setShowGrayModal] = useState(false);
   const [selectedGrayCategory, setSelectedGrayCategory] = useState<string>('');
   const [grayFormData, setGrayFormData] = useState({
@@ -74,41 +69,34 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
       setLoading(true);
       setError('');
 
-      const [carsData, dashboardData, mileageStatus] = await Promise.all([
+      const [carsData, dashboardData] = await Promise.all([
         getCars(),
-        getDashboard(selectedCarId || undefined),
-        getMileageCheckStatus()
+        getDashboard(selectedCarId || undefined)
       ]);
 
       setCars(carsData.cars || []);
       
       if (!selectedCarId && carsData.cars?.length > 0) {
         onCarChange(carsData.cars[0].id);
-        return; // loadData вызовется снова с новым selectedCarId
+        return;
       }
 
       if (selectedCarId && dashboardData.cars && dashboardData.records && dashboardData.intervals) {
         const currentCar = dashboardData.cars.find((c: Car) => c.id === selectedCarId);
         if (currentCar) {
-          // Загружаем все отметки пробега
           const mileageData = await getMileageChecks(selectedCarId);
           const checks = mileageData.checks || [];
-          setMileageChecks(checks);
           
-          // Проверяем, введен ли пробег за текущий месяц
           const currentYearMonth = `${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}`;
           const entered = checks.some((c: any) => c.yearMonth === currentYearMonth);
           setIsMileageEntered(entered);
           
-          // Считаем средний темп
           const calculatedAvg = calculateAvgPerMonth(checks);
           setAvgPerMonth(calculatedAvg.avg);
           setIsDefaultTempo(calculatedAvg.isDefault);
           
-          // Проверяем ОСАГО
           checkOsagoStatus(dashboardData.records);
           
-          // Строим плитки
           const calculatedTiles = buildTiles(
             dashboardData.records,
             dashboardData.intervals,
@@ -197,9 +185,7 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
       const interval = Number(intervals[catConfig.key]) || catConfig.defaultInterval;
       
       if (catConfig.isTimeBased) {
-        // Категории по времени (тормозная жидкость, антифриз, ОСАГО)
         if (!lastRec) {
-          // Серая плитка
           tiles.push({
             cat: catConfig.key,
             name: catConfig.name,
@@ -215,9 +201,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         const nextDueDate = new Date(lastDate);
         nextDueDate.setMonth(nextDueDate.getMonth() + interval);
         
-        const currentMonthStart = new Date(currentMonthEnd.getFullYear(), currentMonthEnd.getMonth(), 1);
-        const nextMonthStart = new Date(nextMonthEnd.getFullYear(), nextMonthEnd.getMonth(), 1);
-        
         let color: 'red' | 'yellow' | 'green';
         let message: string | undefined;
         
@@ -228,7 +211,7 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
           color = 'yellow';
           message = 'В следующем месяце может потребоваться ТО';
         } else {
-          continue; // зеленые не показываем для time-based
+          continue;
         }
         
         tiles.push({
@@ -242,9 +225,7 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
           forecastDate: nextDueDate
         });
       } else {
-        // Категории по пробегу
         if (!lastRec) {
-          // Серая плитка
           const forecastDate = new Date();
           forecastDate.setDate(forecastDate.getDate() + Math.ceil(interval / avgPerDay));
           
@@ -297,7 +278,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
       }
     }
     
-    // Сортировка по forecastDate
     tiles.sort((a, b) => {
       if (!a.forecastDate && !b.forecastDate) return 0;
       if (!a.forecastDate) return 1;
@@ -344,7 +324,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
       await submitMileageCheck(selectedCarId, Number(mileageInput));
       setShowMileageModal(false);
       setMileageInput('');
-      // Сбрасываем уведомления о пробеге
       await markNotificationsRead(['mileage']);
       loadData();
     } catch (err: any) {
@@ -406,12 +385,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         cost: Number(grayFormData.cost) || 0
       });
       
-      // Автообновление пробега, если новый > текущего
-      const car = cars.find(c => c.id === selectedCarId);
-      if (car && Number(grayFormData.mileage) > car.mileage) {
-        // Обновление пробега авто происходит на бэкенде при создании записи
-      }
-      
       setShowGrayModal(false);
       loadData();
     } catch (err: any) {
@@ -453,7 +426,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
     );
   }
 
-  // БЛОКИРОВКА: если пробег не введен, показываем только селектор и поле ввода
   if (!isMileageEntered) {
     const currentMonthName = new Date().toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
     
@@ -491,10 +463,8 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
     );
   }
 
-  // Основной интерфейс (пробег введен)
   return (
     <div className="space-y-4">
-      {/* Таблетки рекомендаций (ОСАГО) */}
       <div className="space-y-2">
         {osagoStatus === 'expired' && (
           <div className="bg-red-500/10 border border-red-500/30 rounded-full px-4 py-2.5 flex items-center justify-between shadow-[0_0_15px_rgba(239,68,68,0.15)] animate-pulse">
@@ -525,7 +495,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         )}
       </div>
 
-      {/* Селектор авто */}
       <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-4">
         <label className="block text-sm font-medium text-gray-300 mb-2">Выберите автомобиль</label>
         <select
@@ -547,7 +516,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         )}
       </div>
 
-      {/* Кнопка ввода пробега */}
       <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 shadow-[0_0_15px_rgba(168,85,247,0.1)]">
         <div className="flex items-center justify-between">
           <div>
@@ -565,7 +533,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         </div>
       </div>
 
-      {/* Плитки прогноза */}
       <div>
         <h2 className="text-lg font-bold text-gray-100 mb-3 flex items-center gap-2">
           🧠 Умный прогноз ТО
@@ -632,7 +599,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         )}
       </div>
 
-      {/* Модалка ввода пробега */}
       {showMileageModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm">
@@ -663,7 +629,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         </div>
       )}
 
-      {/* Модалка обновления ОСАГО */}
       {showOsagoModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm">
@@ -693,7 +658,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         </div>
       )}
 
-      {/* Модалка для серой плитки */}
       {showGrayModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
