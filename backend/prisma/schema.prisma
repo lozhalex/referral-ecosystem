@@ -15,8 +15,7 @@ model User {
   // ==========================================
   // 1. СИСТЕМНЫЕ РОЛИ И ПРАВА ДОСТУПА
   // ==========================================
-  role           String    @default("user") // "user", "cashier", "controller", "admin", "SUPER_ADMIN"
-  // permissions удалено, так как SQLite не поддерживает String[]
+  role           String    @default("user") // "user", "cashier", "controller", "admin", "SUPER_ADMIN", "service_master"
   
   // ==========================================
   // 2. БИЗНЕС-СТАТУС (Платный / Бесплатный)
@@ -44,7 +43,6 @@ model User {
   referredBy     User?     @relation("UserReferrals", fields: [referredById], references: [id])
   referrals      User[]    @relation("UserReferrals")
   
-  // 🆕 ДОБАВЛЕНО: обратная связь для Push-подписок
   pushSubscriptions PushSubscription[]
   
   wallet         Wallet?
@@ -59,12 +57,13 @@ model User {
   rcbRequestsReceived RcbRequest[] @relation("RcbRequestReceiver")
 
   // --- ПОМОЩНИК АВТОМОБИЛИСТА ---
-  cars              Car[]
-  serviceRecords    ServiceRecord[]
-  serviceInterval   ServiceInterval?
-  masters           Master[]
-  mileageChecks     MileageCheck[]
-  autoSettings      UserAutoSettings?
+  cars                   Car[]
+  serviceRecords         ServiceRecord[]
+  serviceRecordsAsAuthor ServiceRecord[] @relation("ServiceRecordAuthor") // 🆕 ДОБАВЛЕНО
+  serviceInterval        ServiceInterval?
+  masters                Master[]
+  mileageChecks          MileageCheck[]
+  autoSettings           UserAutoSettings?
   
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -104,7 +103,7 @@ model TreeAuditLog {
   admin         User     @relation("AuditAdmin", fields: [adminId], references: [id])
   targetUserId  Int?
   targetUser    User?    @relation("AuditTarget", fields: [targetUserId], references: [id])
-  action        String   // Напр: "FOUNDER_MODIFICATION_ALLOWED", "ROLE_CHANGED"
+  action        String
   oldData       String?
   newData       String?
   createdAt     DateTime @default(now())
@@ -189,12 +188,12 @@ model Car {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  user        User      @relation(fields: [userId], references: [id])
-  records     ServiceRecord[]
-  mileageChecks MileageCheck[]
+  user               User      @relation(fields: [userId], references: [id])
+  records            ServiceRecord[]
+  mileageChecks      MileageCheck[]
+  serviceAccessQrs   ServiceAccessQR[]
 
   @@index([userId, isDeleted])
-  serviceAccessQrs ServiceAccessQR[]
 }
 
 model ServiceRecord {
@@ -213,11 +212,13 @@ model ServiceRecord {
 
   car         Car       @relation(fields: [carId], references: [id])
   user        User      @relation(fields: [userId], references: [id])
+  author      User?     @relation("ServiceRecordAuthor", fields: [authorId], references: [id]) // 🆕 ДОБАВЛЕНО
 
   @@index([carId, date])
   @@index([userId])
-  source   String @default("owner") // "owner" | "service_master"
-  authorId Int?
+  
+  source      String    @default("owner") // "owner" | "service_master"
+  authorId    Int?
 }
 
 model ServiceInterval {
