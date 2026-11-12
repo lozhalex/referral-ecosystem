@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getJournal, createRecord, getCars } from '../../api/auto';
+import { getJournal, createRecord, getCars, submitMileageCheck } from '../../api/auto';
 import { CATEGORIES, getCategoryName } from './categories';
 
 interface JournalProps {
@@ -22,6 +22,8 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
   const [records, setRecords] = useState<Record[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showMileageModal, setShowMileageModal] = useState(false);
+  const [mileageInput, setMileageInput] = useState('');
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     mileage: '',
@@ -67,6 +69,12 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
     setIsModalOpen(true);
   };
 
+  const handleOpenMileageModal = () => {
+    const car = cars.find(c => c.id === selectedCarId);
+    setMileageInput(String(car?.mileage || ''));
+    setShowMileageModal(true);
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCarId) return alert('Выберите автомобиль');
@@ -81,6 +89,36 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
       loadData();
     } catch (err) {
       alert('Ошибка сохранения записи');
+    }
+  };
+
+  const handleMileageSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCarId || !mileageInput) return;
+    try {
+      // Обновляем mileageCheck и карточку авто
+      await submitMileageCheck(selectedCarId, Number(mileageInput));
+      
+      // Создаём запись в журнале
+      await createRecord({
+        carId: selectedCarId,
+        category: 'mileage',
+        date: new Date().toISOString().split('T')[0],
+        mileage: Number(mileageInput),
+        work: `Ввод пробега: ${Number(mileageInput).toLocaleString('ru-RU')} км`,
+        cost: 0,
+        comment: ''
+      });
+      
+      setShowMileageModal(false);
+      setMileageInput('');
+      loadData();
+    } catch (err: any) {
+      if (err.response?.data?.code === 'MILEAGE_DECREASED') {
+        alert(`Пробег уменьшился. Последний зафиксированный: ${err.response.data.lastMileage} км`);
+      } else {
+        alert(err.response?.data?.message || 'Ошибка сохранения пробега');
+      }
     }
   };
 
@@ -99,7 +137,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
     );
   }
 
-  // 🆕 Берём только ПОСЛЕДНЮЮ запись о пробеге (records уже отсортированы по дате desc)
   const lastMileageRecord = records.find(rec => rec.category === 'mileage');
   const otherRecords = records.filter(rec => rec.category !== 'mileage');
 
@@ -114,6 +151,26 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
           + Добавить запись
         </button>
       </div>
+
+      {/* 🆕 Кнопка быстрого ввода пробега */}
+      <button
+        onClick={handleOpenMileageModal}
+        className="w-full bg-gradient-to-r from-purple-500/20 to-cyan-500/20 border border-purple-500/30 rounded-xl p-4 text-left hover:shadow-lg hover:shadow-purple-500/10 transition-all"
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-purple-300 flex items-center gap-2">
+              📍 Ввести пробег
+            </h3>
+            <p className="text-xs text-purple-400/80 mt-1">
+              {new Date().toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}
+            </p>
+          </div>
+          <span className="px-4 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg text-sm font-medium">
+            Ввести
+          </span>
+        </div>
+      </button>
 
       {records.length === 0 ? (
         <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-6 text-center">
@@ -131,7 +188,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         </div>
       ) : (
         <div className="space-y-3">
-          {/* 🆕 Только ПОСЛЕДНЯЯ запись о пробеге — вверху списка */}
           {lastMileageRecord && (
             <>
               <h3 className="text-sm font-semibold text-cyan-400 uppercase tracking-wider mt-2">
@@ -158,7 +214,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
             </>
           )}
 
-          {/* Остальные записи журнала */}
           {otherRecords.length > 0 && (
             <>
               <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mt-4">
@@ -179,6 +234,37 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
               ))}
             </>
           )}
+        </div>
+      )}
+
+      {/* Модалка ввода пробега */}
+      {showMileageModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="p-4 border-b border-white/10 flex justify-between items-center">
+              <h3 className="font-bold text-gray-100">Введите пробег</h3>
+              <button onClick={() => setShowMileageModal(false)} className="text-gray-400 hover:text-white text-xl transition-colors">&times;</button>
+            </div>
+            <form onSubmit={handleMileageSave} className="p-4 space-y-4">
+              <p className="text-sm text-gray-400">
+                Текущий пробег: <strong className="text-cyan-400">{cars.find(c => c.id === selectedCarId)?.mileage} км</strong>
+              </p>
+              <input
+                type="number"
+                required
+                value={mileageInput}
+                onChange={(e) => setMileageInput(e.target.value)}
+                placeholder="Введите текущий пробег"
+                className="w-full px-3 py-2.5 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all placeholder-gray-500"
+              />
+              <button
+                type="submit"
+                className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
+              >
+                Сохранить
+              </button>
+            </form>
+          </div>
         </div>
       )}
 
