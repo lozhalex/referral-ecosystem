@@ -16,7 +16,7 @@ model User {
   // 1. СИСТЕМНЫЕ РОЛИ И ПРАВА ДОСТУПА
   // ==========================================
   role           String    @default("user") // "user", "cashier", "controller", "admin", "SUPER_ADMIN"
-  permissions    String[]  @default([])     // Гибкий RBAC на будущее (напр. ["manage_cash", "approve_requests"])
+  // permissions удалено, так как SQLite не поддерживает String[]
   
   // ==========================================
   // 2. БИЗНЕС-СТАТУС (Платный / Бесплатный)
@@ -35,7 +35,7 @@ model User {
   isFounder          Boolean   @default(false) 
   tokenVersion       Int       @default(1)
   isSuspicious       Boolean   @default(false)
-  preferredContact   String?   // "sms", "telegram", "whatsapp", "max"
+  preferredContact   String?   
 
   // ==========================================
   // 4. СВЯЗИ И ОТНОШЕНИЯ
@@ -43,6 +43,9 @@ model User {
   referredById   Int?
   referredBy     User?     @relation("UserReferrals", fields: [referredById], references: [id])
   referrals      User[]    @relation("UserReferrals")
+  
+  // 🆕 ДОБАВЛЕНО: обратная связь для Push-подписок
+  pushSubscriptions PushSubscription[]
   
   wallet         Wallet?
   auditLogsAsAdmin   TreeAuditLog[] @relation("AuditAdmin")
