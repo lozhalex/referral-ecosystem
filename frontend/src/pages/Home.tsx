@@ -3,14 +3,6 @@ import Header from '../components/Header';
 import ProjectCard from '../components/ProjectCard';
 import { projects } from '../data/projects';
 import { apiClient } from '../api/client';
-import { 
-  isPushSupported, 
-  requestNotificationPermission, 
-  registerServiceWorker, 
-  subscribeToPush,
-  getVapidPublicKey,
-  urlBase64ToUint8Array
-} from '../utils/push';
 
 const getUserCountText = (count: number) => {
   const lastTwo = count % 100;
@@ -20,6 +12,18 @@ const getUserCountText = (count: number) => {
   if (lastOne === 1) return 'человек';
   return 'человек';
 };
+
+// Вспомогательная функция для конвертации VAPID ключа
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
 
 export default function Home() {
   const [showAll, setShowAll] = useState(false);
@@ -50,8 +54,13 @@ export default function Home() {
       });
   }, []);
 
-  // Загрузка количества уведомлений для бейджа
+  // Загрузка количества уведомлений для бейджа (ТОЛЬКО для авторизованных)
   useEffect(() => {
+    if (!token) {
+      setAutoNotifications(0);
+      return;
+    }
+    
     apiClient.get('/api/auto/notifications')
       .then((res) => {
         if (res.data.success) setAutoNotifications(res.data.totalCount || 0);
@@ -60,42 +69,47 @@ export default function Home() {
         console.error('Ошибка загрузки уведомлений:', err);
         setAutoNotifications(0);
       });
-  }, []);
+  }, [token]);
 
-  // 🆕 Инициализация Push-уведомлений с РЕАЛЬНЫМ VAPID ключом
+  // Инициализация Push-уведомлений
   useEffect(() => {
     const initPush = async () => {
-      if (user && isPushSupported()) {
-        // Запрашиваем разрешение только если оно еще не было дано или отклонено
+      if (user && 'serviceWorker' in navigator && 'PushManager' in window) {
         if (Notification.permission === 'default') {
-          const permission = await requestNotificationPermission();
+          const permission = await Notification.requestPermission();
           
           if (permission === 'granted') {
-            const registration = await registerServiceWorker();
-            if (registration) {
-              try {
-                // Получаем реальный публичный ключ с бэкенда
-                const publicKey = await getVapidPublicKey();
-                
-                if (publicKey) {
-                  const subscription = await registration.pushManager.subscribe({
-                    userVisibleOnly: true,
-                    applicationServerKey: urlBase64ToUint8Array(publicKey)
-                  });
-                  
-                  await subscribeToPush(subscription.toJSON());
-                  console.log('Push subscription successful');
-                }
-              } catch (err) {
-                console.error('Push subscription failed:', err);
-              }
+            try {
+              const registration = await navigator.serviceWorker.register('/sw.js');
+              console.log('Service Worker registered:', registration);
+              
+              // Реальный VAPID ключ с сервера
+              const vapidKey = 'BA2kcZEdRwChZpsy0sBuFZGSQwUoBaXTKPSNF525EXIfU1eIUD1XOmOG_37pGDMciePJW36i6rVM59fNFGMY6dY';
+              
+              const subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(vapidKey)
+              });
+              
+              await fetch('/api/auto/push/subscribe', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(subscription.toJSON())
+              });
+              
+              console.log('Push subscription successful');
+            } catch (err) {
+              console.error('Push subscription failed:', err);
             }
           }
         }
       }
     };
     initPush();
-  }, [user]);
+  }, [user, token]);
 
   const available = projects.filter(p => p.status === 'available');
   const development = projects.filter(p => p.status === 'development');
@@ -103,7 +117,6 @@ export default function Home() {
   const hiddenCount = planned.length;
 
   const renderProjectCard = (p: any) => {
-    // Показываем бейдж только на плитке "auto" и если есть непрочитанные уведомления
     const hasNotification = p.id === 'auto' && autoNotifications > 0;
     
     return (
@@ -122,7 +135,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-dark-900 relative">
-      {/* Декоративные фоновые пятна */}
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-neon-purple/10 rounded-full mix-blend-screen filter blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-neon-cyan/10 rounded-full mix-blend-screen filter blur-3xl pointer-events-none"></div>
       
