@@ -9,7 +9,7 @@ export const protectFounder = async (req: any, res: Response, next: NextFunction
     const targetUserId = req.params.id ? Number(req.params.id) : req.body.userId;
     
     if (!targetUserId) {
-      return next(); // Если ID нет, пропускаем (валидация произойдет в другом месте)
+      return next(); // Если ID нет, пропускаем
     }
 
     const targetUser = await prisma.user.findUnique({
@@ -22,10 +22,10 @@ export const protectFounder = async (req: any, res: Response, next: NextFunction
       if (req.user?.role === 'SUPER_ADMIN') {
         await prisma.treeAuditLog.create({
           data: {
-            userId: req.user.userId,
+            adminId: req.user.userId,
+            targetUserId: targetUserId,
             action: 'FOUNDER_MODIFICATION_ALLOWED',
-            details: `SUPER_ADMIN (ID: ${req.user.userId}) изменил данные основателя (ID: ${targetUserId}, Phone: ${targetUser.phone}). Изменения: ${JSON.stringify(req.body)}`,
-            ipAddress: req.ip || req.headers['x-forwarded-for'] || 'unknown'
+            newData: `SUPER_ADMIN изменил данные основателя. Изменения: ${JSON.stringify(req.body)}`
           }
         });
         
@@ -33,7 +33,7 @@ export const protectFounder = async (req: any, res: Response, next: NextFunction
         return next(); // Пропускаем запрос дальше
       }
       
-      // ❌ ЖЕСТКИЙ ЗАПРЕТ для admin, cashier, controller и обычных user
+      // ❌ ЖЕСТКИЙ ЗАПРЕТ для admin и остальных
       return res.status(403).json({ 
         success: false, 
         message: 'Доступ запрещен: нельзя изменять данные, роль или баланс основателей (founders).' 
