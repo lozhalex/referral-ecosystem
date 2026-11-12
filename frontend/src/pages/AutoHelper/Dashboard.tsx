@@ -33,23 +33,21 @@ interface ServiceTile {
 const DEFAULT_AVG_PER_MONTH = 1500;
 
 const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTabChange }) => {
+  const [showMileageErrorModal, setShowMileageErrorModal] = useState(false);
+  const [lastRecordedMileage, setLastRecordedMileage] = useState(0);
   const [cars, setCars] = useState<Car[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
   const [isMileageEntered, setIsMileageEntered] = useState(false);
   const [showMileageModal, setShowMileageModal] = useState(false);
   const [mileageInput, setMileageInput] = useState('');
-  
   const [tiles, setTiles] = useState<ServiceTile[]>([]);
   const [avgPerMonth, setAvgPerMonth] = useState(DEFAULT_AVG_PER_MONTH);
   const [isDefaultTempo, setIsDefaultTempo] = useState(true);
   const [showOthers, setShowOthers] = useState(false);
-  
   const [osagoStatus, setOsagoStatus] = useState<'ok' | 'warning' | 'expired' | 'none'>('none');
   const [showOsagoModal, setShowOsagoModal] = useState(false);
   const [osagoDateInput, setOsagoDateInput] = useState(new Date().toISOString().split('T')[0]);
-  
   const [showGrayModal, setShowGrayModal] = useState(false);
   const [selectedGrayCategory, setSelectedGrayCategory] = useState<string>('');
   const [grayFormData, setGrayFormData] = useState({
@@ -328,7 +326,8 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
       loadData();
     } catch (err: any) {
       if (err.response?.data?.code === 'MILEAGE_DECREASED') {
-        alert(`Пробег уменьшился. Последний зафиксированный: ${err.response.data.lastMileage} км. Это ошибка?`);
+        setLastRecordedMileage(err.response.data.lastMileage);
+        setShowMileageErrorModal(true);
       } else {
         alert(err.response?.data?.message || 'Ошибка сохранения пробега');
       }
@@ -698,6 +697,43 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
                 Сохранить запись
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🆕 НОВОЕ: Модалка ошибки уменьшения пробега */}
+      {showMileageErrorModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+            <div className="text-4xl mb-4">⚠️</div>
+            <h3 className="text-lg font-bold text-gray-100 mb-2">Пробег уменьшился</h3>
+            <p className="text-sm text-gray-400 mb-6">
+              Последний зафиксированный пробег: <span className="text-cyan-400 font-bold">{lastRecordedMileage} км</span>.<br/>
+              Новый пробег не может быть меньше предыдущего. Это ошибка?
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => setShowMileageErrorModal(false)}
+                className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
+              >
+                Ввести верные данные
+              </button>
+              <button
+                onClick={() => {
+                  alert('Функция "Заявка в ТП" находится в разработке и будет доступна в ближайших обновлениях.');
+                  setShowMileageErrorModal(false);
+                }}
+                className="w-full py-2.5 bg-white/5 text-gray-300 rounded-lg font-medium hover:bg-white/10 transition border border-white/10"
+              >
+                Заявка в ТП на корректировку
+              </button>
+              <button
+                onClick={() => setShowMileageErrorModal(false)}
+                className="w-full py-2 text-sm text-gray-500 hover:text-gray-300 transition"
+              >
+                Отмена
+              </button>
+            </div>
           </div>
         </div>
       )}
