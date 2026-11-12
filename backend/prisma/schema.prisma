@@ -254,3 +254,16 @@ model UserAutoSettings {
   updatedAt             DateTime  @updatedAt
   user                  User      @relation(fields: [userId], references: [id])
 }
+
+model PushSubscription {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id])
+  
+  @@index([userId])
+}

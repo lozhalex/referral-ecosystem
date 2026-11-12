@@ -3,6 +3,14 @@ import Header from '../components/Header';
 import ProjectCard from '../components/ProjectCard';
 import { projects } from '../data/projects';
 import { apiClient } from '../api/client';
+import { 
+  isPushSupported, 
+  requestNotificationPermission, 
+  registerServiceWorker, 
+  subscribeToPush,
+  getVapidPublicKey,
+  urlBase64ToUint8Array
+} from '../utils/push';
 
 const getUserCountText = (count: number) => {
   const lastTwo = count % 100;
@@ -17,7 +25,7 @@ export default function Home() {
   const [showAll, setShowAll] = useState(false);
   const [userCount, setUserCount] = useState<number | null>(null);
   const [autoNotifications, setAutoNotifications] = useState<number>(0);
-
+  
   const token = localStorage.getItem('token');
   const user = token ? JSON.parse(atob(token.split('.')[1])) : null;
 
@@ -26,6 +34,7 @@ export default function Home() {
     window.location.reload();
   };
 
+  // Загрузка общего количества пользователей
   useEffect(() => {
     apiClient.get('/api/stats/total-users')
       .then((res) => {
@@ -37,10 +46,11 @@ export default function Home() {
       })
       .catch((err) => {
         console.error('Ошибка загрузки счетчика пользователей:', err);
-        setUserCount(0); // Безопасный фолбэк вместо фейковой 1247
+        setUserCount(0);
       });
   }, []);
 
+  // Загрузка количества уведомлений для бейджа
   useEffect(() => {
     apiClient.get('/api/auto/notifications')
       .then((res) => {
@@ -52,13 +62,50 @@ export default function Home() {
       });
   }, []);
 
+  // 🆕 Инициализация Push-уведомлений с РЕАЛЬНЫМ VAPID ключом
+  useEffect(() => {
+    const initPush = async () => {
+      if (user && isPushSupported()) {
+        // Запрашиваем разрешение только если оно еще не было дано или отклонено
+        if (Notification.permission === 'default') {
+          const permission = await requestNotificationPermission();
+          
+          if (permission === 'granted') {
+            const registration = await registerServiceWorker();
+            if (registration) {
+              try {
+                // Получаем реальный публичный ключ с бэкенда
+                const publicKey = await getVapidPublicKey();
+                
+                if (publicKey) {
+                  const subscription = await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(publicKey)
+                  });
+                  
+                  await subscribeToPush(subscription.toJSON());
+                  console.log('Push subscription successful');
+                }
+              } catch (err) {
+                console.error('Push subscription failed:', err);
+              }
+            }
+          }
+        }
+      }
+    };
+    initPush();
+  }, [user]);
+
   const available = projects.filter(p => p.status === 'available');
   const development = projects.filter(p => p.status === 'development');
   const planned = projects.filter(p => p.status === 'planned');
   const hiddenCount = planned.length;
 
   const renderProjectCard = (p: any) => {
+    // Показываем бейдж только на плитке "auto" и если есть непрочитанные уведомления
     const hasNotification = p.id === 'auto' && autoNotifications > 0;
+    
     return (
       <div key={p.id} className="relative group">
         <ProjectCard project={p} isAuthorized={!!user} />
@@ -78,9 +125,9 @@ export default function Home() {
       {/* Декоративные фоновые пятна */}
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-neon-purple/10 rounded-full mix-blend-screen filter blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-neon-cyan/10 rounded-full mix-blend-screen filter blur-3xl pointer-events-none"></div>
-
+      
       <Header user={user} onLogout={handleLogout} />
-
+      
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
         <section className="text-center mb-10">
           <h1 className="text-4xl sm:text-5xl font-bold text-white mb-4 font-display tracking-tight">

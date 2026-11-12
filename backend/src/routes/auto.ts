@@ -115,7 +115,6 @@ router.post('/journal', async (req: any, res: Response) => {
       }
     });
     
-    // Автообновление пробега авто, если новый пробег > текущего
     if (carId && mileage) {
       await prisma.car.updateMany({
         where: { 
@@ -170,8 +169,6 @@ router.post('/intervals', async (req: any, res: Response) => {
 // ==========================================
 // 4. ВВОД ПРОБЕГА (Mileage Check)
 // ==========================================
-
-// 🆕 НОВОЕ: Получить все отметки пробега для конкретного авто
 router.get('/mileage-checks/:carId', async (req: any, res: Response) => {
   try {
     const carId = Number(req.params.carId);
@@ -197,7 +194,6 @@ router.post('/mileage-check', async (req: any, res: Response) => {
       orderBy: { yearMonth: 'desc' }
     });
     
-    // 🆕 Возвращаем структурированную ошибку с кодом
     if (lastCheck && Number(km) < lastCheck.km) {
       return res.status(400).json({ 
         success: false, 
@@ -347,13 +343,11 @@ router.get('/notifications', async (req: any, res: Response) => {
     const now = new Date();
     const currentYearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
     const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const nextMonthEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0);
     
     const cars = await prisma.car.findMany({
       where: { userId: req.user.userId, isDeleted: false }
     });
     
-    // 1. Проверка не введённого пробега
     const mileageStatus = await prisma.mileageCheck.findMany({
       where: { 
         userId: req.user.userId,
@@ -372,7 +366,6 @@ router.get('/notifications', async (req: any, res: Response) => {
       });
     }
     
-    // 2. Проверка красных плиток ТО (прогноз на текущий месяц)
     const records = await prisma.serviceRecord.findMany({
       where: { userId: req.user.userId }
     });
@@ -388,7 +381,6 @@ router.get('/notifications', async (req: any, res: Response) => {
       }
     }
     
-    // Категории по времени (тормозная жидкость, антифриз, ОСАГО)
     const timeBasedCats = ['brake_fluid', 'antifreeze', 'ac_recharge', 'osago'];
     for (const catKey of timeBasedCats) {
       const lastRec = byCategory[catKey];
@@ -422,8 +414,7 @@ router.get('/notifications', async (req: any, res: Response) => {
 
 router.post('/notifications/read', async (req: any, res: Response) => {
   try {
-    const { types } = req.body; // массив типов: ['mileage', 'osago', 'service']
-    // Пока просто логируем — в будущем можно добавить таблицу прочитанных уведомлений
+    const { types } = req.body;
     console.log('Notifications marked as read:', types);
     res.json({ success: true });
   } catch (err) {
@@ -432,7 +423,38 @@ router.post('/notifications/read', async (req: any, res: Response) => {
   }
 });
 
-// Вспомогательная функция для получения названия категории
+// ==========================================
+// 8. PUSH-УВЕДОМЛЕНИЯ (Инфраструктура)
+// ==========================================
+router.post('/push/subscribe', async (req: any, res: Response) => {
+  try {
+    const { endpoint, keys } = req.body;
+    if (!endpoint || !keys || !keys.p256dh || !keys.auth) {
+      return res.status(400).json({ success: false, message: 'Неверные данные подписки' });
+    }
+
+    await prisma.pushSubscription.upsert({
+      where: { endpoint: endpoint },
+      update: {
+        userId: req.user.userId,
+        p256dh: keys.p256dh,
+        auth: keys.auth
+      },
+      create: {
+        userId: req.user.userId,
+        endpoint: endpoint,
+        p256dh: keys.p256dh,
+        auth: keys.auth
+      }
+    });
+
+    res.json({ success: true, message: 'Подписка на уведомления сохранена' });
+  } catch (err) {
+    console.error('Push subscribe error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
 function getCategoryName(key: string): string {
   const names: Record<string, string> = {
     brake_fluid: 'Тормозная жидкость',
