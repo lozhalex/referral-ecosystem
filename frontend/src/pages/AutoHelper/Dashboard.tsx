@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getDashboard, getCars, getMileageCheckStatus, submitMileageCheck } from '../../api/auto';
-import { getPredictableCategories } from './categories';
+import { getDashboard, getCars, getMileageCheckStatus, submitMileageCheck, getMileageChecks, createRecord, markNotificationsRead } from '../../api/auto';
+import { CATEGORIES, getCategoryName, getPredictableCategories } from './categories';
 
 interface DashboardProps {
   selectedCarId: number | null;
@@ -15,32 +15,55 @@ interface Car {
   year: string;
   gosnomer: string;
   mileage: number;
+  isFwd?: boolean; // полный привод
 }
 
 interface ServiceTile {
   cat: string;
   name: string;
-  lastDate: string;
-  lastMileage: number;
-  currentMileage: number;
+  color: 'red' | 'yellow' | 'green' | 'gray';
+  message?: string; // текст для красных/желтых
+  forecastDate?: Date; // для сортировки
   interval: number;
   isTimeBased: boolean;
-  remaining: number;
-  percentUsed: number;
-  avgPerMonth: number;
-  color: 'green' | 'yellow' | 'red';
+  lastMileage?: number;
+  lastDate?: string;
 }
+
+const DEFAULT_AVG_PER_MONTH = 1500;
 
 const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTabChange }) => {
   const [cars, setCars] = useState<Car[]>([]);
-  const [tiles, setTiles] = useState<ServiceTile[]>([]);
-  const [otherTiles, setOtherTiles] = useState<ServiceTile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [uncheckedCars, setUncheckedCars] = useState<Car[]>([]);
+  
+  // Пробег
+  const [mileageChecks, setMileageChecks] = useState<any[]>([]);
+  const [isMileageEntered, setIsMileageEntered] = useState(false);
   const [showMileageModal, setShowMileageModal] = useState(false);
   const [mileageInput, setMileageInput] = useState('');
+  
+  // Прогноз
+  const [tiles, setTiles] = useState<ServiceTile[]>([]);
+  const [avgPerMonth, setAvgPerMonth] = useState(DEFAULT_AVG_PER_MONTH);
+  const [isDefaultTempo, setIsDefaultTempo] = useState(true);
   const [showOthers, setShowOthers] = useState(false);
+  
+  // ОСАГО
+  const [osagoStatus, setOsagoStatus] = useState<'ok' | 'warning' | 'expired' | 'none'>('none');
+  const [showOsagoModal, setShowOsagoModal] = useState(false);
+  const [osagoDateInput, setOsagoDateInput] = useState(new Date().toISOString().split('T')[0]);
+  
+  // Модалка для серой плитки
+  const [showGrayModal, setShowGrayModal] = useState(false);
+  const [selectedGrayCategory, setSelectedGrayCategory] = useState<string>('');
+  const [grayFormData, setGrayFormData] = useState({
+    date: new Date().toISOString().split('T')[0],
+    mileage: '',
+    cost: '',
+    work: '',
+    comment: ''
+  });
 
   useEffect(() => {
     loadData();
@@ -58,27 +81,42 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
       ]);
 
       setCars(carsData.cars || []);
-      setUncheckedCars(mileageStatus.uncheckedCars || []);
       
       if (!selectedCarId && carsData.cars?.length > 0) {
         onCarChange(carsData.cars[0].id);
+        return; // loadData вызовется снова с новым selectedCarId
       }
 
-      if (dashboardData.cars && dashboardData.records && dashboardData.intervals) {
+      if (selectedCarId && dashboardData.cars && dashboardData.records && dashboardData.intervals) {
         const currentCar = dashboardData.cars.find((c: Car) => c.id === selectedCarId);
         if (currentCar) {
-          const calculatedTiles = calculateSmartForecast(
+          // Загружаем все отметки пробега
+          const mileageData = await getMileageChecks(selectedCarId);
+          const checks = mileageData.checks || [];
+          setMileageChecks(checks);
+          
+          // Проверяем, введен ли пробег за текущий месяц
+          const currentYearMonth = `${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+          const entered = checks.some((c: any) => c.yearMonth === currentYearMonth);
+          setIsMileageEntered(entered);
+          
+          // Считаем средний темп
+          const calculatedAvg = calculateAvgPerMonth(checks);
+          setAvgPerMonth(calculatedAvg.avg);
+          setIsDefaultTempo(calculatedAvg.isDefault);
+          
+          // Проверяем ОСАГО
+          checkOsagoStatus(dashboardData.records);
+          
+          // Строим плитки
+          const calculatedTiles = buildTiles(
             dashboardData.records,
             dashboardData.intervals,
-            currentCar.mileage
+            currentCar,
+            calculatedAvg.avg,
+            currentCar.isFwd || false
           );
-          
-          const { topTiles, otherTiles: others } = selectTopTiles(calculatedTiles);
-          setTiles(topTiles);
-          setOtherTiles(others);
-        } else {
-          setTiles([]);
-          setOtherTiles([]);
+          setTiles(calculatedTiles);
         }
       }
     } catch (err: any) {
@@ -89,110 +127,213 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
     }
   };
 
-  const calculateSmartForecast = (
+  const calculateAvgPerMonth = (checks: any[]) => {
+    if (checks.length < 2) {
+      return { avg: DEFAULT_AVG_PER_MONTH, isDefault: true };
+    }
+    
+    const sorted = [...checks].sort((a, b) => a.yearMonth.localeCompare(b.yearMonth));
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    
+    const firstYear = parseInt(first.yearMonth.substring(0, 4));
+    const firstMonth = parseInt(first.yearMonth.substring(4, 6));
+    const lastYear = parseInt(last.yearMonth.substring(0, 4));
+    const lastMonth = parseInt(last.yearMonth.substring(4, 6));
+    
+    const monthsDiff = (lastYear - firstYear) * 12 + (lastMonth - firstMonth);
+    
+    if (monthsDiff <= 0) {
+      return { avg: DEFAULT_AVG_PER_MONTH, isDefault: true };
+    }
+    
+    const kmDiff = last.km - first.km;
+    const avg = kmDiff / monthsDiff;
+    
+    return { avg: Math.round(avg), isDefault: false };
+  };
+
+  const getForecastDates = (avgPerMonth: number) => {
+    const today = new Date();
+    const currentMonthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const nextMonthEnd = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+    
+    const daysUntilCurrentEnd = Math.ceil((currentMonthEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    const daysUntilNextEnd = Math.ceil((nextMonthEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    const avgPerDay = avgPerMonth / 30;
+    
+    return {
+      currentMonthEnd,
+      nextMonthEnd,
+      daysUntilCurrentEnd,
+      daysUntilNextEnd,
+      avgPerDay
+    };
+  };
+
+  const buildTiles = (
     records: any[],
     intervals: Record<string, number>,
-    currentMileage: number
+    currentCar: Car,
+    avgPerMonth: number,
+    isFwd: boolean
   ): ServiceTile[] => {
-    const byCategory: Record<string, any> = {};
+    const { currentMonthEnd, nextMonthEnd, avgPerDay } = getForecastDates(avgPerMonth);
+    const currentMileage = currentCar.mileage;
     
+    const byCategory: Record<string, any> = {};
     for (const rec of records) {
       if (!byCategory[rec.category] || rec.date > byCategory[rec.category].date) {
         byCategory[rec.category] = rec;
       }
     }
-
+    
+    const predictableCats = getPredictableCategories(isFwd, currentMileage);
     const tiles: ServiceTile[] = [];
-    const today = new Date();
-    const predictableCats = getPredictableCategories();
-
+    
     for (const catConfig of predictableCats) {
       const lastRec = byCategory[catConfig.key];
-      if (!lastRec) continue;
-
       const interval = Number(intervals[catConfig.key]) || catConfig.defaultInterval;
-      if (interval <= 0) continue;
-
-      const lastMileage = Number(lastRec.mileage) || 0;
-      const kmPassed = Math.max(0, currentMileage - lastMileage);
       
-      let remaining: number;
-      let percentUsed: number;
-      let avgPerMonth: number = 0;
-
       if (catConfig.isTimeBased) {
-        const lastDateObj = new Date(lastRec.date + 'T00:00:00');
-        const monthsDiff = Math.max(1, (today.getFullYear() - lastDateObj.getFullYear()) * 12 + (today.getMonth() - lastDateObj.getMonth()));
-        remaining = interval - monthsDiff;
-        percentUsed = Math.round((monthsDiff / interval) * 100);
+        // Категории по времени (тормозная жидкость, антифриз, ОСАГО)
+        if (!lastRec) {
+          // Серая плитка
+          tiles.push({
+            cat: catConfig.key,
+            name: catConfig.name,
+            color: 'gray',
+            interval,
+            isTimeBased: true,
+            forecastDate: undefined
+          });
+          continue;
+        }
+        
+        const lastDate = new Date(lastRec.date + 'T00:00:00');
+        const nextDueDate = new Date(lastDate);
+        nextDueDate.setMonth(nextDueDate.getMonth() + interval);
+        
+        const currentMonthStart = new Date(currentMonthEnd.getFullYear(), currentMonthEnd.getMonth(), 1);
+        const nextMonthStart = new Date(nextMonthEnd.getFullYear(), nextMonthEnd.getMonth(), 1);
+        
+        let color: 'red' | 'yellow' | 'green';
+        let message: string | undefined;
+        
+        if (nextDueDate <= currentMonthEnd) {
+          color = 'red';
+          message = 'В этом месяце требуется ТО';
+        } else if (nextDueDate <= nextMonthEnd) {
+          color = 'yellow';
+          message = 'В следующем месяце может потребоваться ТО';
+        } else {
+          continue; // зеленые не показываем для time-based
+        }
+        
+        tiles.push({
+          cat: catConfig.key,
+          name: catConfig.name,
+          color,
+          message,
+          interval,
+          isTimeBased: true,
+          lastDate: lastRec.date,
+          forecastDate: nextDueDate
+        });
       } else {
-        const daysDiff = Math.max(1, Math.floor((today.getTime() - new Date(lastRec.date + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24)));
-        const avgPerDay = kmPassed / daysDiff;
-        avgPerMonth = Math.round(avgPerDay * 30);
-        remaining = interval - kmPassed;
-        percentUsed = Math.round((kmPassed / interval) * 100);
+        // Категории по пробегу
+        if (!lastRec) {
+          // Серая плитка
+          const forecastDate = new Date();
+          forecastDate.setDate(forecastDate.getDate() + Math.ceil(interval / avgPerDay));
+          
+          tiles.push({
+            cat: catConfig.key,
+            name: catConfig.name,
+            color: 'gray',
+            interval,
+            isTimeBased: false,
+            forecastDate
+          });
+          continue;
+        }
+        
+        const lastMileage = Number(lastRec.mileage) || 0;
+        const threshold = lastMileage + interval;
+        
+        const forecastCurrentEnd = currentMileage + (avgPerDay * getForecastDates(avgPerMonth).daysUntilCurrentEnd);
+        const forecastNextEnd = currentMileage + (avgPerDay * getForecastDates(avgPerMonth).daysUntilNextEnd);
+        
+        let color: 'red' | 'yellow' | 'green';
+        let message: string | undefined;
+        
+        if (forecastCurrentEnd >= threshold) {
+          color = 'red';
+          message = 'В этом месяце требуется ТО';
+        } else if (forecastNextEnd >= threshold) {
+          color = 'yellow';
+          message = 'В следующем месяце может потребоваться ТО';
+        } else {
+          color = 'green';
+        }
+        
+        const kmUntilThreshold = threshold - currentMileage;
+        const daysUntilThreshold = kmUntilThreshold / avgPerDay;
+        const forecastDate = new Date();
+        forecastDate.setDate(forecastDate.getDate() + daysUntilThreshold);
+        
+        tiles.push({
+          cat: catConfig.key,
+          name: catConfig.name,
+          color,
+          message,
+          interval,
+          isTimeBased: false,
+          lastMileage,
+          lastDate: lastRec.date,
+          forecastDate
+        });
       }
-
-      let color: 'green' | 'yellow' | 'red';
-      if (catConfig.isTimeBased) {
-        if (remaining <= 0) color = 'red';
-        else if (remaining <= 1) color = 'yellow';
-        else color = 'green';
-      } else {
-        if (remaining < 0) color = 'red';
-        else if (remaining <= 1000) color = 'red';
-        else if (remaining <= 3000) color = 'yellow';
-        else color = 'green';
-      }
-
-      tiles.push({
-        cat: catConfig.key,
-        name: catConfig.name,
-        lastDate: lastRec.date,
-        lastMileage,
-        currentMileage,
-        interval,
-        isTimeBased: catConfig.isTimeBased,
-        remaining,
-        percentUsed,
-        avgPerMonth,
-        color
-      });
     }
-
+    
+    // Сортировка по forecastDate
     tiles.sort((a, b) => {
-      if (a.remaining < 0 && b.remaining >= 0) return -1;
-      if (b.remaining < 0 && a.remaining >= 0) return 1;
-      return b.percentUsed - a.percentUsed;
+      if (!a.forecastDate && !b.forecastDate) return 0;
+      if (!a.forecastDate) return 1;
+      if (!b.forecastDate) return -1;
+      return a.forecastDate.getTime() - b.forecastDate.getTime();
     });
-
+    
     return tiles;
   };
 
-  const selectTopTiles = (allTiles: ServiceTile[]) => {
-    const urgent = allTiles.filter(t => 
-      (t.isTimeBased ? t.remaining <= 1 : t.remaining < 3000) || t.percentUsed > 80
-    );
-    
-    urgent.sort((a, b) => b.percentUsed - a.percentUsed);
-    const topUrgent = urgent.slice(0, 8);
-    
-    if (topUrgent.length < 6) {
-      const remaining = allTiles.filter(t => !topUrgent.includes(t));
-      remaining.sort((a, b) => b.percentUsed - a.percentUsed);
-      const needToAdd = 6 - topUrgent.length;
-      topUrgent.push(...remaining.slice(0, needToAdd));
+  const checkOsagoStatus = (records: any[]) => {
+    const osagoRecords = records.filter((r: any) => r.category === 'osago');
+    if (osagoRecords.length === 0) {
+      setOsagoStatus('none');
+      return;
     }
-    
-    const others = allTiles.filter(t => !topUrgent.includes(t));
-    
-    return { topTiles: topUrgent, otherTiles: others };
-  };
 
-  const getTileColorClass = (color: string): string => {
-    if (color === 'red') return 'border-red-500/50 bg-red-500/10 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.1)]';
-    if (color === 'yellow') return 'border-yellow-500/50 bg-yellow-500/10 text-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.1)]';
-    return 'border-green-500/50 bg-green-500/10 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.1)]';
+    const latestOsago = osagoRecords.sort((a: any, b: any) => 
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    )[0];
+
+    const lastDate = new Date(latestOsago.date);
+    const expDate = new Date(lastDate);
+    expDate.setFullYear(expDate.getFullYear() + 1);
+    
+    const now = new Date();
+    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const nextMonthEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+    
+    if (expDate <= currentMonthEnd) {
+      setOsagoStatus('expired');
+    } else if (expDate <= nextMonthEnd) {
+      setOsagoStatus('warning');
+    } else {
+      setOsagoStatus('ok');
+    }
   };
 
   const handleMileageSubmit = async (e: React.FormEvent) => {
@@ -203,9 +344,88 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
       await submitMileageCheck(selectedCarId, Number(mileageInput));
       setShowMileageModal(false);
       setMileageInput('');
+      // Сбрасываем уведомления о пробеге
+      await markNotificationsRead(['mileage']);
       loadData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Ошибка сохранения пробега');
+      if (err.response?.data?.code === 'MILEAGE_DECREASED') {
+        alert(`Пробег уменьшился. Последний зафиксированный: ${err.response.data.lastMileage} км. Это ошибка?`);
+      } else {
+        alert(err.response?.data?.message || 'Ошибка сохранения пробега');
+      }
+    }
+  };
+
+  const handleOsagoSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCarId || !osagoDateInput) return;
+    
+    const currentCar = cars.find(c => c.id === selectedCarId);
+    
+    try {
+      await createRecord({
+        carId: selectedCarId,
+        category: 'osago',
+        date: osagoDateInput,
+        mileage: currentCar?.mileage || 0,
+        work: 'Продление полиса ОСАГО',
+        cost: 0,
+        comment: ''
+      });
+      setShowOsagoModal(false);
+      await markNotificationsRead(['osago']);
+      loadData();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Ошибка сохранения даты ОСАГО');
+    }
+  };
+
+  const handleGrayTileClick = (catKey: string) => {
+    setSelectedGrayCategory(catKey);
+    const car = cars.find(c => c.id === selectedCarId);
+    setGrayFormData({
+      date: new Date().toISOString().split('T')[0],
+      mileage: String(car?.mileage || ''),
+      cost: '',
+      work: '',
+      comment: ''
+    });
+    setShowGrayModal(true);
+  };
+
+  const handleGraySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCarId || !selectedGrayCategory) return;
+    
+    try {
+      await createRecord({
+        carId: selectedCarId,
+        category: selectedGrayCategory,
+        ...grayFormData,
+        mileage: Number(grayFormData.mileage),
+        cost: Number(grayFormData.cost) || 0
+      });
+      
+      // Автообновление пробега, если новый > текущего
+      const car = cars.find(c => c.id === selectedCarId);
+      if (car && Number(grayFormData.mileage) > car.mileage) {
+        // Обновление пробега авто происходит на бэкенде при создании записи
+      }
+      
+      setShowGrayModal(false);
+      loadData();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Ошибка сохранения');
+    }
+  };
+
+  const getTileColorClass = (color: string): string => {
+    switch (color) {
+      case 'red': return 'border-red-500/50 bg-red-500/10 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.1)]';
+      case 'yellow': return 'border-yellow-500/50 bg-yellow-500/10 text-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.1)]';
+      case 'green': return 'border-green-500/50 bg-green-500/10 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.1)]';
+      case 'gray': return 'border-gray-500/30 bg-gray-500/10 text-gray-400';
+      default: return 'border-gray-500/30 bg-gray-500/10 text-gray-400';
     }
   };
 
@@ -233,19 +453,79 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
     );
   }
 
+  // БЛОКИРОВКА: если пробег не введен, показываем только селектор и поле ввода
+  if (!isMileageEntered) {
+    const currentMonthName = new Date().toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+    
+    return (
+      <div className="space-y-4">
+        <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-4">
+          <label className="block text-sm font-medium text-gray-300 mb-2">Выберите автомобиль</label>
+          <select
+            value={selectedCarId || ''}
+            onChange={(e) => onCarChange(Number(e.target.value))}
+            className="w-full px-3 py-2.5 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all"
+          >
+            {cars.map(car => (
+              <option key={car.id} value={car.id} className="bg-slate-800">
+                {car.marka} {car.model} {car.gosnomer} ({car.mileage} км)
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="bg-gradient-to-br from-purple-500/20 to-cyan-500/20 border border-purple-500/30 rounded-2xl p-6 text-center">
+          <div className="text-5xl mb-3">📍</div>
+          <h3 className="text-lg font-bold text-gray-100 mb-2">Введите пробег за {currentMonthName}</h3>
+          <p className="text-sm text-gray-400 mb-4">
+            Для получения точного прогноза необходимо ежемесячно вводить актуальный пробег
+          </p>
+          <button
+            onClick={() => setShowMileageModal(true)}
+            className="px-6 py-3 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all font-medium"
+          >
+            Ввести пробег
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Основной интерфейс (пробег введен)
   return (
     <div className="space-y-4">
-      {uncheckedCars.length > 0 && (
-        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 shadow-[0_0_15px_rgba(234,179,8,0.1)]">
-          <p className="text-sm text-yellow-400 font-medium">
-            ⚠️ Не введен пробег за {new Date().toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}:
-          </p>
-          <p className="text-xs text-yellow-500/80 mt-1">
-            {uncheckedCars.map(c => `${c.marka} ${c.model}`).join(', ')}
-          </p>
-        </div>
-      )}
+      {/* Таблетки рекомендаций (ОСАГО) */}
+      <div className="space-y-2">
+        {osagoStatus === 'expired' && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-full px-4 py-2.5 flex items-center justify-between shadow-[0_0_15px_rgba(239,68,68,0.15)] animate-pulse">
+            <span className="text-sm text-red-400 font-medium flex items-center gap-2">
+              🚨 Срок действия ОСАГО истек!
+            </span>
+            <button 
+              onClick={() => setShowOsagoModal(true)} 
+              className="text-xs bg-red-500/20 hover:bg-red-500/30 text-red-300 px-3 py-1 rounded-full transition font-medium"
+            >
+              Обновить
+            </button>
+          </div>
+        )}
+        
+        {osagoStatus === 'warning' && (
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-full px-4 py-2.5 flex items-center justify-between shadow-[0_0_15px_rgba(234,179,8,0.15)]">
+            <span className="text-sm text-yellow-400 font-medium flex items-center gap-2">
+              ⚠️ ОСАГО истекает в течение месяца
+            </span>
+            <button 
+              onClick={() => setShowOsagoModal(true)} 
+              className="text-xs bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 px-3 py-1 rounded-full transition font-medium"
+            >
+              Обновить
+            </button>
+          </div>
+        )}
+      </div>
 
+      {/* Селектор авто */}
       <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-4">
         <label className="block text-sm font-medium text-gray-300 mb-2">Выберите автомобиль</label>
         <select
@@ -259,8 +539,15 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
             </option>
           ))}
         </select>
+        
+        {isDefaultTempo && (
+          <p className="text-xs text-yellow-400 mt-2 flex items-center gap-1">
+            ⚠️ Используется дефолтный темп (1500 км/мес). Введите пробег за несколько месяцев для точного прогноза
+          </p>
+        )}
       </div>
 
+      {/* Кнопка ввода пробега */}
       <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 shadow-[0_0_15px_rgba(168,85,247,0.1)]">
         <div className="flex items-center justify-between">
           <div>
@@ -278,10 +565,13 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         </div>
       </div>
 
+      {/* Плитки прогноза */}
       <div>
         <h2 className="text-lg font-bold text-gray-100 mb-3 flex items-center gap-2">
           🧠 Умный прогноз ТО
-          <span className="text-xs font-normal text-gray-400 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">на основе вашего пробега</span>
+          <span className="text-xs font-normal text-gray-400 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">
+            средний темп: {avgPerMonth} км/мес
+          </span>
         </h2>
         
         {tiles.length === 0 ? (
@@ -301,41 +591,39 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         ) : (
           <>
             <div className="grid grid-cols-2 gap-3">
-              {tiles.map(tile => (
+              {tiles.slice(0, 6).map(tile => (
                 <div
                   key={tile.cat}
-                  onClick={() => onTabChange('journal')}
+                  onClick={() => tile.color === 'gray' ? handleGrayTileClick(tile.cat) : onTabChange('journal')}
                   className={`border rounded-xl p-3 cursor-pointer hover:scale-[1.02] transition-all duration-300 ${getTileColorClass(tile.color)}`}
                 >
                   <div className="font-semibold text-sm">{tile.name}</div>
-                  <div className="text-xs mt-1 opacity-80">
-                    {tile.isTimeBased ? `Осталось: ${tile.remaining} мес.` : `Осталось: ${tile.remaining} км`}
-                  </div>
+                  {tile.message && <div className="text-xs mt-1 opacity-90">{tile.message}</div>}
+                  {tile.color === 'gray' && <div className="text-xs mt-1 opacity-70">Внесите данные</div>}
                 </div>
               ))}
             </div>
 
-            {otherTiles.length > 0 && (
+            {tiles.length > 6 && (
               <button
                 onClick={() => setShowOthers(!showOthers)}
                 className="w-full mt-3 py-2 text-sm text-cyan-400 hover:bg-white/5 rounded-lg transition-all border border-transparent hover:border-white/10"
               >
-                {showOthers ? '▲ Скрыть' : '▼'} Другие категории ({otherTiles.length})
+                {showOthers ? '▲ Скрыть' : '▼'} Другие категории ({tiles.length - 6})
               </button>
             )}
 
-            {showOthers && otherTiles.length > 0 && (
+            {showOthers && tiles.length > 6 && (
               <div className="grid grid-cols-2 gap-3 mt-3">
-                {otherTiles.map(tile => (
+                {tiles.slice(6).map(tile => (
                   <div
                     key={tile.cat}
-                    onClick={() => onTabChange('journal')}
+                    onClick={() => tile.color === 'gray' ? handleGrayTileClick(tile.cat) : onTabChange('journal')}
                     className={`border rounded-xl p-3 cursor-pointer hover:scale-[1.02] transition-all duration-300 ${getTileColorClass(tile.color)}`}
                   >
                     <div className="font-semibold text-sm">{tile.name}</div>
-                    <div className="text-xs mt-1 opacity-80">
-                      {tile.isTimeBased ? `Осталось: ${tile.remaining} мес.` : `Осталось: ${tile.remaining} км`}
-                    </div>
+                    {tile.message && <div className="text-xs mt-1 opacity-90">{tile.message}</div>}
+                    {tile.color === 'gray' && <div className="text-xs mt-1 opacity-70">Внесите данные</div>}
                   </div>
                 ))}
               </div>
@@ -344,6 +632,7 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         )}
       </div>
 
+      {/* Модалка ввода пробега */}
       {showMileageModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm">
@@ -368,6 +657,81 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
                 className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
               >
                 Сохранить
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Модалка обновления ОСАГО */}
+      {showOsagoModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="p-4 border-b border-white/10 flex justify-between items-center">
+              <h3 className="font-bold text-gray-100">Обновить дату ОСАГО</h3>
+              <button onClick={() => setShowOsagoModal(false)} className="text-gray-400 hover:text-white text-xl transition-colors">&times;</button>
+            </div>
+            <form onSubmit={handleOsagoSubmit} className="p-4 space-y-4">
+              <p className="text-sm text-gray-400">
+                Укажите дату начала действия <strong className="text-cyan-400">нового полиса</strong>.
+              </p>
+              <input
+                type="date"
+                required
+                value={osagoDateInput}
+                onChange={(e) => setOsagoDateInput(e.target.value)}
+                className="w-full px-3 py-2.5 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all"
+              />
+              <button
+                type="submit"
+                className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
+              >
+                Сохранить дату
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Модалка для серой плитки */}
+      {showGrayModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b border-white/10 flex justify-between items-center sticky top-0 bg-slate-900 z-10">
+              <h3 className="font-bold text-gray-100">
+                {getCategoryName(selectedGrayCategory)} — первое ТО
+              </h3>
+              <button onClick={() => setShowGrayModal(false)} className="text-gray-400 hover:text-white text-xl transition-colors">&times;</button>
+            </div>
+            <form onSubmit={handleGraySubmit} className="p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">Дата обслуживания</label>
+                  <input required type="date" className="w-full px-3 py-2.5 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all" value={grayFormData.date} onChange={e => setGrayFormData({...grayFormData, date: e.target.value})} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">Пробег (км)</label>
+                  <input required type="number" className="w-full px-3 py-2.5 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all" value={grayFormData.mileage} onChange={e => setGrayFormData({...grayFormData, mileage: e.target.value})} placeholder="Напр. 195000" />
+                </div>
+              </div>
+              
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">Выполненные работы</label>
+                <textarea required rows={2} className="w-full px-3 py-2.5 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all" value={grayFormData.work} onChange={e => setGrayFormData({...grayFormData, work: e.target.value})} placeholder="Например: Замена масла и фильтра" />
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">Стоимость (₽)</label>
+                <input type="number" className="w-full px-3 py-2.5 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all" value={grayFormData.cost} onChange={e => setGrayFormData({...grayFormData, cost: e.target.value})} placeholder="0" />
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">Комментарий (необязательно)</label>
+                <input className="w-full px-3 py-2.5 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all" value={grayFormData.comment} onChange={e => setGrayFormData({...grayFormData, comment: e.target.value})} placeholder="Например: Масло Shell 5W-30" />
+              </div>
+
+              <button type="submit" className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all mt-2">
+                Сохранить запись
               </button>
             </form>
           </div>

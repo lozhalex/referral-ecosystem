@@ -1,73 +1,68 @@
-export interface Category {
+export interface CategoryConfig {
   key: string;
   name: string;
-  isPredictable: boolean; // Показывается в прогнозе на главной
-  isTimeBased: boolean;   // Интервал в месяцах, а не в км
-  defaultInterval: number; // Интервал по умолчанию (км или месяцы)
+  defaultInterval: number; // в км или месяцах
+  isTimeBased: boolean; // true = интервал в месяцах, false = в км
+  isPredictable: boolean; // показывается ли на главной
+  isFwdOnly?: boolean; // только для полного привода (масло в раздатке)
+  isReglament?: boolean; // регламентное ТО (скрывается при пробеге > 100000)
+  group: string; // группа для сортировки
 }
 
-export const CATEGORIES: Category[] = [
-  // === ПРОГНОЗИРУЕМЫЕ (ПР) ===
-  
-  // Двигатель и ТО
-  { key: 'to', name: 'Регламентное ТО', isPredictable: true, isTimeBased: false, defaultInterval: 10000 },
-  { key: 'oil_engine', name: 'Масло двигателя + фильтр', isPredictable: true, isTimeBased: false, defaultInterval: 7500 },
-  { key: 'filters_air_cabin', name: 'Воздушный и салонный фильтры', isPredictable: true, isTimeBased: false, defaultInterval: 15000 },
-  { key: 'fuel_filter', name: 'Топливный фильтр', isPredictable: true, isTimeBased: false, defaultInterval: 30000 },
-  { key: 'spark_plugs', name: 'Свечи зажигания', isPredictable: true, isTimeBased: false, defaultInterval: 30000 },
-  { key: 'timing_belt', name: 'Ремень/цепь ГРМ и ролики', isPredictable: true, isTimeBased: false, defaultInterval: 60000 },
-  
-  // Трансмиссия
-  { key: 'transmission_oil', name: 'Масло в КПП', isPredictable: true, isTimeBased: false, defaultInterval: 60000 },
-  { key: 'transfer_case_oil', name: 'Масло в раздатке и редукторах', isPredictable: true, isTimeBased: false, defaultInterval: 60000 },
-  
-  // Тормозная система и подвеска
-  { key: 'brake_pads_front', name: 'Тормозные колодки передние', isPredictable: true, isTimeBased: false, defaultInterval: 30000 },
-  { key: 'brake_pads_rear', name: 'Тормозные колодки задние', isPredictable: true, isTimeBased: false, defaultInterval: 40000 },
-  { key: 'brake_discs', name: 'Тормозные диски', isPredictable: true, isTimeBased: false, defaultInterval: 60000 },
-  { key: 'brake_fluid', name: 'Тормозная жидкость', isPredictable: true, isTimeBased: true, defaultInterval: 24 }, // 24 месяца
-  { key: 'shocks', name: 'Амортизаторы и стойки', isPredictable: true, isTimeBased: false, defaultInterval: 80000 },
-  { key: 'silent_blocks', name: 'Сайлентблоки и рычаги', isPredictable: true, isTimeBased: false, defaultInterval: 80000 },
-  { key: 'ball_joints', name: 'Шаровые опоры', isPredictable: true, isTimeBased: false, defaultInterval: 80000 },
-  
-  // Охлаждение и климат
-  { key: 'antifreeze', name: 'Антифриз / Охлаждающая жидкость', isPredictable: true, isTimeBased: true, defaultInterval: 36 }, // 36 месяцев
-  { key: 'ac_recharge', name: 'Заправка кондиционера', isPredictable: true, isTimeBased: true, defaultInterval: 24 }, // 24 месяца
-  { key: 'ac_filter', name: 'Фильтр кондиционера', isPredictable: true, isTimeBased: false, defaultInterval: 15000 },
-  
-  // === НЕПРОГНОЗИРУЕМЫЕ (НП) - только в журнале ===
-  { key: 'wheel_bearings', name: 'Ступичные подшипники', isPredictable: false, isTimeBased: false, defaultInterval: 100000 },
-  { key: 'cooling_hoses', name: 'Патрубки системы охлаждения', isPredictable: false, isTimeBased: false, defaultInterval: 100000 },
-  { key: 'battery', name: 'Аккумулятор (АКБ)', isPredictable: false, isTimeBased: true, defaultInterval: 48 }, // 48 месяцев
-  { key: 'starter_generator', name: 'Генератор / стартер', isPredictable: false, isTimeBased: false, defaultInterval: 150000 },
-  { key: 'tire_service', name: 'Шиномонтаж и балансировка', isPredictable: false, isTimeBased: false, defaultInterval: 10000 },
-  { key: 'wheel_alignment', name: 'Развал-схождение', isPredictable: false, isTimeBased: false, defaultInterval: 20000 },
-  { key: 'other', name: 'Прочее', isPredictable: false, isTimeBased: false, defaultInterval: 20000 }
+export const CATEGORIES: CategoryConfig[] = [
+  // === ДВИГАТЕЛЬ И ТО ===
+  { key: 'reglament', name: 'Регламентное ТО', defaultInterval: 15000, isTimeBased: false, isPredictable: true, isReglament: true, group: 'engine' },
+  { key: 'oil', name: 'Масло двигателя + фильтр', defaultInterval: 10000, isTimeBased: false, isPredictable: true, group: 'engine' },
+  { key: 'air_filter', name: 'Воздушный и салонный фильтры', defaultInterval: 15000, isTimeBased: false, isPredictable: true, group: 'engine' },
+  { key: 'fuel_filter', name: 'Топливный фильтр', defaultInterval: 30000, isTimeBased: false, isPredictable: true, group: 'engine' },
+  { key: 'spark_plugs', name: 'Свечи зажигания', defaultInterval: 30000, isTimeBased: false, isPredictable: true, group: 'engine' },
+  { key: 'timing_belt', name: 'Ремень/цепь ГРМ и ролики', defaultInterval: 60000, isTimeBased: false, isPredictable: true, group: 'engine' },
+
+  // === ТРАНСМИССИЯ ===
+  { key: 'transmission_oil', name: 'Масло в КПП', defaultInterval: 60000, isTimeBased: false, isPredictable: true, group: 'transmission' },
+  { key: 'transfer_oil', name: 'Масло в раздатке и редукторах', defaultInterval: 60000, isTimeBased: false, isPredictable: true, isFwdOnly: true, group: 'transmission' },
+
+  // === ТОРМОЗА И ПОДВЕСКА ===
+  { key: 'brake_pads_front', name: 'Тормозные колодки передние', defaultInterval: 40000, isTimeBased: false, isPredictable: true, group: 'brakes' },
+  { key: 'brake_pads_rear', name: 'Тормозные колодки задние', defaultInterval: 60000, isTimeBased: false, isPredictable: true, group: 'brakes' },
+  { key: 'brake_discs', name: 'Тормозные диски', defaultInterval: 80000, isTimeBased: false, isPredictable: true, group: 'brakes' },
+  { key: 'brake_fluid', name: 'Тормозная жидкость', defaultInterval: 24, isTimeBased: true, isPredictable: true, group: 'brakes' },
+  { key: 'shock_absorbers', name: 'Амортизаторы и стойки', defaultInterval: 80000, isTimeBased: false, isPredictable: true, group: 'brakes' },
+  { key: 'silentblocks', name: 'Сайлентблоки и рычаги', defaultInterval: 80000, isTimeBased: false, isPredictable: true, group: 'brakes' },
+  { key: 'ball_joints', name: 'Шаровые опоры', defaultInterval: 80000, isTimeBased: false, isPredictable: true, group: 'brakes' },
+
+  // === ОХЛАЖДЕНИЕ И КЛИМАТ ===
+  { key: 'antifreeze', name: 'Антифриз', defaultInterval: 48, isTimeBased: true, isPredictable: true, group: 'cooling' },
+  { key: 'ac_recharge', name: 'Заправка кондиционера', defaultInterval: 24, isTimeBased: true, isPredictable: true, group: 'cooling' },
+  { key: 'ac_filter', name: 'Фильтр кондиционера', defaultInterval: 15000, isTimeBased: false, isPredictable: true, group: 'cooling' },
+
+  // === ОСАГО (добавлено по запросу) ===
+  { key: 'osago', name: 'ОСАГО', defaultInterval: 12, isTimeBased: true, isPredictable: true, group: 'insurance' },
+
+  // === НЕПРОГНОЗИРУЕМЫЕ (только журнал) ===
+  { key: 'wheel_bearings', name: 'Ступичные подшипники', defaultInterval: 0, isTimeBased: false, isPredictable: false, group: 'other' },
+  { key: 'hoses', name: 'Патрубки системы охлаждения', defaultInterval: 0, isTimeBased: false, isPredictable: false, group: 'other' },
+  { key: 'battery', name: 'Аккумулятор (АКБ)', defaultInterval: 0, isTimeBased: false, isPredictable: false, group: 'other' },
+  { key: 'generator', name: 'Генератор / стартер', defaultInterval: 0, isTimeBased: false, isPredictable: false, group: 'other' },
+  { key: 'tires', name: 'Шиномонтаж и балансировка', defaultInterval: 0, isTimeBased: false, isPredictable: false, group: 'other' },
+  { key: 'alignment', name: 'Развал-схождение', defaultInterval: 0, isTimeBased: false, isPredictable: false, group: 'other' },
+  { key: 'other', name: 'Прочее', defaultInterval: 0, isTimeBased: false, isPredictable: false, group: 'other' },
 ];
 
-// Интервалы по умолчанию (для инициализации настроек пользователя)
+export const getCategoryName = (key: string): string => {
+  return CATEGORIES.find(c => c.key === key)?.name || key;
+};
+
+export const getPredictableCategories = (isFwd: boolean = false, currentMileage: number = 0): CategoryConfig[] => {
+  return CATEGORIES.filter(c => {
+    if (!c.isPredictable) return false;
+    if (c.isFwdOnly && !isFwd) return false;
+    if (c.isReglament && currentMileage > 100000) return false;
+    return true;
+  });
+};
+
 export const DEFAULT_INTERVALS: Record<string, number> = {};
-CATEGORIES.forEach(cat => {
-  DEFAULT_INTERVALS[cat.key] = cat.defaultInterval;
+CATEGORIES.forEach(c => {
+  DEFAULT_INTERVALS[c.key] = c.defaultInterval;
 });
-
-// Получить название категории по ключу
-export function getCategoryName(key: string): string {
-  const found = CATEGORIES.find(c => c.key === key);
-  return found ? found.name : key;
-}
-
-// Получить только прогнозируемые категории
-export function getPredictableCategories(): Category[] {
-  return CATEGORIES.filter(c => c.isPredictable);
-}
-
-// Получить только непрогнозируемые категории
-export function getNonPredictableCategories(): Category[] {
-  return CATEGORIES.filter(c => !c.isPredictable);
-}
-
-// Получить категорию по ключу
-export function getCategoryByKey(key: string): Category | undefined {
-  return CATEGORIES.find(c => c.key === key);
-}

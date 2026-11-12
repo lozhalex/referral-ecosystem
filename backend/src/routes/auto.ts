@@ -10,7 +10,6 @@ router.use(authenticateToken);
 // ==========================================
 // 1. АВТОМОБИЛИ (Cars)
 // ==========================================
-
 router.get('/cars', async (req: any, res: Response) => {
   try {
     const cars = await prisma.car.findMany({
@@ -82,12 +81,11 @@ router.post('/cars/:id/delete', async (req: any, res: Response) => {
 // ==========================================
 // 2. ЖУРНАЛ ОБСЛУЖИВАНИЯ (Journal)
 // ==========================================
-
 router.get('/journal', async (req: any, res: Response) => {
   try {
     const carId = req.query.carId ? Number(req.query.carId) : undefined;
     const records = await prisma.serviceRecord.findMany({
-      where: { 
+      where: {
         userId: req.user.userId,
         ...(carId && { carId })
       },
@@ -103,7 +101,6 @@ router.get('/journal', async (req: any, res: Response) => {
 router.post('/journal', async (req: any, res: Response) => {
   try {
     const { carId, date, mileage, category, subcat, work, cost, comment } = req.body;
-    
     const record = await prisma.serviceRecord.create({
       data: {
         userId: req.user.userId,
@@ -117,7 +114,8 @@ router.post('/journal', async (req: any, res: Response) => {
         comment: comment || ''
       }
     });
-
+    
+    // Автообновление пробега авто, если новый пробег > текущего
     if (carId && mileage) {
       await prisma.car.updateMany({
         where: { 
@@ -128,7 +126,7 @@ router.post('/journal', async (req: any, res: Response) => {
         data: { mileage: Number(mileage) }
       });
     }
-
+    
     res.json({ success: true, record });
   } catch (err) {
     console.error('Auto journal create error:', err);
@@ -139,15 +137,14 @@ router.post('/journal', async (req: any, res: Response) => {
 // ==========================================
 // 3. ИНТЕРВАЛЫ И ПРОГНОЗ (Reminders / Intervals)
 // ==========================================
-
 router.get('/intervals', async (req: any, res: Response) => {
   try {
     const interval = await prisma.serviceInterval.findUnique({
       where: { userId: req.user.userId }
     });
-    res.json({ 
-      success: true, 
-      intervals: interval ? JSON.parse(interval.data) : null 
+    res.json({
+      success: true,
+      intervals: interval ? JSON.parse(interval.data) : null
     });
   } catch (err) {
     console.error('Auto intervals get error:', err);
@@ -174,24 +171,42 @@ router.post('/intervals', async (req: any, res: Response) => {
 // 4. ВВОД ПРОБЕГА (Mileage Check)
 // ==========================================
 
+// 🆕 НОВОЕ: Получить все отметки пробега для конкретного авто
+router.get('/mileage-checks/:carId', async (req: any, res: Response) => {
+  try {
+    const carId = Number(req.params.carId);
+    const checks = await prisma.mileageCheck.findMany({
+      where: { carId, userId: req.user.userId },
+      orderBy: { yearMonth: 'asc' }
+    });
+    res.json({ success: true, checks });
+  } catch (err) {
+    console.error('Auto mileage checks get error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
 router.post('/mileage-check', async (req: any, res: Response) => {
   try {
     const { carId, km } = req.body;
     const now = new Date();
     const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
-
+    
     const lastCheck = await prisma.mileageCheck.findFirst({
       where: { carId: Number(carId), userId: req.user.userId },
       orderBy: { yearMonth: 'desc' }
     });
-
+    
+    // 🆕 Возвращаем структурированную ошибку с кодом
     if (lastCheck && Number(km) < lastCheck.km) {
       return res.status(400).json({ 
         success: false, 
-        message: `Новый пробег не может быть меньше последнего (${lastCheck.km} км)` 
+        code: 'MILEAGE_DECREASED',
+        lastMileage: lastCheck.km,
+        message: `Пробег уменьшился. Последний зафиксированный: ${lastCheck.km} км`
       });
     }
-
+    
     await prisma.mileageCheck.upsert({
       where: { 
         carId_yearMonth: { 
@@ -207,7 +222,7 @@ router.post('/mileage-check', async (req: any, res: Response) => {
         km: Number(km)
       }
     });
-
+    
     await prisma.car.updateMany({
       where: { 
         id: Number(carId), 
@@ -216,7 +231,7 @@ router.post('/mileage-check', async (req: any, res: Response) => {
       },
       data: { mileage: Number(km) }
     });
-
+    
     res.json({ success: true });
   } catch (err) {
     console.error('Auto mileage check error:', err);
@@ -229,20 +244,16 @@ router.get('/mileage-check/status', async (req: any, res: Response) => {
     const cars = await prisma.car.findMany({
       where: { userId: req.user.userId, isDeleted: false }
     });
-
     const now = new Date();
     const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
-
     const checks = await prisma.mileageCheck.findMany({
       where: { 
         userId: req.user.userId,
         yearMonth
       }
     });
-
     const checkedCarIds = new Set(checks.map(c => c.carId));
     const uncheckedCars = cars.filter(car => !checkedCarIds.has(car.id));
-
     res.json({ 
       success: true, 
       uncheckedCars,
@@ -258,11 +269,9 @@ router.get('/mileage-check/status', async (req: any, res: Response) => {
 // ==========================================
 // 5. ДАШБОРД (все данные для главной)
 // ==========================================
-
 router.get('/dashboard', async (req: any, res: Response) => {
   try {
     const carId = req.query.carId ? Number(req.query.carId) : undefined;
-    
     const [cars, records, intervalRow, mileageChecks] = await Promise.all([
       prisma.car.findMany({ 
         where: { userId: req.user.userId, isDeleted: false } 
@@ -279,9 +288,7 @@ router.get('/dashboard', async (req: any, res: Response) => {
         orderBy: { yearMonth: 'desc' }
       })
     ]);
-
     const intervals = intervalRow ? JSON.parse(intervalRow.data) : {};
-
     res.json({ 
       success: true, 
       cars, 
@@ -298,14 +305,13 @@ router.get('/dashboard', async (req: any, res: Response) => {
 // ==========================================
 // 6. НАСТРОЙКИ ПОЛЬЗОВАТЕЛЯ
 // ==========================================
-
 router.get('/settings', async (req: any, res: Response) => {
   try {
     const settings = await prisma.userAutoSettings.findUnique({
       where: { userId: req.user.userId }
     });
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       settings: settings || { mileageReminderTime: '09:00' }
     });
   } catch (err) {
@@ -320,9 +326,9 @@ router.post('/settings', async (req: any, res: Response) => {
     await prisma.userAutoSettings.upsert({
       where: { userId: req.user.userId },
       update: { mileageReminderTime: mileageReminderTime || '09:00' },
-      create: { 
-        userId: req.user.userId, 
-        mileageReminderTime: mileageReminderTime || '09:00' 
+      create: {
+        userId: req.user.userId,
+        mileageReminderTime: mileageReminderTime || '09:00'
       }
     });
     res.json({ success: true });
@@ -335,33 +341,28 @@ router.post('/settings', async (req: any, res: Response) => {
 // ==========================================
 // 7. УВЕДОМЛЕНИЯ (Notifications)
 // ==========================================
-
 router.get('/notifications', async (req: any, res: Response) => {
   try {
-    const notifications = [];
+    const notifications: any[] = [];
     const now = new Date();
-    
-    // Форматируем текущий месяц как строку "YYYYMM" (например, "202611")
     const currentYearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
-
+    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const nextMonthEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+    
     const cars = await prisma.car.findMany({
       where: { userId: req.user.userId, isDeleted: false }
     });
-
-    // Ищем только те записи, которые сделаны за текущий месяц
+    
+    // 1. Проверка не введённого пробега
     const mileageStatus = await prisma.mileageCheck.findMany({
       where: { 
         userId: req.user.userId,
         yearMonth: currentYearMonth
       }
     });
-
-    // Собираем ID машин, для которых пробег уже введен в этом месяце
     const checkedCarIds = new Set(mileageStatus.map(m => m.carId));
-    
-    // Фильтруем машины, для которых пробег НЕ введен
     const carsWithoutMileage = cars.filter(car => !checkedCarIds.has(car.id));
-
+    
     if (carsWithoutMileage.length > 0) {
       notifications.push({
         type: 'mileage',
@@ -370,7 +371,44 @@ router.get('/notifications', async (req: any, res: Response) => {
         carNames: carsWithoutMileage.map(c => `${c.marka} ${c.model}`).join(', ')
       });
     }
-
+    
+    // 2. Проверка красных плиток ТО (прогноз на текущий месяц)
+    const records = await prisma.serviceRecord.findMany({
+      where: { userId: req.user.userId }
+    });
+    const intervalRow = await prisma.serviceInterval.findUnique({
+      where: { userId: req.user.userId }
+    });
+    const intervals = intervalRow ? JSON.parse(intervalRow.data) : {};
+    
+    const byCategory: Record<string, any> = {};
+    for (const rec of records) {
+      if (!byCategory[rec.category] || rec.date > byCategory[rec.category].date) {
+        byCategory[rec.category] = rec;
+      }
+    }
+    
+    // Категории по времени (тормозная жидкость, антифриз, ОСАГО)
+    const timeBasedCats = ['brake_fluid', 'antifreeze', 'ac_recharge', 'osago'];
+    for (const catKey of timeBasedCats) {
+      const lastRec = byCategory[catKey];
+      if (!lastRec) continue;
+      
+      const intervalMonths = intervals[catKey] || 12;
+      const lastDate = new Date(lastRec.date);
+      const nextDueDate = new Date(lastDate);
+      nextDueDate.setMonth(nextDueDate.getMonth() + intervalMonths);
+      
+      if (nextDueDate <= currentMonthEnd) {
+        notifications.push({
+          type: 'service',
+          message: `${catKey === 'osago' ? 'ОСАГО' : getCategoryName(catKey)} истекает в этом месяце`,
+          count: 1,
+          category: catKey
+        });
+      }
+    }
+    
     res.json({ 
       success: true, 
       notifications,
@@ -384,12 +422,25 @@ router.get('/notifications', async (req: any, res: Response) => {
 
 router.post('/notifications/read', async (req: any, res: Response) => {
   try {
-    // Здесь можно логировать факт прочтения, если потребуется
+    const { types } = req.body; // массив типов: ['mileage', 'osago', 'service']
+    // Пока просто логируем — в будущем можно добавить таблицу прочитанных уведомлений
+    console.log('Notifications marked as read:', types);
     res.json({ success: true });
   } catch (err) {
     console.error('Auto notifications read error:', err);
     res.status(500).json({ success: false, message: 'Ошибка сервера' });
   }
 });
+
+// Вспомогательная функция для получения названия категории
+function getCategoryName(key: string): string {
+  const names: Record<string, string> = {
+    brake_fluid: 'Тормозная жидкость',
+    antifreeze: 'Антифриз',
+    ac_recharge: 'Кондиционер',
+    osago: 'ОСАГО'
+  };
+  return names[key] || key;
+}
 
 export default router;
