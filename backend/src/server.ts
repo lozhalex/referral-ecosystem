@@ -1,9 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
-import cron from 'node-cron'; // 👈 ДОБАВЛЕНО: для фоновых задач
-import { PrismaClient } from '@prisma/client'; // 👈 ДОБАВЛЕНО: для доступа к БД из крона
-
+import cron from 'node-cron';
+import { PrismaClient } from '@prisma/client';
 import authRoutes from './routes/auth';
 import adminRoutes from './routes/admin';
 import eventsRoutes from './routes/events';
@@ -13,33 +12,37 @@ import statsRoutes from './routes/stats';
 import alertsRoutes from './routes/alerts';
 import membershipRoutes from './routes/membership';
 import rcbRoutes from './routes/rcb';
-import autoRoutes from './routes/auto'; // 👈 ДОБАВЛЕНО
+import autoRoutes from './routes/auto';
 
 const app = express();
 const PORT: number = Number(process.env.PORT) || 3000;
-const prisma = new PrismaClient(); // 👈 ДОБАВЛЕНО: экземпляр клиента для крон-задачи
+const prisma = new PrismaClient();
 
-// ПУНКТ 16: Строгая настройка CORS (добавлен новый домен)
+// ✅ КРИТИЧНО: доверяем 1 прокси (Nginx). Без этого express-rate-limit падает.
+app.set('trust proxy', 1);
+
+// ПУНКТ 16: Строгая настройка CORS
 const allowedOrigins = [
-  'http://localhost:5173', // Локальная разработка Vite
-  'http://177.177.212.220', // Текущий сервер (оставляем для обратной совместимости)
+  'http://localhost:5173',
+  'http://177.177.212.220',
   'http://booomerang.ru',
   'https://booomerang.ru',
   'http://www.booomerang.ru',
   'https://www.booomerang.ru'
 ];
 
-app.use(cors({ 
-  origin: function(origin, callback) {
-    // Разрешаем запросы без origin (например, мобильные приложения или Postman) 
-    // или если origin есть в списке разрешенных
+app.use(cors({
+  origin: function (origin, callback) {
+    // Разрешаем запросы без origin (Postman, мобильные приложения, серверные вызовы)
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      callback(new Error('Не разрешенный источник (CORS)'));
+      callback(new Error('Не разрешенный источник (CORS)'), false);
     }
   },
-  credentials: true 
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
 app.use(express.json());
@@ -48,21 +51,22 @@ app.use(express.json());
 const csrfProtection = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
     if (req.headers['x-requested-with'] !== 'XMLHttpRequest') {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'CSRF validation failed: Missing required header' 
+      return res.status(403).json({
+        success: false,
+        message: 'CSRF validation failed: Missing required header'
       });
     }
   }
   next();
 };
-
 app.use(csrfProtection);
 
-const authLimiter = rateLimit({ 
-  windowMs: 60 * 1000, 
-  max: 5, 
-  message: { success: false, message: 'Слишком много попыток. Попробуйте позже.' } 
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Слишком много попыток. Попробуйте позже.' }
 });
 
 app.use('/api/auth', authLimiter, authRoutes);
@@ -74,7 +78,7 @@ app.use('/api/scanner', scannerRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/admin/alerts', alertsRoutes);
 app.use('/api/rcb', rcbRoutes);
-app.use('/api/auto', autoRoutes); // 👈 ДОБАВЛЕНО
+app.use('/api/auto', autoRoutes);
 
 // Health check освобождаем от CSRF для удобства мониторинга
 app.get('/api/health', (req, res) => {
@@ -88,17 +92,15 @@ app.get('/api/health', (req, res) => {
 cron.schedule('0 3 * * *', async () => {
   try {
     const now = new Date();
-    
     const result = await prisma.transaction.updateMany({
       where: {
         status: 'PENDING',
-        unlockDate: { lte: now } // Найти все, где дата разморозки уже наступила
+        unlockDate: { lte: now }
       },
       data: {
         status: 'AVAILABLE'
       }
     });
-
     if (result.count > 0) {
       console.log(`[CRON] ✅ Успешно разморожено ${result.count} транзакций бонусов.`);
     }
@@ -106,6 +108,7 @@ cron.schedule('0 3 * * *', async () => {
     console.error('[CRON] ❌ Ошибка при разморозке бонусов:', error);
   }
 });
+
 console.log('✅ Cron-задача разморозки бонусов зарегистрирована');
 // =================================================================
 
