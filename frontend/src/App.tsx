@@ -15,7 +15,6 @@ import AutoHelper from './pages/AutoHelper';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // 🆕 Глобальный перехват реферальной ссылки
-// Работает для любого URL сайта: /?ref=..., /login?ref=..., /register?ref=...
 function ReferralCapture() {
   const [searchParams] = useSearchParams();
   useEffect(() => {
@@ -47,6 +46,7 @@ function App() {
         <Route path="/building" element={<ProjectStub />} />
         <Route path="/eco" element={<ProjectStub />} />
         <Route path="/dating" element={<ProjectStub />} />
+        
         {/* 🛡️ Защищенные маршруты (требуют авторизации) */}
         <Route element={<ProtectedRoute />}>
           <Route path="/auto" element={<AutoHelper />} />

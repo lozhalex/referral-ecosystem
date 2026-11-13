@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom';
-import { BoomerangLogo } from './BoomerangLogo';
 
 interface HeaderProps {
   user: { phone: string; role: string } | null;
@@ -17,10 +16,9 @@ export default function Header({ user, onLogout }: HeaderProps) {
             className="flex items-center gap-2 cursor-pointer"
             onClick={() => navigate('/')}
           >
-            <BoomerangLogo size={32} />
+            <img src="/logo-mark.svg" alt="Бумеранг" className="h-8 w-auto" />
             <span className="text-xl font-bold text-white font-display">Бумеранг</span>
           </div>
-
           <div className="flex items-center gap-3">
             {user ? (
               <>

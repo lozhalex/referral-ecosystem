@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="110 168 180 288" width="180" height="288" fill="none">
+  <defs>
+    <filter id="glowP" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feFlood flood-color="#A855F7" flood-opacity="0.5"/>
+      <feComposite in2="b" operator="in"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowC" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feFlood flood-color="#22D3EE" flood-opacity="0.5"/>
+      <feComposite in2="b" operator="in"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Правый бумеранг (циан) — нижний (под) -->
+  <path d="M276.342 444.924C270.472 448.529 265.054 442.521 260.538 435.112L199.128 363.222C188.291 350.806 188.291 341.194 199.128 328.778L260.538 256.888C265.054 249.479 270.472 243.471 276.342 247.076C282.393 251.081 282.393 259.091 277.245 268.302L230.285 338.991C227.274 343.664 227.274 348.336 230.285 353.009L277.245 423.698C282.393 432.909 282.393 440.919 276.342 444.924Z" fill="#22D3EE" stroke="#22D3EE" stroke-width="2" stroke-linecap="round" filter="url(#glowC)"/>
+
+  <!-- Левый бумеранг (фиолетовый) — верхний (над) -->
+  <path d="M122.658 178.076C128.528 174.471 133.946 180.479 138.462 187.888L199.872 259.778C210.709 272.194 210.709 281.806 199.872 294.222L138.462 366.112C133.946 373.521 128.528 379.529 122.658 375.924C116.607 371.919 116.607 363.909 121.755 354.698L168.715 284.009C171.726 279.336 171.726 274.664 168.715 269.991L121.755 199.302C116.607 190.091 116.607 182.081 122.658 178.076Z" fill="#A855F7" stroke="#A855F7" stroke-width="2" stroke-linecap="round" filter="url(#glowP)"/>
+</svg>
