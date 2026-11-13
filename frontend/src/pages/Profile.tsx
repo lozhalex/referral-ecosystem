@@ -300,8 +300,8 @@ const Profile: React.FC = () => {
           <span>←</span> На главную
         </button>
         <span className={`text-xs font-bold px-3 py-1.5 rounded-full border ${
-          isPartner(user) 
-            ? 'text-neon-green border-neon-green/30 bg-neon-green/10' 
+          isPartner(user)
+            ? 'text-neon-green border-neon-green/30 bg-neon-green/10'
             : 'text-slate-400 border-white/10 bg-white/5'
         }`}>
           {isPartner(user) ? 'ПАРТНЕР СМАРТ' : 'БЕСПЛАТНЫЙ УЧАСТНИК'}
@@ -337,7 +337,7 @@ const Profile: React.FC = () => {
         </div>
       </div>
 
-      {/* Системная роль */}
+      {/* Системная роль — теперь включает service_master */}
       {hasRole(user.role, ['admin', 'SUPER_ADMIN', 'cashier', 'controller', 'service_master' as any]) && (
         <div className="glass p-4 mb-6 border border-neon-purple/20">
           <p className="text-xs text-slate-400 mb-1 uppercase tracking-wider">Системная роль</p>
@@ -362,8 +362,8 @@ const Profile: React.FC = () => {
             <div className="mt-4 space-y-4">
               {serviceMessage && (
                 <div className={`p-3 text-sm rounded-xl border ${
-                  serviceMessage.includes('✅') 
-                    ? 'bg-neon-green/10 text-neon-green border-neon-green/20' 
+                  serviceMessage.includes('✅')
+                    ? 'bg-neon-green/10 text-neon-green border-neon-green/20'
                     : serviceMessage.includes('⏱️')
                     ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
                     : 'bg-red-500/10 text-red-400 border-red-500/20'
@@ -469,7 +469,7 @@ const Profile: React.FC = () => {
 
                   <form onSubmit={handleServiceSave} className="space-y-3 bg-white/5 border border-white/10 rounded-xl p-4">
                     <p className="text-xs text-slate-400 uppercase tracking-wider">Новая запись в журнал</p>
-                    
+
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-xs text-gray-400 mb-1 block">Дата</label>
@@ -605,9 +605,9 @@ const Profile: React.FC = () => {
               <div className="flex-1">
                 <p className="text-sm text-slate-300 mb-2">Регистрация в РЦБ (бесплатно)</p>
                 {!user.isRcbRegisteredFree ? (
-                  <button 
-                    onClick={handleMarkRegistered} 
-                    disabled={rcbActionLoading} 
+                  <button
+                    onClick={handleMarkRegistered}
+                    disabled={rcbActionLoading}
                     className="text-xs bg-white/10 text-white px-4 py-2 rounded-lg hover:bg-white/20 transition disabled:opacity-50 border border-white/10"
                   >
                     {rcbActionLoading ? 'Обработка...' : 'Перейти к регистрации ↗'}
@@ -630,9 +630,9 @@ const Profile: React.FC = () => {
                     <p className="text-xs text-slate-400 mb-3 leading-relaxed">
                       Для получения статуса партнера и личной реферальной ссылки, внесите оплату тарифа СМАРТ в приложении РЦБ.
                     </p>
-                    <button 
-                      onClick={handleRequestPayment} 
-                      disabled={rcbActionLoading} 
+                    <button
+                      onClick={handleRequestPayment}
+                      disabled={rcbActionLoading}
                       className="btn-neon text-xs px-5 py-2.5"
                     >
                       {rcbActionLoading ? 'Обработка...' : 'Я оплатил тариф СМАРТ, проверить'}
@@ -680,8 +680,8 @@ const Profile: React.FC = () => {
           Сменить пароль
         </button>
         {hasRole(user.role, ['admin', 'SUPER_ADMIN']) && (
-          <button 
-            onClick={() => navigate('/admin')} 
+          <button
+            onClick={() => navigate('/admin')}
             className="w-full py-3 bg-neon-purple/10 text-neon-purple rounded-xl font-medium hover:bg-neon-purple/20 transition border border-neon-purple/20 text-sm"
           >
             🔧 Админ-панель
@@ -709,14 +709,14 @@ const Profile: React.FC = () => {
               {getReferralLink()}
             </div>
             <div className="space-y-2">
-              <button 
-                onClick={handleCopyLink} 
+              <button
+                onClick={handleCopyLink}
                 className={`w-full py-3 rounded-xl font-bold transition ${copied ? 'bg-neon-green text-dark-900' : 'btn-neon'}`}
               >
                 {copied ? '✅ Скопировано!' : '📋 Скопировать ссылку'}
               </button>
-              <button 
-                onClick={() => { setShowInviteModal(false); setCopied(false); }} 
+              <button
+                onClick={() => { setShowInviteModal(false); setCopied(false); }}
                 className="w-full py-3 text-slate-400 text-sm hover:text-white transition"
               >
                 Закрыть
