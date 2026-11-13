@@ -19,7 +19,7 @@ const Profile: React.FC = () => {
   const [rcbLinkInput, setRcbLinkInput] = useState('');
   const [savingLink, setSavingLink] = useState(false);
 
-  // === Состояния для панели сервисмена ===
+  // === Состояния панели сервисмена ===
   const [showServicePanel, setShowServicePanel] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [manualToken, setManualToken] = useState('');
@@ -143,7 +143,6 @@ const Profile: React.FC = () => {
   };
 
   // === Функции панели сервисмена ===
-
   const startScanner = async () => {
     setIsScanning(true);
     setServiceMessage('');
@@ -160,9 +159,7 @@ const Profile: React.FC = () => {
           setIsScanning(false);
           await validateToken(decodedText);
         },
-        (_errorMessage) => {
-          // Игнорируем ошибки сканирования (это нормально)
-        }
+        (_errorMessage) => {}
       );
     } catch (err) {
       console.error('Scanner start error:', err);
@@ -348,7 +345,7 @@ const Profile: React.FC = () => {
         </div>
       )}
 
-      {/* 🆕 ПАНЕЛЬ СЕРВИСМЕНА (только для role === 'service_master') */}
+      {/* 🆕 ПАНЕЛЬ СЕРВИСМЕНА */}
       {isServiceMaster && (
         <div className="glass p-5 mb-6 border border-neon-cyan/30 shadow-[0_0_15px_rgba(34,211,238,0.1)]">
           <button
