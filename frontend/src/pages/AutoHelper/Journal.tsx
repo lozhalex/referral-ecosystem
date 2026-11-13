@@ -17,7 +17,37 @@ interface Record {
   cost: number;
   comment: string;
   source?: string;
+  author?: { phone: string } | null;
 }
+
+// 🆕 Локальный маппинг категорий (на случай, если их нет в categories.ts)
+const LOCAL_CATEGORY_NAMES: Record<string, string> = {
+  mileage: 'Ввод пробега',
+  oil_engine: 'Масло двигателя + фильтр',
+  oil_transmission: 'Масло в КПП',
+  brake_fluid: 'Тормозная жидкость',
+  antifreeze: 'Антифриз',
+  ac_recharge: 'Кондиционер',
+  osago: 'ОСАГО',
+  tires: 'Шиномонтаж',
+  battery: 'Аккумулятор',
+  spark_plugs: 'Свечи зажигания',
+  air_filter: 'Воздушный фильтр',
+  cabin_filter: 'Салонный фильтр',
+  fuel_filter: 'Топливный фильтр',
+  brake_pads: 'Тормозные колодки',
+  timing_belt: 'Ремень ГРМ',
+  to: 'Регламентное ТО'
+};
+
+// Функция получения имени категории с фолбэком
+const getCategoryDisplayName = (key: string): string => {
+  // Сначала пробуем getCategoryName из categories.ts
+  const fromCategories = getCategoryName(key);
+  if (fromCategories && fromCategories !== key) return fromCategories;
+  // Если не нашли — берём из локального маппинга
+  return LOCAL_CATEGORY_NAMES[key] || key;
+};
 
 const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
   const [cars, setCars] = useState<any[]>([]);
@@ -25,7 +55,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  // Состояния для QR-модалки
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrToken, setQrToken] = useState('');
   const [qrCarInfo, setQrCarInfo] = useState<any>(null);
@@ -149,7 +178,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         </button>
       </div>
 
-      {/* 🆕 Кнопка генерации QR для сервисмена */}
       <button
         onClick={handleGenerateQR}
         disabled={qrGenerating}
@@ -189,7 +217,7 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
           {records.map(rec => (
             <div key={rec.id} className="bg-slate-900/60 backdrop-blur-md rounded-xl p-4 border border-white/10 hover:border-cyan-500/30 transition-all duration-300">
               <div className="flex justify-between items-start mb-1">
-                <span className="font-bold text-gray-100">{getCategoryName(rec.category)}</span>
+                <span className="font-bold text-gray-100">{getCategoryDisplayName(rec.category)}</span>
                 <span className="font-semibold text-cyan-400">{rec.cost} ₽</span>
               </div>
               <div className="text-sm text-gray-400 mb-1">
@@ -198,7 +226,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
               {rec.work && <div className="text-sm text-gray-300">{rec.work}</div>}
               {rec.comment && <div className="text-xs text-gray-500 mt-1 italic">"{rec.comment}"</div>}
               
-              {/* 🆕 Пометка о том, что запись внесена мастером */}
               {rec.source === 'service_master' && (
                 <div className="mt-2 pt-2 border-t border-white/5 flex items-center gap-2">
                   <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/30">
@@ -211,7 +238,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         </div>
       )}
 
-      {/* Модалка добавления записи */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -257,7 +283,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         </div>
       )}
 
-      {/* 🆕 Модалка с QR-кодом для сервисмена */}
       {showQRModal && qrToken && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
