@@ -42,16 +42,6 @@ const Profile: React.FC = () => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerId = 'qr-scanner-container';
 
-  useEffect(() => {
-    loadProfile();
-    return () => {
-      if (scannerRef.current) {
-        scannerRef.current.stop().catch(() => {});
-        scannerRef.current.clear();
-      }
-    };
-  }, []);
-
   const loadProfile = async () => {
     try {
       const response = await apiClient.get('/api/auth/me');
@@ -66,6 +56,49 @@ const Profile: React.FC = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  // 🆕 Инициализация сканера ТОЛЬКО когда контейнер уже отрисован в DOM
+  useEffect(() => {
+    if (isScanning && !scannerRef.current) {
+      const scanner = new Html5Qrcode(scannerContainerId);
+      scannerRef.current = scanner;
+      scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        async (decodedText) => {
+          try {
+            await scanner.stop();
+            scanner.clear();
+          } catch (e) {}
+          scannerRef.current = null;
+          setIsScanning(false);
+          await validateToken(decodedText);
+        },
+        (_errorMessage) => {}
+      ).catch((err) => {
+        console.error('Scanner start error:', err);
+        setServiceMessage('❌ Не удалось запустить камеру. Используйте ручной ввод.');
+        scannerRef.current = null;
+        setIsScanning(false);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isScanning]);
+
+  // Очистка сканера при размонтировании
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {});
+        scannerRef.current.clear();
+        scannerRef.current = null;
+      }
+    };
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -143,31 +176,6 @@ const Profile: React.FC = () => {
   };
 
   // === Функции панели сервисмена ===
-  const startScanner = async () => {
-    setIsScanning(true);
-    setServiceMessage('');
-    try {
-      const scanner = new Html5Qrcode(scannerContainerId);
-      scannerRef.current = scanner;
-      await scanner.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        async (decodedText) => {
-          await scanner.stop();
-          scanner.clear();
-          scannerRef.current = null;
-          setIsScanning(false);
-          await validateToken(decodedText);
-        },
-        (_errorMessage) => {}
-      );
-    } catch (err) {
-      console.error('Scanner start error:', err);
-      setServiceMessage('❌ Не удалось запустить камеру. Используйте ручной ввод.');
-      setIsScanning(false);
-    }
-  };
-
   const stopScanner = async () => {
     if (scannerRef.current) {
       try {
@@ -337,7 +345,7 @@ const Profile: React.FC = () => {
         </div>
       </div>
 
-      {/* Системная роль — теперь включает service_master */}
+      {/* Системная роль */}
       {hasRole(user.role, ['admin', 'SUPER_ADMIN', 'cashier', 'controller', 'service_master' as any]) && (
         <div className="glass p-4 mb-6 border border-neon-purple/20">
           <p className="text-xs text-slate-400 mb-1 uppercase tracking-wider">Системная роль</p>
@@ -345,7 +353,7 @@ const Profile: React.FC = () => {
         </div>
       )}
 
-      {/* 🆕 ПАНЕЛЬ СЕРВИСМЕНА */}
+      {/* ПАНЕЛЬ СЕРВИСМЕНА */}
       {isServiceMaster && (
         <div className="glass p-5 mb-6 border border-neon-cyan/30 shadow-[0_0_15px_rgba(34,211,238,0.1)]">
           <button
@@ -375,7 +383,7 @@ const Profile: React.FC = () => {
               {!isFormOpen && !isSessionClosed && (
                 <>
                   <button
-                    onClick={isScanning ? stopScanner : startScanner}
+                    onClick={isScanning ? stopScanner : () => setIsScanning(true)}
                     disabled={serviceLoading}
                     className="w-full py-3 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all disabled:opacity-50"
                   >
