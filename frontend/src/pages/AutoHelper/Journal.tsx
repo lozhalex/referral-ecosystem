@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { getJournal, createRecord, getCars } from '../../api/auto';
+import { getJournal, createRecord, getCars, generateServiceQR, revokeServiceQR } from '../../api/auto';
 import { CATEGORIES, getCategoryName } from './categories';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface JournalProps {
   selectedCarId: number | null;
   onCarChange: (carId: number | null) => void;
 }
 
-// 🆕 Переименован из Record в JournalRecord, чтобы не конфликтовать с встроенным типом Record<K, V>
+// Переименован из Record в JournalRecord — чтобы не конфликтовать с встроенным типом Record<K, V>
 interface JournalRecord {
   id: number;
   date: string;
@@ -19,7 +20,7 @@ interface JournalRecord {
   source?: string;
 }
 
-// 🆕 Локальный маппинг категорий (на случай, если их нет в categories.ts)
+// Локальный маппинг русских названий категорий
 const LOCAL_CATEGORY_NAMES: { [key: string]: string } = {
   mileage: 'Ввод пробега',
   oil_engine: 'Масло двигателя + фильтр',
@@ -39,7 +40,6 @@ const LOCAL_CATEGORY_NAMES: { [key: string]: string } = {
   to: 'Регламентное ТО'
 };
 
-// Функция получения имени категории с фолбэком
 const getCategoryDisplayName = (key: string): string => {
   const fromCategories = getCategoryName(key);
   if (fromCategories && fromCategories !== key) return fromCategories;
@@ -51,6 +51,13 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
   const [records, setRecords] = useState<JournalRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Состояния для QR-доступа сервисмена
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [qrToken, setQrToken] = useState('');
+  const [qrCarInfo, setQrCarInfo] = useState<any>(null);
+  const [qrGenerating, setQrGenerating] = useState(false);
+
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     mileage: '',
@@ -113,6 +120,35 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
     }
   };
 
+  const handleGenerateQR = async () => {
+    if (!selectedCarId) return;
+    setQrGenerating(true);
+    try {
+      const res = await generateServiceQR(selectedCarId);
+      if (res.success) {
+        setQrToken(res.token);
+        setQrCarInfo(res.carInfo);
+        setShowQRModal(true);
+      }
+    } catch (err) {
+      alert('Ошибка генерации QR-кода');
+    } finally {
+      setQrGenerating(false);
+    }
+  };
+
+  const handleRevokeQR = async () => {
+    if (!qrToken) return;
+    try {
+      await revokeServiceQR(qrToken);
+      setShowQRModal(false);
+      setQrToken('');
+      setQrCarInfo(null);
+    } catch (err) {
+      alert('Ошибка отмены доступа');
+    }
+  };
+
   const inputClass = "w-full px-3 py-2.5 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all placeholder-gray-500";
 
   if (loading) return <div className="text-center py-10 text-cyan-400 animate-pulse">Загрузка...</div>;
@@ -139,6 +175,27 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
           + Добавить запись
         </button>
       </div>
+
+      {/* Кнопка QR для сервисмена */}
+      <button
+        onClick={handleGenerateQR}
+        disabled={qrGenerating}
+        className="w-full bg-gradient-to-r from-purple-500/20 to-cyan-500/20 border border-purple-500/30 rounded-xl p-4 text-left hover:shadow-lg hover:shadow-purple-500/10 transition-all disabled:opacity-50"
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-purple-300 flex items-center gap-2">
+              🔑 Показать QR для сервисмена
+            </h3>
+            <p className="text-xs text-purple-400/80 mt-1">
+              Действителен 1 час. Сервисмен сможет внести данные о ТО.
+            </p>
+          </div>
+          <span className="px-4 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg text-sm font-medium">
+            {qrGenerating ? 'Генерация...' : 'Показать'}
+          </span>
+        </div>
+      </button>
 
       {records.length === 0 ? (
         <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-6 text-center">
@@ -167,7 +224,7 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
               </div>
               {rec.work && <div className="text-sm text-gray-300">{rec.work}</div>}
               {rec.comment && <div className="text-xs text-gray-500 mt-1 italic">"{rec.comment}"</div>}
-              
+
               {rec.source === 'service_master' && (
                 <div className="mt-2 pt-2 border-t border-white/5 flex items-center gap-2">
                   <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/30">
@@ -180,6 +237,7 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         </div>
       )}
 
+      {/* Модалка добавления записи */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -221,6 +279,41 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
                 Сохранить запись
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Модалка с QR-кодом для сервисмена */}
+      {showQRModal && qrToken && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+            <h3 className="text-lg font-bold text-gray-100 mb-2">QR-код для сервисмена</h3>
+            {qrCarInfo && (
+              <p className="text-sm text-gray-400 mb-4">
+                {qrCarInfo.marka} {qrCarInfo.model} {qrCarInfo.gosnomer}
+              </p>
+            )}
+
+            <div className="bg-white p-4 rounded-xl inline-block mb-4">
+              <QRCodeSVG value={qrToken} size={200} level="H" />
+            </div>
+
+            <p className="text-xs text-yellow-400 mb-6">
+              ⏱️ Действителен 1 час. Не закрывайте это окно до завершения работ.
+            </p>
+
+            <button
+              onClick={handleRevokeQR}
+              className="w-full py-2.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg font-medium hover:bg-red-500/30 transition-all"
+            >
+              Отменить доступ
+            </button>
+            <button
+              onClick={() => setShowQRModal(false)}
+              className="w-full py-2 text-sm text-gray-500 hover:text-gray-300 transition mt-2"
+            >
+              Закрыть
+            </button>
           </div>
         </div>
       )}
