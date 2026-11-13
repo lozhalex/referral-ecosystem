@@ -1,4 +1,5 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useSearchParams } from 'react-router-dom';
+import { useEffect } from 'react';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
@@ -11,11 +12,25 @@ import Tickets from './pages/Tickets';
 import Scanner from './pages/Scanner';
 import AdminEvents from './pages/AdminEvents';
 import AutoHelper from './pages/AutoHelper';
-import ProtectedRoute from './components/ProtectedRoute'; // 👈 ДОБАВЛЕНО
+import ProtectedRoute from './components/ProtectedRoute';
+
+// 🆕 Глобальный перехват реферальной ссылки
+// Работает для любого URL сайта: /?ref=..., /login?ref=..., /register?ref=...
+function ReferralCapture() {
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const ref = searchParams.get('ref');
+    if (ref) {
+      localStorage.setItem('referral_phone', ref);
+    }
+  }, [searchParams]);
+  return null;
+}
 
 function App() {
   return (
     <Router>
+      <ReferralCapture />
       <Routes>
         {/* Публичные маршруты */}
         <Route path="/" element={<Home />} />
@@ -32,7 +47,6 @@ function App() {
         <Route path="/building" element={<ProjectStub />} />
         <Route path="/eco" element={<ProjectStub />} />
         <Route path="/dating" element={<ProjectStub />} />
-
         {/* 🛡️ Защищенные маршруты (требуют авторизации) */}
         <Route element={<ProtectedRoute />}>
           <Route path="/auto" element={<AutoHelper />} />
