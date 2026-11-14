@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import ProjectCard from '../components/ProjectCard';
+import OnboardingModal from '../components/OnboardingModal'; // 👈 НОВЫЙ ИМПОРТ
 import { projects } from '../data/projects';
 import { apiClient } from '../api/client';
 
@@ -13,7 +14,6 @@ const getUserCountText = (count: number) => {
   return 'человек';
 };
 
-// Вспомогательная функция для конвертации VAPID ключа
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -30,6 +30,9 @@ export default function Home() {
   const [userCount, setUserCount] = useState<number | null>(null);
   const [autoNotifications, setAutoNotifications] = useState<number>(0);
   
+  // 👈 НОВОЕ: Состояние для системного онбординга
+  const [showSystemOnboarding, setShowSystemOnboarding] = useState(false);
+
   const token = localStorage.getItem('token');
   const user = token ? JSON.parse(atob(token.split('.')[1])) : null;
 
@@ -38,7 +41,15 @@ export default function Home() {
     window.location.reload();
   };
 
-  // Загрузка общего количества пользователей
+  // 👈 НОВОЕ: Проверка онбординга при монтировании
+  useEffect(() => {
+    const hasSeenOnboarding = localStorage.getItem('onboarding_system_shown');
+    if (!hasSeenOnboarding) {
+      // Небольшая задержка для плавного появления после загрузки страницы
+      setTimeout(() => setShowSystemOnboarding(true), 500);
+    }
+  }, []);
+
   useEffect(() => {
     apiClient.get('/api/stats/total-users')
       .then((res) => {
@@ -54,13 +65,11 @@ export default function Home() {
       });
   }, []);
 
-  // Загрузка количества уведомлений для бейджа (ТОЛЬКО для авторизованных)
   useEffect(() => {
     if (!token) {
       setAutoNotifications(0);
       return;
     }
-    
     apiClient.get('/api/auto/notifications')
       .then((res) => {
         if (res.data.success) setAutoNotifications(res.data.totalCount || 0);
@@ -71,26 +80,20 @@ export default function Home() {
       });
   }, [token]);
 
-  // Инициализация Push-уведомлений
   useEffect(() => {
     const initPush = async () => {
       if (user && 'serviceWorker' in navigator && 'PushManager' in window) {
         if (Notification.permission === 'default') {
           const permission = await Notification.requestPermission();
-          
           if (permission === 'granted') {
             try {
               const registration = await navigator.serviceWorker.register('/sw.js');
               console.log('Service Worker registered:', registration);
-              
-              // Реальный VAPID ключ с сервера
               const vapidKey = 'BA2kcZEdRwChZpsy0sBuFZGSQwUoBaXTKPSNF525EXIfU1eIUD1XOmOG_37pGDMciePJW36i6rVM59fNFGMY6dY';
-              
               const subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: urlBase64ToUint8Array(vapidKey)
               });
-              
               await fetch('/api/auto/push/subscribe', {
                 method: 'POST',
                 headers: {
@@ -99,7 +102,6 @@ export default function Home() {
                 },
                 body: JSON.stringify(subscription.toJSON())
               });
-              
               console.log('Push subscription successful');
             } catch (err) {
               console.error('Push subscription failed:', err);
@@ -118,7 +120,6 @@ export default function Home() {
 
   const renderProjectCard = (p: any) => {
     const hasNotification = p.id === 'auto' && autoNotifications > 0;
-    
     return (
       <div key={p.id} className="relative group">
         <ProjectCard project={p} isAuthorized={!!user} />
@@ -132,6 +133,23 @@ export default function Home() {
       </div>
     );
   };
+
+  // 👈 НОВОЕ: Данные для системного онбординга (из Спецификации v1.0)
+  const systemOnboardingSteps = [
+    {
+      title: '🪃 Всё возвращается. Одна экосистема.',
+      text: 'Бумеранг — это сеть проектов, где каждое действие приносит пользу вам и тем, кого вы пригласили.'
+    },
+    {
+      title: '💎 Станьте партнёром',
+      text: 'Оформите тариф СМАРТ — и откройте доступ ко всем модулям экосистемы. Приглашайте друзей и получайте бонусы.'
+    },
+    {
+      title: '🚀 Как начать',
+      text: 'Уже доступны «Помощник автомобилиста» и «Билеты на мероприятия». Остальные модули — в разработке.',
+      actionLabel: 'Создать аккаунт / Войти'
+    }
+  ];
 
   return (
     <div className="min-h-screen bg-dark-900 relative">
@@ -248,6 +266,15 @@ export default function Home() {
           <p>© 2026 Бумеранг · Один аккаунт — все сервисы</p>
         </footer>
       </main>
+
+      {/* 👈 НОВОЕ: Рендер модального окна онбординга */}
+      {showSystemOnboarding && (
+        <OnboardingModal
+          steps={systemOnboardingSteps}
+          storageKey="onboarding_system_shown"
+          onComplete={() => setShowSystemOnboarding(false)}
+        />
+      )}
     </div>
   );
 }
