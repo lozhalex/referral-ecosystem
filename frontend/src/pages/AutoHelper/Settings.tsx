@@ -6,7 +6,10 @@ import { useToast } from '../../hooks/useToast';
 const Settings: React.FC = () => {
   const { success, error: showError } = useToast();
   const [intervals, setIntervals] = useState<Record<string, number>>({});
-  const [settings, setSettings] = useState({ mileageReminderTime: '09:00' });
+  const [settings, setSettings] = useState({ 
+    mileageReminderTime: '09:00',
+    disableOsagoReminder: false
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -28,7 +31,10 @@ const Settings: React.FC = () => {
       });
 
       setIntervals(intervalsRes.intervals || defaultIntervals);
-      setSettings(settingsRes.settings || { mileageReminderTime: '09:00' });
+      setSettings(settingsRes.settings || { 
+        mileageReminderTime: '09:00', 
+        disableOsagoReminder: false 
+      });
     } catch (err) {
       console.error('Ошибка загрузки настроек:', err);
       const defaultIntervals: Record<string, number> = {};
@@ -46,7 +52,7 @@ const Settings: React.FC = () => {
       setSaving(true);
       await Promise.all([
         saveIntervals(intervals),
-        saveSettings(settings.mileageReminderTime)
+        saveSettings(settings.mileageReminderTime, settings.disableOsagoReminder)
       ]);
       success('Настройки успешно сохранены!');
     } catch (err) {
@@ -97,6 +103,33 @@ const Settings: React.FC = () => {
           <span className="text-sm text-gray-400">
             Ежемесячное напоминание (1-го числа)
           </span>
+        </div>
+      </div>
+
+      <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <h3 className="font-semibold text-gray-100 flex items-center gap-2">
+              🔕 Напоминания об ОСАГО
+            </h3>
+            <p className="text-sm text-gray-400 mt-1">
+              Отключить уведомления об истечении срока действия полиса ОСАГО
+            </p>
+          </div>
+          <button
+            role="switch"
+            aria-checked={settings.disableOsagoReminder}
+            onClick={() => setSettings(prev => ({ ...prev, disableOsagoReminder: !prev.disableOsagoReminder }))}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:ring-offset-2 focus:ring-offset-slate-900 ${
+              settings.disableOsagoReminder ? 'bg-cyan-600' : 'bg-slate-700'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                settings.disableOsagoReminder ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
         </div>
       </div>
 
