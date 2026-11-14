@@ -402,7 +402,26 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
     return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
   };
 
-  // 🆕 Скелетон загрузки Dashboard
+  // 🆕 Кнопка "Пригласить друга" — вынесем в отдельный блок, чтобы использовать в нескольких местах
+  const inviteButton = (
+    <button
+      onClick={() => setShowShareModal(true)}
+      className="w-full py-3.5 bg-gradient-to-r from-purple-600/20 to-cyan-600/20 border border-purple-500/30 text-white rounded-xl hover:from-purple-600/30 hover:to-cyan-600/30 transition-all font-medium flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(168,85,247,0.1)]"
+    >
+      <span className="text-lg">📤</span>
+      <span>Пригласить друга и получить бонус</span>
+    </button>
+  );
+
+  // 🆕 Модалка "Поделиться" — тоже вынесем, чтобы не дублировать
+  const shareModal = showShareModal && (
+    <ShareModal
+      moduleId="auto"
+      userPhone={userPhone}
+      onClose={() => setShowShareModal(false)}
+    />
+  );
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -469,22 +488,11 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
           </button>
         </div>
 
-        {/* 🆕 Кнопка "Пригласить друга" для состояния "пробег не введён" */}
-        <button
-          onClick={() => setShowShareModal(true)}
-          className="w-full py-3 bg-white/5 border border-white/10 text-gray-300 rounded-xl hover:bg-white/10 transition-all font-medium flex items-center justify-center gap-2"
-        >
-          <span>📤</span> Пригласить друга в Бумеранг
-        </button>
+        {/* 🆕 Кнопка "Пригласить друга" в состоянии "пробег не введён" */}
+        {inviteButton}
 
-        {/* 🆕 Модалка "Поделиться" */}
-        {showShareModal && (
-          <ShareModal
-            moduleId="auto"
-            userPhone={userPhone}
-            onClose={() => setShowShareModal(false)}
-          />
-        )}
+        {/* 🆕 Модалка */}
+        {shareModal}
       </div>
     );
   }
@@ -561,14 +569,8 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         </div>
       )}
 
-      {/* 🆕 Кнопка "Пригласить друга" — видна в основном состоянии Dashboard */}
-      <button
-        onClick={() => setShowShareModal(true)}
-        className="w-full py-3.5 bg-gradient-to-r from-purple-600/20 to-cyan-600/20 border border-purple-500/30 text-white rounded-xl hover:from-purple-600/30 hover:to-cyan-600/30 transition-all font-medium flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(168,85,247,0.1)]"
-      >
-        <span className="text-lg">📤</span>
-        <span>Пригласить друга и получить бонус</span>
-      </button>
+      {/* 🆕 Кнопка "Пригласить друга" в основном состоянии Dashboard */}
+      {inviteButton}
 
       <div>
         <h2 className="text-lg font-bold text-gray-100 mb-3 flex items-center gap-2">
@@ -768,14 +770,8 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         </div>
       )}
 
-      {/* 🆕 Модалка "Поделиться" — подключена в основном состоянии Dashboard */}
-      {showShareModal && (
-        <ShareModal
-          moduleId="auto"
-          userPhone={userPhone}
-          onClose={() => setShowShareModal(false)}
-        />
-      )}
+      {/* 🆕 Модалка "Поделиться" в основном состоянии */}
+      {shareModal}
     </div>
   );
 };
