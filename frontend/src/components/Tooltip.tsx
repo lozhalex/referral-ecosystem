@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, ReactNode } from 'react';
+import { useState, useRef, ReactNode } from 'react';
 
 interface TooltipProps {
   text: string;
@@ -9,7 +9,7 @@ interface TooltipProps {
 
 export default function Tooltip({ text, children, position = 'top', className = '' }: TooltipProps) {
   const [visible, setVisible] = useState(false);
-  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const show = () => setVisible(true);
   const hide = () => setVisible(false);
