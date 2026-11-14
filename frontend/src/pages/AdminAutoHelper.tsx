@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getAdminCars, getAdminRecords, updateAdminRecord, deleteAdminRecord } from '../api/adminAuto';
 import { CATEGORIES } from './AutoHelper/categories';
 import { useToast } from '../hooks/useToast';
+import { useNavigate } from 'react-router-dom';
 
 export default function AdminAutoHelper() {
   const { success, error: showError } = useToast();
@@ -14,6 +15,7 @@ export default function AdminAutoHelper() {
   // Состояние для модального окна редактирования
   const [editingRecord, setEditingRecord] = useState<any | null>(null);
   const [editForm, setEditForm] = useState({ date: '', mileage: '', category: '', work: '', cost: '', comment: '' });
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadData();
@@ -84,23 +86,21 @@ export default function AdminAutoHelper() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-100">Администрирование: Помощник автомобилиста</h1>
-        <div className="flex bg-slate-800 rounded-lg p-1 border border-white/10">
-          <button
-            onClick={() => setActiveTab('cars')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'cars' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:text-white'}`}
-          >
-            Автомобили
-          </button>
-          <button
-            onClick={() => setActiveTab('records')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'records' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:text-white'}`}
-          >
-            Журнал ТО
-          </button>
-        </div>
-      </div>
+      <div className="flex items-center justify-between mb-6">
+  <div className="flex items-center gap-4">
+    <button
+      onClick={() => navigate('/admin')}
+      className="flex items-center gap-2 text-gray-400 hover:text-white transition text-sm"
+    >
+      <span>←</span>
+      <span>В админ-панель</span>
+    </button>
+    <h1 className="text-2xl font-bold text-gray-100">Администрирование: Помощник автомобилиста</h1>
+  </div>
+  <div className="flex bg-slate-800 rounded-lg p-1 border border-white/10">
+    ...
+  </div>
+</div>
 
       {activeTab === 'cars' && (
         <div className="bg-slate-900 border border-white/10 rounded-xl overflow-hidden">
