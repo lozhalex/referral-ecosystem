@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getDashboard, getCars, submitMileageCheck, getMileageChecks, createRecord, markNotificationsRead } from '../../api/auto';
 import { getCategoryName, getPredictableCategories } from './categories';
-import { useToast } from '../../hooks/useToast';
+import Skeleton from '../../components/Skeleton';
 
 interface DashboardProps {
   selectedCarId: number | null;
@@ -39,7 +39,6 @@ interface LastMileageCheck {
 const DEFAULT_AVG_PER_MONTH = 1500;
 
 const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTabChange }) => {
-  const { success, error: showError, info } = useToast();
   const [showMileageErrorModal, setShowMileageErrorModal] = useState(false);
   const [lastRecordedMileage, setLastRecordedMileage] = useState(0);
   const [cars, setCars] = useState<Car[]>([]);
@@ -275,7 +274,7 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
       setOsagoStatus('none');
       return;
     }
-    const latestOsago = osagoRecords.sort((a: any, b: any) => 
+    const latestOsago = osagoRecords.sort((a: any, b: any) =>
       new Date(b.date).getTime() - new Date(a.date).getTime()
     )[0];
     const lastDate = new Date(latestOsago.date);
@@ -310,14 +309,13 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
       setShowMileageModal(false);
       setMileageInput('');
       await markNotificationsRead(['mileage']);
-      success('Пробег успешно сохранён!');
       loadData();
     } catch (err: any) {
       if (err.response?.data?.code === 'MILEAGE_DECREASED') {
         setLastRecordedMileage(err.response.data.lastMileage);
         setShowMileageErrorModal(true);
       } else {
-        showError(err.response?.data?.message || 'Ошибка сохранения пробега');
+        alert(err.response?.data?.message || 'Ошибка сохранения пробега');
       }
     }
   };
@@ -338,10 +336,9 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
       });
       setShowOsagoModal(false);
       await markNotificationsRead(['osago']);
-      success('Дата ОСАГО обновлена!');
       loadData();
     } catch (err: any) {
-      showError(err.response?.data?.message || 'Ошибка сохранения даты ОСАГО');
+      alert(err.response?.data?.message || 'Ошибка сохранения даты ОСАГО');
     }
   };
 
@@ -370,10 +367,9 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         cost: Number(grayFormData.cost) || 0
       });
       setShowGrayModal(false);
-      success('Запись успешно добавлена!');
       loadData();
     } catch (err: any) {
-      showError(err.response?.data?.message || 'Ошибка сохранения');
+      alert(err.response?.data?.message || 'Ошибка сохранения');
     }
   };
 
@@ -392,8 +388,22 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
     return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
   };
 
+  // 🆕 Скелетон загрузки Dashboard
   if (loading) {
-    return <div className="flex items-center justify-center py-20"><div className="text-cyan-400 animate-pulse">Загрузка данных...</div></div>;
+    return (
+      <div className="space-y-4">
+        {/* Скелетон селектора авто */}
+        <Skeleton variant="card" height="80px" />
+        {/* Скелетон плиток ТО (6 штук) */}
+        <div className="grid grid-cols-2 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} variant="rect" height="80px" />
+          ))}
+        </div>
+        {/* Скелетон кнопки "Другие категории" */}
+        <Skeleton variant="button" width="100%" />
+      </div>
+    );
   }
 
   if (error) {
@@ -472,8 +482,8 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
             <span className="text-sm text-yellow-400 font-medium flex items-center gap-2">
               ⚠️ ОСАГО истекает в течение месяца
             </span>
-            <button 
-              onClick={() => setShowOsagoModal(true)} 
+            <button
+              onClick={() => setShowOsagoModal(true)}
               className="text-xs bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 px-3 py-1 rounded-full transition font-medium"
             >
               Обновить
@@ -696,7 +706,7 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
               </button>
               <button
                 onClick={() => {
-                  info('Функция "Заявка в ТП" находится в разработке и будет доступна в ближайших обновлениях.');
+                  alert('Функция "Заявка в ТП" находится в разработке и будет доступна в ближайших обновлениях.');
                   setShowMileageErrorModal(false);
                 }}
                 className="w-full py-2.5 bg-white/5 text-gray-300 rounded-lg font-medium hover:bg-white/10 transition border border-white/10"

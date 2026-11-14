@@ -5,11 +5,10 @@ import { markRcbRegistered, requestRcbPayment, updateRcbLink } from '../api/rcb'
 import { hasRole, isPartner } from '../utils/roles';
 import { CATEGORIES, getCategoryName } from './AutoHelper/categories';
 import { Html5Qrcode } from 'html5-qrcode';
-import { useToast } from '../hooks/useToast';
+import Skeleton from '../components/Skeleton';
 
 const Profile: React.FC = () => {
   const navigate = useNavigate();
-  const { success, error: showError } = useToast();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -164,11 +163,11 @@ const Profile: React.FC = () => {
     try {
       const res = await updateRcbLink(rcbLinkInput.trim());
       if (res.success) {
-        success('Ссылка сохранена!');
+        alert('Ссылка сохранена!');
         await loadProfile();
       }
     } catch (err: any) {
-      showError(err.response?.data?.message || 'Ошибка');
+      alert(err.response?.data?.message || 'Ошибка');
     } finally {
       setSavingLink(false);
     }
@@ -279,11 +278,43 @@ const Profile: React.FC = () => {
     return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
   };
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <p className="text-slate-400 font-display text-xl">Загрузка...</p>
-    </div>
-  );
+  // 🆕 Скелетон загрузки профиля
+  if (loading) {
+    return (
+      <div className="min-h-screen p-4 pb-24 max-w-md mx-auto space-y-6">
+        {/* Скелетон шапки */}
+        <div className="flex items-center justify-between">
+          <Skeleton variant="text" width="100px" />
+          <Skeleton variant="button" width="140px" />
+        </div>
+        {/* Скелетон аватара + имени */}
+        <div className="flex items-center gap-4">
+          <Skeleton variant="circle" width="64px" height="64px" />
+          <div className="flex-1 space-y-2">
+            <Skeleton variant="text" width="140px" />
+            <Skeleton variant="text" width="180px" />
+          </div>
+        </div>
+        {/* Скелетон блока телефона */}
+        <Skeleton variant="card" height="80px" />
+        {/* Скелетон баланса и рефералов */}
+        <div className="grid grid-cols-2 gap-3">
+          <Skeleton variant="card" height="80px" />
+          <Skeleton variant="card" height="80px" />
+        </div>
+        {/* Скелетон трекера РЦБ */}
+        <Skeleton variant="card" height="200px" />
+        {/* Скелетон проектов */}
+        <Skeleton variant="card" height="160px" />
+        {/* Скелетон кнопок действий */}
+        <div className="space-y-3">
+          <Skeleton variant="button" width="100%" />
+          <Skeleton variant="button" width="100%" />
+          <Skeleton variant="button" width="100%" />
+        </div>
+      </div>
+    );
+  }
 
   if (error) return (
     <div className="min-h-screen flex items-center justify-center p-4">

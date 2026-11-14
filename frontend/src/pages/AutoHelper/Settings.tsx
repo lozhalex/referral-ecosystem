@@ -1,15 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { getIntervals, saveIntervals, getSettings, saveSettings } from '../../api/auto';
 import { getPredictableCategories } from './categories';
-import { useToast } from '../../hooks/useToast';
+import Skeleton from '../../components/Skeleton';
 
 const Settings: React.FC = () => {
-  const { success, error: showError } = useToast();
   const [intervals, setIntervals] = useState<Record<string, number>>({});
-  const [settings, setSettings] = useState({ 
-    mileageReminderTime: '09:00',
-    disableOsagoReminder: false
-  });
+  const [settings, setSettings] = useState({ mileageReminderTime: '09:00' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -31,10 +27,7 @@ const Settings: React.FC = () => {
       });
 
       setIntervals(intervalsRes.intervals || defaultIntervals);
-      setSettings(settingsRes.settings || { 
-        mileageReminderTime: '09:00', 
-        disableOsagoReminder: false 
-      });
+      setSettings(settingsRes.settings || { mileageReminderTime: '09:00' });
     } catch (err) {
       console.error('Ошибка загрузки настроек:', err);
       const defaultIntervals: Record<string, number> = {};
@@ -52,11 +45,11 @@ const Settings: React.FC = () => {
       setSaving(true);
       await Promise.all([
         saveIntervals(intervals),
-        saveSettings(settings.mileageReminderTime, settings.disableOsagoReminder)
+        saveSettings(settings.mileageReminderTime)
       ]);
-      success('Настройки успешно сохранены!');
+      alert('Настройки успешно сохранены!');
     } catch (err) {
-      showError('Ошибка сохранения');
+      alert('Ошибка сохранения');
     } finally {
       setSaving(false);
     }
@@ -70,12 +63,13 @@ const Settings: React.FC = () => {
   };
 
   const handleReset = () => {
-    const defaultIntervals: Record<string, number> = {};
-    getPredictableCategories().forEach(c => {
-      defaultIntervals[c.key] = c.defaultInterval;
-    });
-    setIntervals(defaultIntervals);
-    success('Интервалы сброшены к значениям по умолчанию');
+    if (window.confirm('Вы уверены, что хотите сбросить все интервалы к значениям по умолчанию?')) {
+      const defaultIntervals: Record<string, number> = {};
+      getPredictableCategories().forEach(c => {
+        defaultIntervals[c.key] = c.defaultInterval;
+      });
+      setIntervals(defaultIntervals);
+    }
   };
 
   const getUnit = (categoryKey: string): string => {
@@ -85,7 +79,36 @@ const Settings: React.FC = () => {
 
   const inputClass = "w-full px-3 py-2.5 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all placeholder-gray-500";
 
-  if (loading) return <div className="text-center py-10 text-cyan-400 animate-pulse">Загрузка...</div>;
+  // 🆕 Скелетон загрузки настроек
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        {/* Скелетон блока "Время напоминания" */}
+        <Skeleton variant="card" height="100px" />
+        {/* Скелетон заголовка + кнопки "Сохранить" */}
+        <div className="flex justify-between items-center">
+          <Skeleton variant="text" width="180px" />
+          <Skeleton variant="button" width="100px" />
+        </div>
+        {/* Скелетон информационного блока */}
+        <Skeleton variant="rect" height="50px" />
+        {/* Скелетон списка интервалов (5 строк) */}
+        <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl divide-y divide-white/10">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex items-center justify-between p-4">
+              <Skeleton variant="text" width="160px" />
+              <div className="flex items-center gap-2">
+                <Skeleton variant="rect" width="96px" height="32px" />
+                <Skeleton variant="text" width="40px" />
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Скелетон кнопки сброса */}
+        <Skeleton variant="button" width="100%" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -103,33 +126,6 @@ const Settings: React.FC = () => {
           <span className="text-sm text-gray-400">
             Ежемесячное напоминание (1-го числа)
           </span>
-        </div>
-      </div>
-
-      <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            <h3 className="font-semibold text-gray-100 flex items-center gap-2">
-              🔕 Напоминания об ОСАГО
-            </h3>
-            <p className="text-sm text-gray-400 mt-1">
-              Отключить уведомления об истечении срока действия полиса ОСАГО
-            </p>
-          </div>
-          <button
-            role="switch"
-            aria-checked={settings.disableOsagoReminder}
-            onClick={() => setSettings(prev => ({ ...prev, disableOsagoReminder: !prev.disableOsagoReminder }))}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:ring-offset-2 focus:ring-offset-slate-900 ${
-              settings.disableOsagoReminder ? 'bg-cyan-600' : 'bg-slate-700'
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                settings.disableOsagoReminder ? 'translate-x-6' : 'translate-x-1'
-              }`}
-            />
-          </button>
         </div>
       </div>
 

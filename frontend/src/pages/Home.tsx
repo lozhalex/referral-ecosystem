@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import ProjectCard from '../components/ProjectCard';
-import OnboardingModal from '../components/OnboardingModal'; // 👈 НОВЫЙ ИМПОРТ
+import Skeleton from '../components/Skeleton';
 import { projects } from '../data/projects';
 import { apiClient } from '../api/client';
 
@@ -29,10 +29,6 @@ export default function Home() {
   const [showAll, setShowAll] = useState(false);
   const [userCount, setUserCount] = useState<number | null>(null);
   const [autoNotifications, setAutoNotifications] = useState<number>(0);
-  
-  // 👈 НОВОЕ: Состояние для системного онбординга
-  const [showSystemOnboarding, setShowSystemOnboarding] = useState(false);
-
   const token = localStorage.getItem('token');
   const user = token ? JSON.parse(atob(token.split('.')[1])) : null;
 
@@ -40,15 +36,6 @@ export default function Home() {
     localStorage.removeItem('token');
     window.location.reload();
   };
-
-  // 👈 НОВОЕ: Проверка онбординга при монтировании
-  useEffect(() => {
-    const hasSeenOnboarding = localStorage.getItem('onboarding_system_shown');
-    if (!hasSeenOnboarding) {
-      // Небольшая задержка для плавного появления после загрузки страницы
-      setTimeout(() => setShowSystemOnboarding(true), 500);
-    }
-  }, []);
 
   useEffect(() => {
     apiClient.get('/api/stats/total-users')
@@ -134,23 +121,6 @@ export default function Home() {
     );
   };
 
-  // 👈 НОВОЕ: Данные для системного онбординга (из Спецификации v1.0)
-  const systemOnboardingSteps = [
-    {
-      title: '🪃 Всё возвращается. Одна экосистема.',
-      text: 'Бумеранг — это сеть проектов, где каждое действие приносит пользу вам и тем, кого вы пригласили.'
-    },
-    {
-      title: '💎 Станьте партнёром',
-      text: 'Оформите тариф СМАРТ — и откройте доступ ко всем модулям экосистемы. Приглашайте друзей и получайте бонусы.'
-    },
-    {
-      title: '🚀 Как начать',
-      text: 'Уже доступны «Помощник автомобилиста» и «Билеты на мероприятия». Остальные модули — в разработке.',
-      actionLabel: 'Создать аккаунт / Войти'
-    }
-  ];
-
   return (
     <div className="min-h-screen bg-dark-900 relative">
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-neon-purple/10 rounded-full mix-blend-screen filter blur-3xl pointer-events-none"></div>
@@ -168,15 +138,16 @@ export default function Home() {
           </p>
         </section>
 
+        {/* 🆕 Скелетон счётчика пользователей */}
         <section className="text-center mb-12">
           <div className="inline-flex items-center gap-2 glass px-6 py-3 border border-neon-cyan/20">
-            <span className="text-neon-cyan font-semibold font-display text-lg">
-              {userCount !== null ? (
-                <>👥 Нас уже {userCount.toLocaleString('ru-RU')} {getUserCountText(userCount)}</>
-              ) : (
-                <>👥 Загрузка...</>
-              )}
-            </span>
+            {userCount !== null ? (
+              <span className="text-neon-cyan font-semibold font-display text-lg">
+                👥 Нас уже {userCount.toLocaleString('ru-RU')} {getUserCountText(userCount)}
+              </span>
+            ) : (
+              <Skeleton variant="text" width="180px" />
+            )}
           </div>
         </section>
 
@@ -266,15 +237,6 @@ export default function Home() {
           <p>© 2026 Бумеранг · Один аккаунт — все сервисы</p>
         </footer>
       </main>
-
-      {/* 👈 НОВОЕ: Рендер модального окна онбординга */}
-      {showSystemOnboarding && (
-        <OnboardingModal
-          steps={systemOnboardingSteps}
-          storageKey="onboarding_system_shown"
-          onComplete={() => setShowSystemOnboarding(false)}
-        />
-      )}
     </div>
   );
 }

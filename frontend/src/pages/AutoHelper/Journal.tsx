@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getJournal, createRecord, getCars, generateServiceQR, revokeServiceQR } from '../../api/auto';
 import { CATEGORIES, getCategoryName } from './categories';
 import { QRCodeSVG } from 'qrcode.react';
-import { useToast } from '../../hooks/useToast';
+import Skeleton from '../../components/Skeleton';
 
 interface JournalProps {
   selectedCarId: number | null;
@@ -46,7 +46,6 @@ const getCategoryDisplayName = (key: string): string => {
 };
 
 const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
-  const { success, error: showError } = useToast();
   const [cars, setCars] = useState<any[]>([]);
   const [records, setRecords] = useState<JournalRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,10 +101,7 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCarId) {
-      showError('Выберите автомобиль');
-      return;
-    }
+    if (!selectedCarId) return alert('Выберите автомобиль');
     try {
       await createRecord({
         carId: selectedCarId,
@@ -114,10 +110,9 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         cost: Number(formData.cost) || 0
       });
       setIsModalOpen(false);
-      success('Запись успешно добавлена!');
       loadData();
     } catch (err) {
-      showError('Ошибка сохранения записи');
+      alert('Ошибка сохранения записи');
     }
   };
 
@@ -132,7 +127,7 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         setShowQRModal(true);
       }
     } catch (err) {
-      showError('Ошибка генерации QR-кода');
+      alert('Ошибка генерации QR-кода');
     } finally {
       setQrGenerating(false);
     }
@@ -145,15 +140,31 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
       setShowQRModal(false);
       setQrToken('');
       setQrCarInfo(null);
-      success('Доступ сервисмена отменён');
     } catch (err) {
-      showError('Ошибка отмены доступа');
+      alert('Ошибка отмены доступа');
     }
   };
 
   const inputClass = "w-full px-3 py-2.5 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all placeholder-gray-500";
 
-  if (loading) return <div className="text-center py-10 text-cyan-400 animate-pulse">Загрузка...</div>;
+  // 🆕 Скелетон загрузки журнала
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        {/* Скелетон заголовка + кнопки */}
+        <div className="flex justify-between items-center">
+          <Skeleton variant="text" width="140px" />
+          <Skeleton variant="button" width="140px" />
+        </div>
+        {/* Скелетон кнопки QR */}
+        <Skeleton variant="rect" height="80px" />
+        {/* Скелетон списка записей (3 карточки) */}
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} variant="card" height="100px" />
+        ))}
+      </div>
+    );
+  }
 
   if (cars.length === 0) {
     return (
