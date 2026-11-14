@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 interface Step {
   title: string;
   text: string;
-  actionLabel?: string; // Текст на кнопке последнего шага
+  actionLabel?: string;
 }
 
 interface OnboardingModalProps {
@@ -19,7 +19,6 @@ export default function OnboardingModal({ steps, storageKey, onComplete }: Onboa
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      // Сохраняем флаг только после просмотра последнего экрана
       localStorage.setItem(storageKey, 'true');
       onComplete();
     }
@@ -39,7 +38,7 @@ export default function OnboardingModal({ steps, storageKey, onComplete }: Onboa
                 idx <= currentStep ? 'bg-neon-purple shadow-[0_0_8px_#A855F7]' : 'bg-white/10'
               }`}
             />
-            ))}
+          ))}
         </div>
 
         <h2 className="text-2xl font-bold text-white mb-4 font-display tracking-tight">
