@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Dashboard from './Dashboard';
 import Journal from './Journal';
 import Cars from './Cars';
 import Settings from './Settings';
+import OnboardingModal from '../../components/OnboardingModal'; // 👈 НОВЫЙ ИМПОРТ
 
 type Tab = 'dashboard' | 'journal' | 'cars' | 'settings';
 
@@ -11,6 +12,23 @@ const AutoHelper: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [selectedCarId, setSelectedCarId] = useState<number | null>(null);
+  
+  // 👈 НОВОЕ: Состояние для онбординга модуля
+  const [showAutoOnboarding, setShowAutoOnboarding] = useState(false);
+
+  // 👈 НОВОЕ: Проверка онбординга при монтировании
+  useEffect(() => {
+    const hasSeenOnboarding = localStorage.getItem('onboarding_auto_shown');
+    if (!hasSeenOnboarding) {
+      setTimeout(() => setShowAutoOnboarding(true), 500);
+    }
+  }, []);
+
+  // 👈 НОВОЕ: Обработчик завершения онбординга
+  const handleAutoOnboardingComplete = () => {
+    setShowAutoOnboarding(false);
+    setActiveTab('cars'); // Переключаем на вкладку "Авто"
+  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -32,6 +50,27 @@ const AutoHelper: React.FC = () => {
     { id: 'journal', icon: '📋', label: 'Журнал' },
     { id: 'cars', icon: '🚗', label: 'Авто' },
     { id: 'settings', icon: '⚙️', label: 'Настройки' },
+  ];
+
+  // 👈 НОВОЕ: Шаги онбординга (из Спецификации v1.0)
+  const autoOnboardingSteps = [
+    {
+      title: '🚗 Добро пожаловать в Помощник автомобилиста!',
+      text: 'Ведите цифровой журнал обслуживания, получайте умные прогнозы ТО и никогда не пропускайте сроки.'
+    },
+    {
+      title: '📊 Вводите пробег раз в месяц',
+      text: 'Система рассчитает ваш средний темп и точно покажет, когда потребуется следующее обслуживание каждой детали.'
+    },
+    {
+      title: '🔑 Покажите QR сервисмену',
+      text: 'Мастер на СТО сам внесёт запись в ваш журнал. Вы получите push-уведомление, а в истории появится пометка «Внесено мастером».'
+    },
+    {
+      title: '🚀 Начнём?',
+      text: 'Добавьте ваш первый автомобиль и введите пробег всего за 2 минуты.',
+      actionLabel: 'Добавить автомобиль'
+    }
   ];
 
   return (
@@ -82,6 +121,15 @@ const AutoHelper: React.FC = () => {
           })}
         </div>
       </div>
+
+      {/* 👈 НОВОЕ: Рендер модального окна онбординга */}
+      {showAutoOnboarding && (
+        <OnboardingModal
+          steps={autoOnboardingSteps}
+          storageKey="onboarding_auto_shown"
+          onComplete={handleAutoOnboardingComplete}
+        />
+      )}
     </div>
   );
 };
