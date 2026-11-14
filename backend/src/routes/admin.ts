@@ -601,4 +601,170 @@ router.delete('/auto/records/:id', requireAdmin, async (req: Request, res: Respo
   }
 });
 
+// ==========================================
+// 🆕 ВИЗУАЛЬНОЕ ДЕРЕВО РЕФЕРАЛОВ
+// ==========================================
+
+interface TreeNode {
+  id: number;
+  phone: string;
+  role: string;
+  referralCount: number;
+  totalDescendants: number;
+  balance: number;
+  isPaidMember: boolean;
+  children: TreeNode[];
+  hasMore: boolean;
+}
+
+// Рекурсивная функция для построения дерева
+const buildTreeNode = async (
+  tx: any,
+  userId: number,
+  currentDepth: number,
+  maxDepth: number,
+  allUsersMap: Map<number, any>
+): Promise<TreeNode> => {
+  const user = allUsersMap.get(userId);
+  const children = await tx.user.findMany({
+    where: { referredById: userId },
+    select: { id: true }
+  });
+
+  const hasMore = currentDepth >= maxDepth && children.length > 0;
+  const childrenToProcess = hasMore ? [] : children;
+
+  const childNodes: TreeNode[] = [];
+  for (const child of childrenToProcess) {
+    const childNode = await buildTreeNode(tx, child.id, currentDepth + 1, maxDepth, allUsersMap);
+    childNodes.push(childNode);
+  }
+
+  // Считаем общее количество потомков (рекурсивно)
+  const countDescendants = async (uid: number): Promise<number> => {
+    const kids = await tx.user.findMany({ where: { referredById: uid }, select: { id: true } });
+    let count = kids.length;
+    for (const kid of kids) {
+      count += await countDescendants(kid.id);
+    }
+    return count;
+  };
+
+  const totalDescendants = await countDescendants(userId);
+
+  return {
+    id: user.id,
+    phone: user.phone,
+    role: user.role,
+    referralCount: children.length,
+    totalDescendants,
+    balance: user.wallet?.balance || 0,
+    isPaidMember: user.isPaidMember,
+    children: childNodes,
+    hasMore
+  };
+};
+
+router.get('/tree/visual', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const depth = Number(req.query.depth) || 3;
+    const searchPhone = req.query.searchPhone as string | undefined;
+
+    const allUsers = await prisma.user.findMany({
+      include: { wallet: { select: { balance: true } } }
+    });
+
+    const allUsersMap = new Map<number, any>();
+    allUsers.forEach(u => allUsersMap.set(u.id, u));
+
+    // Если есть поиск — находим пользователя и строим путь от корня
+    if (searchPhone) {
+      const targetUser = allUsers.find(u => u.phone.includes(searchPhone.replace(/\D/g, '')));
+      if (!targetUser) {
+        return res.json({ success: true, tree: [], stats: null, message: 'Пользователь не найден' });
+      }
+
+      // Строим путь от корня до найденного пользователя
+      const path: number[] = [];
+      let current = targetUser.id;
+      while (current !== null) {
+        path.unshift(current);
+        const user = allUsersMap.get(current);
+        current = user?.referredById || null;
+      }
+
+      // Строим дерево от корня с максимальной глубиной
+      const rootNodes: TreeNode[] = [];
+      for (const rootNodeId of path) {
+        const rootNode = await buildTreeNode(prisma, rootNodeId, 0, depth, allUsersMap);
+        rootNodes.push(rootNode);
+      }
+
+      res.json({ success: true, tree: rootNodes, stats: null });
+    } else {
+      // Обычное дерево от корневых узлов
+      const rootUsers = allUsers.filter(u => u.referredById === null);
+      const rootNodes: TreeNode[] = [];
+      for (const root of rootUsers) {
+        const rootNode = await buildTreeNode(prisma, root.id, 0, depth, allUsersMap);
+        rootNodes.push(rootNode);
+      }
+
+      // Статистика
+      const totalUsers = allUsers.length;
+      const paidMembers = allUsers.filter(u => u.isPaidMember).length;
+      const founders = allUsers.filter(u => u.isFounder).length;
+
+      // Максимальная глубина
+      const getMaxDepth = async (uid: number): Promise<number> => {
+        const kids = await prisma.user.findMany({ where: { referredById: uid }, select: { id: true } });
+        if (kids.length === 0) return 0;
+        const depths = await Promise.all(kids.map(k => getMaxDepth(k.id)));
+        return 1 + Math.max(...depths);
+      };
+
+      const depths = await Promise.all(rootUsers.map(r => getMaxDepth(r.id)));
+      const maxDepth = depths.length > 0 ? Math.max(...depths) : 0;
+
+      // Топ по прямым рефералам
+      const topByDirect = allUsers
+        .map(u => ({ phone: u.phone, count: u.referralCount }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+
+      // Топ по общим потомкам
+      const topByTotal = await Promise.all(
+        allUsers.map(async u => ({
+          phone: u.phone,
+          count: await countDescendants(prisma, u.id)
+        }))
+      );
+      topByTotal.sort((a, b) => b.count - a.count);
+
+      const stats = {
+        totalUsers,
+        maxDepth,
+        paidMembers,
+        founders,
+        topByDirect: topByDirect.slice(0, 5),
+        topByTotal: topByTotal.slice(0, 5)
+      };
+
+      res.json({ success: true, tree: rootNodes, stats });
+    }
+  } catch (err) {
+    console.error('Admin tree visual error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
+// Вспомогательная функция для подсчёта потомков
+const countDescendants = async (tx: any, userId: number): Promise<number> => {
+  const kids = await tx.user.findMany({ where: { referredById: userId }, select: { id: true } });
+  let count = kids.length;
+  for (const kid of kids) {
+    count += await countDescendants(tx, kid.id);
+  }
+  return count;
+};
 export default router;

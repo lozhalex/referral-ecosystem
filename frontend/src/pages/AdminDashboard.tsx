@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { getAdminRcbRequests, approveAdminRcbRequest } from '../api/rcb';
+import ReferralTree from '../components/ReferralTree';
 
 interface User {
   id: number;
@@ -57,7 +58,7 @@ const ROLE_BADGE_CLASS: { [key: string]: string } = {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'logs' | 'rcb'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'tree' | 'logs' | 'rcb'>('users');
   const [users, setUsers] = useState<User[]>([]);
   const [searchPhone, setSearchPhone] = useState('');
   const [selectedUser, setSelectedUser] = useState<UserDetail | null>(null);
@@ -84,6 +85,7 @@ export default function AdminDashboard() {
   const [rcbRequests, setRcbRequests] = useState<RcbRequest[]>([]);
   const [rcbLoading, setRcbLoading] = useState(false);
   const [rcbApprovingId, setRcbApprovingId] = useState<number | null>(null);
+
   const token = localStorage.getItem('token');
 
   useEffect(() => {
@@ -313,16 +315,27 @@ export default function AdminDashboard() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Админ-панель</h1>
           <p className="mt-2 text-gray-600">Центр управления экосистемой</p>
-          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <button onClick={() => navigate('/admin/events')} className="flex items-center justify-center gap-3 p-5 bg-indigo-600 text-white rounded-xl shadow-md hover:bg-indigo-700 transition font-bold text-lg"><span className="text-3xl">🎟️</span>Управление мероприятиями</button>
-            <button onClick={() => navigate('/profile')} className="flex items-center justify-center gap-3 p-5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl shadow-sm hover:bg-gray-50 hover:border-gray-300 transition font-bold text-lg"><span className="text-3xl">👤</span>Вернуться в профиль</button>
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <button onClick={() => navigate('/admin/auto')} className="flex flex-col items-center justify-center gap-2 p-4 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-xl shadow-md hover:shadow-lg transition font-bold text-base">
+              <span className="text-2xl">🚗</span>
+              <span>Автохелпер</span>
+            </button>
+            <button onClick={() => navigate('/admin/events')} className="flex flex-col items-center justify-center gap-2 p-4 bg-indigo-600 text-white rounded-xl shadow-md hover:bg-indigo-700 transition font-bold text-base">
+              <span className="text-2xl">🎟️</span>
+              <span>Мероприятия</span>
+            </button>
+            <button onClick={() => navigate('/profile')} className="flex flex-col items-center justify-center gap-2 p-4 bg-white border-2 border-gray-200 text-gray-700 rounded-xl shadow-sm hover:bg-gray-50 hover:border-gray-300 transition font-bold text-base">
+              <span className="text-2xl">👤</span>
+              <span>В профиль</span>
+            </button>
           </div>
         </div>
 
-        <div className="flex border-b border-gray-200 mb-6">
-          <button onClick={() => setActiveTab('users')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition ${activeTab === 'users' ? 'bg-white text-blue-600 border-t border-l border-r border-gray-200' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}>👥 Пользователи</button>
-          <button onClick={() => setActiveTab('logs')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition ${activeTab === 'logs' ? 'bg-white text-blue-600 border-t border-l border-r border-gray-200' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}>🌳 Дерево и Журнал</button>
-          <button onClick={() => setActiveTab('rcb')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition ${activeTab === 'rcb' ? 'bg-white text-blue-600 border-t border-l border-r border-gray-200' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}>🌉 Заявки РЦБ</button>
+        <div className="flex border-b border-gray-200 mb-6 overflow-x-auto">
+          <button onClick={() => setActiveTab('users')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition whitespace-nowrap ${activeTab === 'users' ? 'bg-white text-blue-600 border-t border-l border-r border-gray-200' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}>👥 Пользователи</button>
+          <button onClick={() => setActiveTab('tree')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition whitespace-nowrap ${activeTab === 'tree' ? 'bg-white text-blue-600 border-t border-l border-r border-gray-200' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}>🌳 Визуальное дерево</button>
+          <button onClick={() => setActiveTab('logs')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition whitespace-nowrap ${activeTab === 'logs' ? 'bg-white text-blue-600 border-t border-l border-r border-gray-200' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}>📋 Аудит</button>
+          <button onClick={() => setActiveTab('rcb')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition whitespace-nowrap ${activeTab === 'rcb' ? 'bg-white text-blue-600 border-t border-l border-r border-gray-200' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}>🌉 Заявки РЦБ</button>
         </div>
 
         {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">{error}</div>}
@@ -377,6 +390,8 @@ export default function AdminDashboard() {
           </>
         )}
 
+        {activeTab === 'tree' && <ReferralTree />}
+
         {activeTab === 'rcb' && (
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="p-6 border-b border-gray-200">
@@ -425,7 +440,7 @@ export default function AdminDashboard() {
         {activeTab === 'logs' && (
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="p-6 border-b border-gray-200 flex flex-wrap gap-3 justify-between items-center">
-              <h2 className="text-lg font-semibold text-gray-900">Управление деревом и аудит</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Журнал аудита</h2>
               <div className="flex gap-3">
                 <button onClick={handleExportTree} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2">💾 Скачать backup дерева (JSON)</button>
                 <button onClick={() => setShowImportModal(true)} className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition flex items-center gap-2">📤 Восстановить из backup (JSON)</button>
