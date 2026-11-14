@@ -38,7 +38,6 @@ app.use(cors({
       callback(null, true);
     } else {
       // 🔧 ФИКС: НЕ выбрасываем ошибку! Раньше это роняло процесс → crash-loop.
-      // Теперь просто не добавляем CORS-заголовки; браузер сам заблокирует ответ.
       console.warn(`[CORS] Заблокирован origin: "${origin}"`);
       callback(null, false);
     }
@@ -99,7 +98,9 @@ cron.schedule('0 3 * * *', async () => {
         status: 'PENDING',
         unlockDate: { lte: now }
       },
-      data: { status: 'AVAILABLE' }
+      data: {
+        status: 'AVAILABLE'
+      }
     });
     if (result.count > 0) {
       console.log(`[CRON] ✅ Успешно разморожено ${result.count} транзакций бонусов.`);

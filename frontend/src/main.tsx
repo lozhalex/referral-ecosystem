@@ -19,6 +19,7 @@ function AppWithToast() {
   );
 }
 
+// ❌ Убрали лишний <BrowserRouter> — он уже есть внутри <App />
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AppWithToast />
