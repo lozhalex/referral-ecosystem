@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
 const prisma = new PrismaClient();
+
 router.use(authenticateToken);
 
 // ==========================================
@@ -92,9 +93,7 @@ router.get('/journal', async (req: any, res: Response) => {
       },
       orderBy: { date: 'desc' },
       include: {
-        author: {
-          select: { phone: true }
-        }
+        author: { select: { phone: true } }
       }
     });
     res.json({ success: true, records });
@@ -123,7 +122,6 @@ router.post('/journal', async (req: any, res: Response) => {
       }
     });
 
-    // Обновляем пробег авто только если запись от владельца И пробег больше текущего
     if (carId && mileage && (!source || source === 'owner')) {
       await prisma.car.updateMany({
         where: {
@@ -134,7 +132,6 @@ router.post('/journal', async (req: any, res: Response) => {
         data: { mileage: Number(mileage) }
       });
     }
-
     res.json({ success: true, record });
   } catch (err) {
     console.error('Auto journal create error:', err);
@@ -197,7 +194,7 @@ router.post('/mileage-check', async (req: any, res: Response) => {
     const { carId, km } = req.body;
     const now = new Date();
     const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
-
+    
     const lastCheck = await prisma.mileageCheck.findFirst({
       where: { carId: Number(carId), userId: req.user.userId },
       orderBy: { yearMonth: 'desc' }
@@ -251,14 +248,17 @@ router.get('/mileage-check/status', async (req: any, res: Response) => {
     });
     const now = new Date();
     const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+    
     const checks = await prisma.mileageCheck.findMany({
       where: {
         userId: req.user.userId,
         yearMonth
       }
     });
+
     const checkedCarIds = new Set(checks.map(c => c.carId));
     const uncheckedCars = cars.filter(car => !checkedCarIds.has(car.id));
+
     res.json({
       success: true,
       uncheckedCars,
@@ -278,29 +278,14 @@ router.get('/dashboard', async (req: any, res: Response) => {
   try {
     const carId = req.query.carId ? Number(req.query.carId) : undefined;
     const [cars, records, intervalRow, mileageChecks] = await Promise.all([
-      prisma.car.findMany({
-        where: { userId: req.user.userId, isDeleted: false }
-      }),
-      prisma.serviceRecord.findMany({
-        where: { userId: req.user.userId, ...(carId && { carId }) },
-        orderBy: { date: 'desc' }
-      }),
-      prisma.serviceInterval.findUnique({
-        where: { userId: req.user.userId }
-      }),
-      prisma.mileageCheck.findMany({
-        where: { userId: req.user.userId },
-        orderBy: { yearMonth: 'desc' }
-      })
+      prisma.car.findMany({ where: { userId: req.user.userId, isDeleted: false } }),
+      prisma.serviceRecord.findMany({ where: { userId: req.user.userId, ...(carId && { carId }) }, orderBy: { date: 'desc' } }),
+      prisma.serviceInterval.findUnique({ where: { userId: req.user.userId } }),
+      prisma.mileageCheck.findMany({ where: { userId: req.user.userId }, orderBy: { yearMonth: 'desc' } })
     ]);
+
     const intervals = intervalRow ? JSON.parse(intervalRow.data) : {};
-    res.json({
-      success: true,
-      cars,
-      records,
-      intervals,
-      mileageChecks
-    });
+    res.json({ success: true, cars, records, intervals, mileageChecks });
   } catch (err) {
     console.error('Auto dashboard error:', err);
     res.status(500).json({ success: false, message: 'Ошибка сервера' });
@@ -308,7 +293,7 @@ router.get('/dashboard', async (req: any, res: Response) => {
 });
 
 // ==========================================
-// 6. НАСТРОЙКИ ПОЛЬЗОВАТЕЛЯ
+// 6. НАСТРОЙКИ ПОЛЬЗОВАТЕЛЯ (🆕 Обновлено)
 // ==========================================
 router.get('/settings', async (req: any, res: Response) => {
   try {
@@ -317,7 +302,7 @@ router.get('/settings', async (req: any, res: Response) => {
     });
     res.json({
       success: true,
-      settings: settings || { mileageReminderTime: '09:00' }
+      settings: settings || { mileageReminderTime: '09:00', disableOsagoReminder: false }
     });
   } catch (err) {
     console.error('Auto settings get error:', err);
@@ -327,13 +312,17 @@ router.get('/settings', async (req: any, res: Response) => {
 
 router.post('/settings', async (req: any, res: Response) => {
   try {
-    const { mileageReminderTime } = req.body;
+    const { mileageReminderTime, disableOsagoReminder } = req.body;
     await prisma.userAutoSettings.upsert({
       where: { userId: req.user.userId },
-      update: { mileageReminderTime: mileageReminderTime || '09:00' },
+      update: { 
+        mileageReminderTime: mileageReminderTime || '09:00',
+        disableOsagoReminder: typeof disableOsagoReminder === 'boolean' ? disableOsagoReminder : false
+      },
       create: {
         userId: req.user.userId,
-        mileageReminderTime: mileageReminderTime || '09:00'
+        mileageReminderTime: mileageReminderTime || '09:00',
+        disableOsagoReminder: typeof disableOsagoReminder === 'boolean' ? disableOsagoReminder : false
       }
     });
     res.json({ success: true });
@@ -344,7 +333,7 @@ router.post('/settings', async (req: any, res: Response) => {
 });
 
 // ==========================================
-// 7. УВЕДОМЛЕНИЯ (Notifications)
+// 7. УВЕДОМЛЕНИЯ (🆕 Обновлено: фильтрация ОСАГО)
 // ==========================================
 router.get('/notifications', async (req: any, res: Response) => {
   try {
@@ -353,15 +342,16 @@ router.get('/notifications', async (req: any, res: Response) => {
     const currentYearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
     const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-    const cars = await prisma.car.findMany({
-      where: { userId: req.user.userId, isDeleted: false }
+    // 🆕 Проверяем настройки пользователя
+    const settings = await prisma.userAutoSettings.findUnique({
+      where: { userId: req.user.userId }
     });
+    const disableOsago = settings?.disableOsagoReminder || false;
 
+    const cars = await prisma.car.findMany({ where: { userId: req.user.userId, isDeleted: false } });
+    
     const mileageStatus = await prisma.mileageCheck.findMany({
-      where: {
-        userId: req.user.userId,
-        yearMonth: currentYearMonth
-      }
+      where: { userId: req.user.userId, yearMonth: currentYearMonth }
     });
     const checkedCarIds = new Set(mileageStatus.map(m => m.carId));
     const carsWithoutMileage = cars.filter(car => !checkedCarIds.has(car.id));
@@ -375,13 +365,10 @@ router.get('/notifications', async (req: any, res: Response) => {
       });
     }
 
-    const records = await prisma.serviceRecord.findMany({
-      where: { userId: req.user.userId }
-    });
-    const intervalRow = await prisma.serviceInterval.findUnique({
-      where: { userId: req.user.userId }
-    });
+    const records = await prisma.serviceRecord.findMany({ where: { userId: req.user.userId } });
+    const intervalRow = await prisma.serviceInterval.findUnique({ where: { userId: req.user.userId } });
     const intervals = intervalRow ? JSON.parse(intervalRow.data) : {};
+    
     const byCategory: Record<string, any> = {};
     for (const rec of records) {
       if (!byCategory[rec.category] || rec.date > byCategory[rec.category].date) {
@@ -393,10 +380,12 @@ router.get('/notifications', async (req: any, res: Response) => {
     for (const catKey of timeBasedCats) {
       const lastRec = byCategory[catKey];
       if (!lastRec) continue;
+      
       const intervalMonths = intervals[catKey] || 12;
       const lastDate = new Date(lastRec.date);
       const nextDueDate = new Date(lastDate);
       nextDueDate.setMonth(nextDueDate.getMonth() + intervalMonths);
+
       if (nextDueDate <= currentMonthEnd) {
         notifications.push({
           type: 'service',
@@ -407,10 +396,15 @@ router.get('/notifications', async (req: any, res: Response) => {
       }
     }
 
+    // 🆕 Фильтруем уведомления по ОСАГО, если пользователь их отключил
+    const filteredNotifications = disableOsago
+      ? notifications.filter(n => n.type !== 'service' || n.category !== 'osago')
+      : notifications;
+
     res.json({
       success: true,
-      notifications,
-      totalCount: notifications.reduce((sum, n) => sum + (n.count || 1), 0)
+      notifications: filteredNotifications,
+      totalCount: filteredNotifications.reduce((sum, n) => sum + (n.count || 1), 0)
     });
   } catch (err) {
     console.error('Auto notifications error:', err);
@@ -449,17 +443,8 @@ router.post('/push/subscribe', async (req: any, res: Response) => {
     }
     await prisma.pushSubscription.upsert({
       where: { endpoint: endpoint },
-      update: {
-        userId: req.user.userId,
-        p256dh: keys.p256dh,
-        auth: keys.auth
-      },
-      create: {
-        userId: req.user.userId,
-        endpoint: endpoint,
-        p256dh: keys.p256dh,
-        auth: keys.auth
-      }
+      update: { userId: req.user.userId, p256dh: keys.p256dh, auth: keys.auth },
+      create: { userId: req.user.userId, endpoint: endpoint, p256dh: keys.p256dh, auth: keys.auth }
     });
     res.json({ success: true, message: 'Подписка на уведомления сохранена' });
   } catch (err) {
@@ -471,53 +456,32 @@ router.post('/push/subscribe', async (req: any, res: Response) => {
 // ==========================================
 // 9. 🆕 QR-ДОСТУП ДЛЯ СЕРВИСМЕНОВ
 // ==========================================
-
-// 9.1. Клиент генерирует QR-токен
 router.post('/service-access/qr/generate', async (req: any, res: Response) => {
   try {
     const { carId } = req.body;
-    if (!carId) {
-      return res.status(400).json({ success: false, message: 'Не указан carId' });
-    }
+    if (!carId) return res.status(400).json({ success: false, message: 'Не указан carId' });
 
     const car = await prisma.car.findFirst({
       where: { id: Number(carId), userId: req.user.userId, isDeleted: false }
     });
-    if (!car) {
-      return res.status(404).json({ success: false, message: 'Автомобиль не найден' });
-    }
+    if (!car) return res.status(404).json({ success: false, message: 'Автомобиль не найден' });
 
     await prisma.serviceAccessQR.updateMany({
-      where: {
-        carId: Number(carId),
-        clientId: req.user.userId,
-        usedAt: null,
-        expiresAt: { gt: new Date() }
-      },
+      where: { carId: Number(carId), clientId: req.user.userId, usedAt: null, expiresAt: { gt: new Date() } },
       data: { expiresAt: new Date() }
     });
 
     const token = uuidv4();
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-
     const qr = await prisma.serviceAccessQR.create({
-      data: {
-        token,
-        carId: Number(carId),
-        clientId: req.user.userId,
-        expiresAt
-      }
+      data: { token, carId: Number(carId), clientId: req.user.userId, expiresAt }
     });
 
     res.json({
       success: true,
       token: qr.token,
       expiresAt: qr.expiresAt,
-      carInfo: {
-        marka: car.marka,
-        model: car.model,
-        gosnomer: car.gosnomer
-      }
+      carInfo: { marka: car.marka, model: car.model, gosnomer: car.gosnomer }
     });
   } catch (err) {
     console.error('QR generate error:', err);
@@ -525,43 +489,27 @@ router.post('/service-access/qr/generate', async (req: any, res: Response) => {
   }
 });
 
-// 9.2. Сервисмен валидирует токен и получает данные авто
 router.post('/service-access/qr/validate', async (req: any, res: Response) => {
   try {
     const { token } = req.body;
-    if (!token) {
-      return res.status(400).json({ success: false, message: 'Не указан токен' });
-    }
-
+    if (!token) return res.status(400).json({ success: false, message: 'Не указан токен' });
     if (req.user.role !== 'service_master') {
       return res.status(403).json({ success: false, message: 'Доступ запрещён: требуется роль сервисмена' });
     }
 
     const qr = await prisma.serviceAccessQR.findUnique({
       where: { token },
-      include: {
-        car: true,
-        client: {
-          select: { id: true, phone: true }
-        }
-      }
+      include: { car: true, client: { select: { id: true, phone: true } } }
     });
 
-    if (!qr) {
-      return res.status(404).json({ success: false, message: 'QR-код не найден' });
-    }
-
-    if (qr.expiresAt < new Date()) {
-      return res.status(410).json({ success: false, message: 'QR-код истёк' });
-    }
+    if (!qr) return res.status(404).json({ success: false, message: 'QR-код не найден' });
+    if (qr.expiresAt < new Date()) return res.status(410).json({ success: false, message: 'QR-код истёк' });
 
     const recentRecords = await prisma.serviceRecord.findMany({
       where: { carId: qr.carId, userId: qr.clientId },
       orderBy: { date: 'desc' },
       take: 3,
-      include: {
-        author: { select: { phone: true } }
-      }
+      include: { author: { select: { phone: true } } }
     });
 
     res.json({
@@ -577,31 +525,17 @@ router.post('/service-access/qr/validate', async (req: any, res: Response) => {
   }
 });
 
-// 9.3. Сервисмен вносит запись через QR
 router.post('/service-access/qr/record', async (req: any, res: Response) => {
   try {
     const { token, date, category, work, cost, comment } = req.body;
-
-    if (!token) {
-      return res.status(400).json({ success: false, message: 'Не указан токен' });
-    }
-
+    if (!token) return res.status(400).json({ success: false, message: 'Не указан токен' });
     if (req.user.role !== 'service_master') {
       return res.status(403).json({ success: false, message: 'Доступ запрещён' });
     }
 
-    const qr = await prisma.serviceAccessQR.findUnique({
-      where: { token },
-      include: { car: true, client: true }
-    });
-
-    if (!qr) {
-      return res.status(404).json({ success: false, message: 'QR-код не найден' });
-    }
-
-    if (qr.expiresAt < new Date()) {
-      return res.status(410).json({ success: false, message: 'QR-код истёк' });
-    }
+    const qr = await prisma.serviceAccessQR.findUnique({ where: { token }, include: { car: true, client: true } });
+    if (!qr) return res.status(404).json({ success: false, message: 'QR-код не найден' });
+    if (qr.expiresAt < new Date()) return res.status(410).json({ success: false, message: 'QR-код истёк' });
 
     const record = await prisma.serviceRecord.create({
       data: {
@@ -618,12 +552,7 @@ router.post('/service-access/qr/record', async (req: any, res: Response) => {
       }
     });
 
-    await sendPushToUser(
-      qr.clientId,
-      'Помощник автомобилиста',
-      'Мастер внёс запись в журнал ТО'
-    );
-
+    await sendPushToUser(qr.clientId, 'Помощник автомобилиста', 'Мастер внёс запись в журнал ТО');
     res.json({ success: true, record });
   } catch (err) {
     console.error('QR record error:', err);
@@ -631,18 +560,12 @@ router.post('/service-access/qr/record', async (req: any, res: Response) => {
   }
 });
 
-// 9.4. Клиент отменяет QR досрочно
 router.post('/service-access/qr/revoke', async (req: any, res: Response) => {
   try {
     const { token } = req.body;
-    if (!token) {
-      return res.status(400).json({ success: false, message: 'Не указан токен' });
-    }
+    if (!token) return res.status(400).json({ success: false, message: 'Не указан токен' });
 
-    const qr = await prisma.serviceAccessQR.findUnique({
-      where: { token }
-    });
-
+    const qr = await prisma.serviceAccessQR.findUnique({ where: { token } });
     if (!qr || qr.clientId !== req.user.userId) {
       return res.status(404).json({ success: false, message: 'QR-код не найден' });
     }
@@ -651,7 +574,6 @@ router.post('/service-access/qr/revoke', async (req: any, res: Response) => {
       where: { id: qr.id },
       data: { expiresAt: new Date() }
     });
-
     res.json({ success: true });
   } catch (err) {
     console.error('QR revoke error:', err);

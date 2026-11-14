@@ -68,9 +68,8 @@ export const getSettings = async () => {
   return response.data;
 };
 
-export const saveSettings = async (mileageReminderTime: string) => {
-  const response = await apiClient.post(`${API_URL}/settings`, { mileageReminderTime });
-  return response.data;
+export const saveSettings = async (mileageReminderTime: string, disableOsagoReminder: boolean) => {
+  return apiClient.post('/api/auto/settings', { mileageReminderTime, disableOsagoReminder });
 };
 
 export const getNotifications = async () => {

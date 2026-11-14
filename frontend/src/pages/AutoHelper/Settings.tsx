@@ -4,7 +4,10 @@ import { getPredictableCategories } from './categories';
 
 const Settings: React.FC = () => {
   const [intervals, setIntervals] = useState<Record<string, number>>({});
-  const [settings, setSettings] = useState({ mileageReminderTime: '09:00' });
+  const [settings, setSettings] = useState({ 
+    mileageReminderTime: '09:00',
+    disableOsagoReminder: false // 🆕 НОВОЕ СОСТОЯНИЕ
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -24,9 +27,12 @@ const Settings: React.FC = () => {
       getPredictableCategories().forEach(c => {
         defaultIntervals[c.key] = c.defaultInterval;
       });
-
+      
       setIntervals(intervalsRes.intervals || defaultIntervals);
-      setSettings(settingsRes.settings || { mileageReminderTime: '09:00' });
+      setSettings(settingsRes.settings || { 
+        mileageReminderTime: '09:00', 
+        disableOsagoReminder: false 
+      });
     } catch (err) {
       console.error('Ошибка загрузки настроек:', err);
       const defaultIntervals: Record<string, number> = {};
@@ -44,11 +50,11 @@ const Settings: React.FC = () => {
       setSaving(true);
       await Promise.all([
         saveIntervals(intervals),
-        saveSettings(settings.mileageReminderTime)
+        saveSettings(settings.mileageReminderTime, settings.disableOsagoReminder) // 🆕 Передаем новый флаг
       ]);
-      alert('Настройки успешно сохранены!');
+      alert('✅ Настройки успешно сохранены!');
     } catch (err) {
-      alert('Ошибка сохранения');
+      alert('❌ Ошибка сохранения');
     } finally {
       setSaving(false);
     }
@@ -82,6 +88,7 @@ const Settings: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Время напоминания о пробеге */}
       <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-4">
         <h3 className="font-semibold text-gray-100 mb-3 flex items-center gap-2">
           ⏰ Время напоминания о пробеге
@@ -99,6 +106,35 @@ const Settings: React.FC = () => {
         </div>
       </div>
 
+      {/* 🆕 Отключение напоминаний об ОСАГО */}
+      <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <h3 className="font-semibold text-gray-100 flex items-center gap-2">
+              🔕 Напоминания об ОСАГО
+            </h3>
+            <p className="text-sm text-gray-400 mt-1">
+              Отключить уведомления об истечении срока действия полиса ОСАГО
+            </p>
+          </div>
+          <button
+            role="switch"
+            aria-checked={settings.disableOsagoReminder}
+            onClick={() => setSettings(prev => ({ ...prev, disableOsagoReminder: !prev.disableOsagoReminder }))}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:ring-offset-2 focus:ring-offset-slate-900 ${
+              settings.disableOsagoReminder ? 'bg-cyan-600' : 'bg-slate-700'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                settings.disableOsagoReminder ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+      </div>
+
+      {/* Интервалы обслуживания */}
       <div>
         <div className="flex justify-between items-center mb-3">
           <h3 className="font-semibold text-gray-100 flex items-center gap-2">
@@ -112,11 +148,9 @@ const Settings: React.FC = () => {
             {saving ? 'Сохранение...' : 'Сохранить'}
           </button>
         </div>
-        
         <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-3 text-sm text-cyan-300 mb-4 shadow-[0_0_15px_rgba(34,211,238,0.1)]">
           Укажите интервалы для каждого вида обслуживания. Для категорий по времени (тормозная жидкость, антифриз) интервал указывается в месяцах.
         </div>
-        
         <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl divide-y divide-white/10">
           {getPredictableCategories().map(cat => (
             <div key={cat.key} className="flex items-center justify-between p-4 hover:bg-white/5 transition-colors">
@@ -135,7 +169,6 @@ const Settings: React.FC = () => {
             </div>
           ))}
         </div>
-        
         <button
           onClick={handleReset}
           className="w-full mt-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 rounded-lg transition-all"
