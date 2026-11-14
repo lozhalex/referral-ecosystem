@@ -308,9 +308,7 @@ const Profile: React.FC = () => {
           <span>←</span> На главную
         </button>
         <span className={`text-xs font-bold px-3 py-1.5 rounded-full border ${
-          isPartner(user)
-            ? 'text-neon-green border-neon-green/30 bg-neon-green/10'
-            : 'text-slate-400 border-white/10 bg-white/5'
+          isPartner(user) ? 'text-neon-green border-neon-green/30 bg-neon-green/10' : 'text-slate-400 border-white/10 bg-white/5'
         }`}>
           {isPartner(user) ? 'ПАРТНЕР СМАРТ' : 'БЕСПЛАТНЫЙ УЧАСТНИК'}
         </span>
@@ -365,7 +363,6 @@ const Profile: React.FC = () => {
             </h3>
             <span className="text-slate-400 text-xl">{showServicePanel ? '▼' : '▶'}</span>
           </button>
-
           {showServicePanel && (
             <div className="mt-4 space-y-4">
               {serviceMessage && (
@@ -379,7 +376,6 @@ const Profile: React.FC = () => {
                   {serviceMessage}
                 </div>
               )}
-
               {!isFormOpen && !isSessionClosed && (
                 <>
                   <button
@@ -389,19 +385,16 @@ const Profile: React.FC = () => {
                   >
                     {isScanning ? '⏹ Остановить камеру' : '📷 Сканировать QR клиента'}
                   </button>
-
                   {isScanning && (
                     <div className="bg-black rounded-xl overflow-hidden border border-white/10">
                       <div id={scannerContainerId} className="w-full"></div>
                     </div>
                   )}
-
                   <div className="relative flex items-center gap-2 my-2">
                     <div className="flex-1 h-px bg-white/10"></div>
                     <span className="text-xs text-slate-500">или</span>
                     <div className="flex-1 h-px bg-white/10"></div>
                   </div>
-
                   <form onSubmit={handleManualValidate} className="flex gap-2">
                     <input
                       type="text"
@@ -420,7 +413,6 @@ const Profile: React.FC = () => {
                   </form>
                 </>
               )}
-
               {isSessionClosed && !isFormOpen && (
                 <div className="text-center py-4">
                   <p className="text-sm text-slate-400 mb-3">Сессия завершена</p>
@@ -435,7 +427,6 @@ const Profile: React.FC = () => {
                   </button>
                 </div>
               )}
-
               {isFormOpen && validatedCar && (
                 <div className="space-y-4">
                   <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-4">
@@ -452,7 +443,6 @@ const Profile: React.FC = () => {
                       </p>
                     )}
                   </div>
-
                   {recentRecords.length > 0 && (
                     <div>
                       <p className="text-xs text-slate-400 uppercase tracking-wider mb-2">Последние записи журнала</p>
@@ -474,10 +464,8 @@ const Profile: React.FC = () => {
                       </div>
                     </div>
                   )}
-
                   <form onSubmit={handleServiceSave} className="space-y-3 bg-white/5 border border-white/10 rounded-xl p-4">
                     <p className="text-xs text-slate-400 uppercase tracking-wider">Новая запись в журнал</p>
-
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-xs text-gray-400 mb-1 block">Дата</label>
@@ -502,7 +490,6 @@ const Profile: React.FC = () => {
                         </select>
                       </div>
                     </div>
-
                     <div>
                       <label className="text-xs text-gray-400 mb-1 block">Выполненные работы</label>
                       <textarea
@@ -514,7 +501,6 @@ const Profile: React.FC = () => {
                         placeholder="Например: Замена масла и фильтра"
                       />
                     </div>
-
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-xs text-gray-400 mb-1 block">Стоимость (₽)</label>
@@ -536,7 +522,6 @@ const Profile: React.FC = () => {
                         />
                       </div>
                     </div>
-
                     <button
                       type="submit"
                       disabled={serviceLoading}
@@ -545,7 +530,6 @@ const Profile: React.FC = () => {
                       {serviceLoading ? 'Сохранение...' : '💾 Сохранить запись'}
                     </button>
                   </form>
-
                   <button
                     onClick={handleEndSession}
                     className="w-full py-2.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg font-medium hover:bg-red-500/30 transition-all text-sm"
@@ -600,6 +584,77 @@ const Profile: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-5">
+            {/* 🆕 Блок: Зачем становиться партнёром СМАРТ (Раздел 3 спецификации v1.0) */}
+            <div className="bg-gradient-to-br from-neon-purple/10 to-neon-cyan/10 border border-neon-purple/20 rounded-xl p-4">
+              <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2 font-display">
+                💎 Зачем становиться партнёром СМАРТ?
+              </h4>
+              <ul className="space-y-2 text-sm text-slate-300">
+                <li className="flex items-start gap-2">
+                  <span className="text-neon-cyan mt-0.5">✓</span>
+                  <span>Доступ ко всем модулям экосистемы — сейчас и в будущем.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-neon-cyan mt-0.5">✓</span>
+                  <span>Личная реферальная ссылка — получайте бонусы за каждого приглашённого.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-neon-cyan mt-0.5">✓</span>
+                  <span>Приоритетная поддержка.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-neon-cyan mt-0.5">✓</span>
+                  <span>Участие в закрытых мероприятиях и акциях.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-neon-cyan mt-0.5">✓</span>
+                  <span>Эксклюзивные бонусы и кэшбэк при самостоятельном оформлении полиса ОСАГО через партнёрские сервисы (Sravni.ru).</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* 🆕 Блок: Как стать партнёром — 4 шага */}
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+              <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2 font-display">
+                🗺️ Как стать партнёром — 4 шага
+              </h4>
+              <ol className="space-y-3 text-sm text-slate-300">
+                <li className="flex items-start gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-neon-purple/20 text-neon-purple text-xs font-bold flex items-center justify-center border border-neon-purple/30">1</span>
+                  <span>
+                    <strong className="text-white">Зарегистрируйтесь в РЦБ</strong> (бесплатно) — нажмите кнопку «Перейти к регистрации», заполните анкету на сайте rcpay.ru.
+                  </span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-neon-purple/20 text-neon-purple text-xs font-bold flex items-center justify-center border border-neon-purple/30">2</span>
+                  <span>
+                    <strong className="text-white">Оплатите тариф СМАРТ</strong> (1990 ₽) — в личном кабинете РЦБ выберите тариф и внесите оплату.
+                  </span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-neon-purple/20 text-neon-purple text-xs font-bold flex items-center justify-center border border-neon-purple/30">3</span>
+                  <span>
+                    <strong className="text-white">Вернитесь в Бумеранг</strong> — нажмите «Я оплатил тариф СМАРТ, проверить» в профиле.
+                  </span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-neon-purple/20 text-neon-purple text-xs font-bold flex items-center justify-center border border-neon-purple/30">4</span>
+                  <span>
+                    <strong className="text-white">Получите статус партнёра</strong> — администратор проверит оплату в течение 24 часов и активирует ваш статус.
+                  </span>
+                </li>
+              </ol>
+            </div>
+
+            {/* ⚠️ Предупреждение */}
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-3 flex items-start gap-2">
+              <span className="text-yellow-400 text-lg flex-shrink-0">⚠️</span>
+              <p className="text-xs text-yellow-200/90 leading-relaxed">
+                <strong>Важно:</strong> статус активируется вручную администратором после проверки факта оплаты в РЦБ. Если прошло больше 24 часов — напишите в поддержку.
+              </p>
+            </div>
+
+            {/* Существующие шаги трекера */}
             <div className="flex items-center gap-3">
               <span className="text-neon-green text-xl">✅</span>
               <span className="text-sm text-slate-300">Регистрация в RefPro — <span className="font-semibold text-white">Выполнено</span></span>
