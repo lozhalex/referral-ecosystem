@@ -1,8 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { apiClient } from '../api/client';
+import { useToast } from '../hooks/useToast';
 
-const ROOT_PHONE_DIGITS = '79503278027';
+const ROOT_PHONE_DIGITS = '79274452831';
 
 const formatPhone = (value: string): string => {
   let digits = value.replace(/\D/g, '');
@@ -28,16 +29,26 @@ const digitsOf = (value: string): string => {
 };
 
 const Register: React.FC = () => {
+  const { success, error: showError } = useToast();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  // 🆕 Читаем ref из URL ИЛИ из localStorage (глобальный перехват из App.tsx)
+  // 🆕 Читаем ref из трёх источников с приоритетом: URL > sessionStorage > localStorage
   const refFromUrl = digitsOf(searchParams.get('ref') || '');
+  const refFromSession = digitsOf(sessionStorage.getItem('pending_ref') || '');
   const refFromStorage = digitsOf(localStorage.getItem('referral_phone') || '');
-  const refValue = refFromUrl || refFromStorage;
+  const refValue = refFromUrl || refFromSession || refFromStorage;
+
+  // 🆕 Читаем redirect из sessionStorage (ReferralCapture) или localStorage (старая логика)
+  const redirectFromSession = sessionStorage.getItem('pending_redirect') || '';
+  const redirectFromStorage = localStorage.getItem('redirectAfterLogin') || '';
+  const pendingRedirect = redirectFromSession || redirectFromStorage || '/profile';
 
   // Блокируем поле ТОЛЬКО если ref пришёл из URL (прямая ссылка)
   const isRefLocked = refFromUrl.length === 11;
+
+  // Определяем источник ref для отображения подсказки
+  const refSource = refFromUrl ? 'url' : refFromSession ? 'session' : refFromStorage ? 'storage' : null;
 
   const [phone, setPhone] = useState('');
   const [referredBy, setReferredBy] = useState(
@@ -48,7 +59,7 @@ const Register: React.FC = () => {
   const [showReferrerModal, setShowReferrerModal] = useState(false);
   const referrerInputRef = useRef<HTMLInputElement>(null);
 
-  // Синхронизация: если ref пришёл из localStorage (не из URL), но поле пустое — подставляем
+  // Синхронизация: если ref пришёл из sessionStorage/localStorage (не из URL), но поле пустое — подставляем
   useEffect(() => {
     if (!isRefLocked && refValue.length === 11 && !referredBy) {
       setReferredBy(formatPhone(refValue));
@@ -68,19 +79,20 @@ const Register: React.FC = () => {
           localStorage.setItem('token', response.data.token);
           localStorage.setItem('user', JSON.stringify(response.data.user));
         }
-        // 🆕 Очищаем реферальный след после успешной регистрации
+
+        // 🆕 Очищаем все реферальные следы после успешной регистрации
+        sessionStorage.removeItem('pending_ref');
+        sessionStorage.removeItem('pending_redirect');
         localStorage.removeItem('referral_phone');
-        alert('✅ Регистрация успешна!\nВаш временный пароль: 1234');
-        const redirectPath = localStorage.getItem('redirectAfterLogin');
-        if (redirectPath) {
-          localStorage.removeItem('redirectAfterLogin');
-          navigate(redirectPath);
-        } else {
-          navigate('/profile');
-        }
+        localStorage.removeItem('redirectAfterLogin');
+
+        success('✅ Регистрация успешна! Временный пароль: 1234');
+
+        // 🆕 Редирект: приоритет sessionStorage > localStorage > /profile
+        navigate(pendingRedirect, { replace: true });
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка при регистрации');
+      showError(err.response?.data?.message || 'Ошибка при регистрации');
     } finally {
       setLoading(false);
     }
@@ -90,7 +102,7 @@ const Register: React.FC = () => {
     e.preventDefault();
     setError('');
     if (digitsOf(phone).length !== 11) {
-      setError('Введите корректный номер телефона');
+      showError('Введите корректный номер телефона');
       return;
     }
     const refDigits = digitsOf(referredBy);
@@ -108,6 +120,11 @@ const Register: React.FC = () => {
 
   const handleModalDontKnow = async () => {
     setShowReferrerModal(false);
+    // 🆕 Если пользователь отказывается от реферала — очищаем sessionStorage,
+    // чтобы при следующей попытке ref не подставился снова
+    sessionStorage.removeItem('pending_ref');
+    sessionStorage.removeItem('pending_redirect');
+    localStorage.removeItem('referral_phone');
     setReferredBy(formatPhone(ROOT_PHONE_DIGITS));
     await submitRegistration(ROOT_PHONE_DIGITS);
   };
@@ -117,6 +134,7 @@ const Register: React.FC = () => {
       {/* Декоративные фоновые пятна */}
       <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-neon-purple/10 rounded-full mix-blend-screen filter blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-neon-cyan/10 rounded-full mix-blend-screen filter blur-3xl pointer-events-none"></div>
+
       <div className="glass w-full max-w-md p-8 border border-white/10 shadow-2xl relative z-10">
         <h1 className="text-3xl font-bold text-center text-white mb-2 font-display tracking-tight">
           Создать аккаунт
@@ -124,6 +142,7 @@ const Register: React.FC = () => {
         <p className="text-sm text-center text-slate-400 mb-8">
           Присоединяйтесь к экосистеме Бумеранг
         </p>
+
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1.5">
@@ -139,6 +158,7 @@ const Register: React.FC = () => {
               required
             />
           </div>
+
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1.5">
               Номер телефона пригласителя
@@ -159,22 +179,32 @@ const Register: React.FC = () => {
                   : 'bg-dark-900/50 border-white/10 text-white focus:ring-1 focus:ring-neon-purple focus:border-neon-purple'
               }`}
             />
+
             {isRefLocked && (
               <p className="mt-2 text-xs text-neon-green flex items-center gap-1">
                 <span>🔒</span> Автозаполнено по реферальной ссылке
               </p>
             )}
-            {!isRefLocked && refFromStorage.length === 11 && (
+
+            {!isRefLocked && refSource === 'session' && (
+              <p className="mt-2 text-xs text-slate-500 flex items-center gap-1">
+                <span>💾</span> Подставлено из ранее открытой ссылки
+              </p>
+            )}
+
+            {!isRefLocked && refSource === 'storage' && (
               <p className="mt-2 text-xs text-slate-500 flex items-center gap-1">
                 <span>💾</span> Подставлено из ранее открытой ссылки
               </p>
             )}
           </div>
+
           {error && (
             <div className="bg-red-500/10 text-red-400 text-sm p-4 rounded-xl border border-red-500/20">
               {error}
             </div>
           )}
+
           <button
             type="submit"
             disabled={loading}
@@ -190,6 +220,7 @@ const Register: React.FC = () => {
             )}
           </button>
         </form>
+
         <div className="mt-8 text-center">
           <p className="text-sm text-slate-400">
             Уже есть аккаунт?{' '}
@@ -198,6 +229,7 @@ const Register: React.FC = () => {
             </Link>
           </p>
         </div>
+
         {/* Модальное окно */}
         {showReferrerModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark-900/80 backdrop-blur-sm px-4">
