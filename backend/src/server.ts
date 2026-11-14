@@ -37,10 +37,9 @@ app.use(cors({
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      // 🔧 ИСПРАВЛЕНИЕ: НЕ выбрасываем ошибку!
-      // callback(null, false) = "не добавляй CORS-заголовки", браузер сам заблокирует.
-      // Раньше было callback(new Error(...), false) — это роняло процесс.
-      console.warn(`[CORS] Заблокирован origin: ${origin}`);
+      // 🔧 ФИКС: НЕ выбрасываем ошибку! Раньше это роняло процесс → crash-loop.
+      // Теперь просто не добавляем CORS-заголовки; браузер сам заблокирует ответ.
+      console.warn(`[CORS] Заблокирован origin: "${origin}"`);
       callback(null, false);
     }
   },
