@@ -90,7 +90,6 @@ app.get('/api/health', (req, res) => {
 
 // =================================================================
 // 🕒 CRON-ЗАДАЧА: Ежедневная разморозка бонусов (Пункт 4)
-// Запускается каждый день в 03:00 ночи по времени сервера
 // =================================================================
 cron.schedule('0 3 * * *', async () => {
   try {
@@ -100,9 +99,7 @@ cron.schedule('0 3 * * *', async () => {
         status: 'PENDING',
         unlockDate: { lte: now }
       },
-      data: {
-        status: 'AVAILABLE'
-      }
+      data: { status: 'AVAILABLE' }
     });
     if (result.count > 0) {
       console.log(`[CRON] ✅ Успешно разморожено ${result.count} транзакций бонусов.`);
@@ -111,12 +108,10 @@ cron.schedule('0 3 * * *', async () => {
     console.error('[CRON] ❌ Ошибка при разморозке бонусов:', error);
   }
 });
-
 console.log('✅ Cron-задача разморозки бонусов зарегистрирована');
 
 // =================================================================
-// 🆕 GLOBAL ERROR HANDLER — перехватывает все необработанные ошибки,
-// чтобы процесс НЕ падал и PM2 не перезапускал сервер.
+// 🆕 GLOBAL ERROR HANDLER — перехватывает все необработанные ошибки
 // =================================================================
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('[ERROR]', err?.message || err);
@@ -137,15 +132,6 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason) => {
   console.error('[UNHANDLED REJECTION]', reason);
 });
-
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('[ERROR]', err?.message || err);
-  if (res.headersSent) return next(err);
-  res.status(500).json({ success: false, message: 'Внутренняя ошибка сервера' });
-});
-
-process.on('uncaughtException', (err) => console.error('[UNCAUGHT]', err));
-process.on('unhandledRejection', (reason) => console.error('[UNHANDLED]', reason));
 
 // =================================================================
 app.listen(PORT, '0.0.0.0', () => {
