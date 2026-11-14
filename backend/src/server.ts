@@ -138,6 +138,15 @@ process.on('unhandledRejection', (reason) => {
   console.error('[UNHANDLED REJECTION]', reason);
 });
 
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('[ERROR]', err?.message || err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ success: false, message: 'Внутренняя ошибка сервера' });
+});
+
+process.on('uncaughtException', (err) => console.error('[UNCAUGHT]', err));
+process.on('unhandledRejection', (reason) => console.error('[UNHANDLED]', reason));
+
 // =================================================================
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
