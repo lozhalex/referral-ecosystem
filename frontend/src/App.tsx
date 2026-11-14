@@ -1,5 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, useSearchParams } from 'react-router-dom';
-import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
@@ -14,22 +13,15 @@ import AdminEvents from './pages/AdminEvents';
 import AutoHelper from './pages/AutoHelper';
 import ProtectedRoute from './components/ProtectedRoute';
 
-// 🆕 Глобальный перехват реферальной ссылки
-function ReferralCapture() {
-  const [searchParams] = useSearchParams();
-  useEffect(() => {
-    const ref = searchParams.get('ref');
-    if (ref) {
-      localStorage.setItem('referral_phone', ref);
-    }
-  }, [searchParams]);
-  return null;
-}
+// 🆕 Импортируем наш глобальный перехватчик реферальных ссылок
+import ReferralCapture from './components/ReferralCapture';
 
 function App() {
   return (
-    <Router>
+    <BrowserRouter>
+      {/* 🎯 ReferralCapture должен быть ВНУТРИ BrowserRouter, но ДО Routes */}
       <ReferralCapture />
+      
       <Routes>
         {/* Публичные маршруты */}
         <Route path="/" element={<Home />} />
@@ -59,7 +51,7 @@ function App() {
           <Route path="/scanner" element={<Scanner />} />
         </Route>
       </Routes>
-    </Router>
+    </BrowserRouter>
   );
 }
 
