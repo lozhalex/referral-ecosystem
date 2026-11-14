@@ -8,7 +8,6 @@ interface JournalProps {
   onCarChange: (carId: number | null) => void;
 }
 
-// Переименован из Record в JournalRecord — чтобы не конфликтовать с встроенным типом Record<K, V>
 interface JournalRecord {
   id: number;
   date: string;
@@ -20,7 +19,6 @@ interface JournalRecord {
   source?: string;
 }
 
-// Локальный маппинг русских названий категорий
 const LOCAL_CATEGORY_NAMES: { [key: string]: string } = {
   mileage: 'Ввод пробега',
   oil_engine: 'Масло двигателя + фильтр',
@@ -51,13 +49,10 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
   const [records, setRecords] = useState<JournalRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // Состояния для QR-доступа сервисмена
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrToken, setQrToken] = useState('');
   const [qrCarInfo, setQrCarInfo] = useState<any>(null);
   const [qrGenerating, setQrGenerating] = useState(false);
-
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     mileage: '',
@@ -153,12 +148,20 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
 
   if (loading) return <div className="text-center py-10 text-cyan-400 animate-pulse">Загрузка...</div>;
 
+  // 🆕 Empty State 2.1: нет автомобилей (обновлён по спецификации v1.0)
   if (cars.length === 0) {
     return (
-      <div className="text-center py-10 bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-6">
-        <p className="text-gray-400 mb-4">Сначала добавьте автомобиль во вкладке "Авто"</p>
-        <button onClick={() => onCarChange(null)} className="px-4 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all">
-          Перейти к авто
+      <div className="text-center py-10 bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-2xl p-8">
+        <div className="text-6xl mb-4">👋</div>
+        <h2 className="text-xl font-bold text-gray-100 mb-2">У вас пока нет автомобилей</h2>
+        <p className="text-gray-400 mb-6">
+          Добавьте первый автомобиль, чтобы начать отслеживать обслуживание и получать умные прогнозы ТО.
+        </p>
+        <button
+          onClick={() => onCarChange(null)}
+          className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all font-medium"
+        >
+          + Добавить автомобиль
         </button>
       </div>
     );
@@ -197,19 +200,29 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         </div>
       </button>
 
+      {/* 🆕 Empty State 2.2: нет записей (обновлён по спецификации v1.0) */}
       {records.length === 0 ? (
         <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-6 text-center">
           <div className="text-3xl mb-2">📓</div>
           <p className="text-gray-100 font-medium mb-2">Записей пока нет</p>
           <p className="text-sm text-gray-400 mb-4">
-            💡 <strong>Совет:</strong> Вы можете добавлять записи задним числом. Просто укажите прошлую дату и пробег, чтобы перенести историю обслуживания из вашего блокнота.
+            Добавьте первую запись задним числом из вашего блокнота или покажите QR-код сервисмену на СТО, чтобы он внёс данные за вас.
           </p>
-          <button
-            onClick={handleOpenModal}
-            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all text-sm font-medium"
-          >
-            Добавить первую запись
-          </button>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <button
+              onClick={handleOpenModal}
+              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all text-sm font-medium"
+            >
+              + Добавить запись
+            </button>
+            <button
+              onClick={handleGenerateQR}
+              disabled={qrGenerating}
+              className="px-4 py-2 bg-white/5 text-gray-300 rounded-lg hover:bg-white/10 transition-all text-sm font-medium border border-white/10 disabled:opacity-50"
+            >
+              🔑 Показать QR для сервисмена
+            </button>
+          </div>
         </div>
       ) : (
         <div className="space-y-3">
@@ -224,7 +237,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
               </div>
               {rec.work && <div className="text-sm text-gray-300">{rec.work}</div>}
               {rec.comment && <div className="text-xs text-gray-500 mt-1 italic">"{rec.comment}"</div>}
-
               {rec.source === 'service_master' && (
                 <div className="mt-2 pt-2 border-t border-white/5 flex items-center gap-2">
                   <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/30">
@@ -293,15 +305,12 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
                 {qrCarInfo.marka} {qrCarInfo.model} {qrCarInfo.gosnomer}
               </p>
             )}
-
             <div className="bg-white p-4 rounded-xl inline-block mb-4">
               <QRCodeSVG value={qrToken} size={200} level="H" />
             </div>
-
             <p className="text-xs text-yellow-400 mb-6">
               ⏱️ Действителен 1 час. Не закрывайте это окно до завершения работ.
             </p>
-
             <button
               onClick={handleRevokeQR}
               className="w-full py-2.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg font-medium hover:bg-red-500/30 transition-all"

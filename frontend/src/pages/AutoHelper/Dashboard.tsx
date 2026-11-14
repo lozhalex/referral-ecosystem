@@ -72,30 +72,23 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
     try {
       setLoading(true);
       setError('');
-
       const [carsData, dashboardData] = await Promise.all([
         getCars(),
         getDashboard(selectedCarId || undefined)
       ]);
-
       setCars(carsData.cars || []);
-      
       if (!selectedCarId && carsData.cars?.length > 0) {
         onCarChange(carsData.cars[0].id);
         return;
       }
-
       if (selectedCarId && dashboardData.cars && dashboardData.records && dashboardData.intervals) {
         const currentCar = dashboardData.cars.find((c: Car) => c.id === selectedCarId);
         if (currentCar) {
           const mileageData = await getMileageChecks(selectedCarId);
           const checks = mileageData.checks || [];
-          
           const currentYearMonth = `${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}`;
           const entered = checks.some((c: any) => c.yearMonth === currentYearMonth);
           setIsMileageEntered(entered);
-          
-          // Сохраняем данные о последнем вводе пробега
           if (checks.length > 0) {
             const lastCheck = checks[checks.length - 1];
             setLastMileageCheck({
@@ -105,13 +98,10 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
           } else {
             setLastMileageCheck(null);
           }
-          
           const calculatedAvg = calculateAvgPerMonth(checks);
           setAvgPerMonth(calculatedAvg.avg);
           setIsDefaultTempo(calculatedAvg.isDefault);
-          
           checkOsagoStatus(dashboardData.records);
-          
           const calculatedTiles = buildTiles(
             dashboardData.records,
             dashboardData.intervals,
@@ -134,25 +124,19 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
     if (checks.length < 2) {
       return { avg: DEFAULT_AVG_PER_MONTH, isDefault: true };
     }
-    
     const sorted = [...checks].sort((a, b) => a.yearMonth.localeCompare(b.yearMonth));
     const first = sorted[0];
     const last = sorted[sorted.length - 1];
-    
     const firstYear = parseInt(first.yearMonth.substring(0, 4));
     const firstMonth = parseInt(first.yearMonth.substring(4, 6));
     const lastYear = parseInt(last.yearMonth.substring(0, 4));
     const lastMonth = parseInt(last.yearMonth.substring(4, 6));
-    
     const monthsDiff = (lastYear - firstYear) * 12 + (lastMonth - firstMonth);
-    
     if (monthsDiff <= 0) {
       return { avg: DEFAULT_AVG_PER_MONTH, isDefault: true };
     }
-    
     const kmDiff = last.km - first.km;
     const avg = kmDiff / monthsDiff;
-    
     return { avg: Math.round(avg), isDefault: false };
   };
 
@@ -160,12 +144,9 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
     const today = new Date();
     const currentMonthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     const nextMonthEnd = new Date(today.getFullYear(), today.getMonth() + 2, 0);
-    
     const daysUntilCurrentEnd = Math.ceil((currentMonthEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     const daysUntilNextEnd = Math.ceil((nextMonthEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    
     const avgPerDay = avgPerMonth / 30;
-    
     return {
       currentMonthEnd,
       nextMonthEnd,
@@ -184,21 +165,17 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
   ): ServiceTile[] => {
     const { currentMonthEnd, nextMonthEnd, avgPerDay } = getForecastDates(avgPerMonth);
     const currentMileage = currentCar.mileage;
-    
     const byCategory: Record<string, any> = {};
     for (const rec of records) {
       if (!byCategory[rec.category] || rec.date > byCategory[rec.category].date) {
         byCategory[rec.category] = rec;
       }
     }
-    
     const predictableCats = getPredictableCategories(isFwd, currentMileage);
     const tiles: ServiceTile[] = [];
-    
     for (const catConfig of predictableCats) {
       const lastRec = byCategory[catConfig.key];
       const interval = Number(intervals[catConfig.key]) || catConfig.defaultInterval;
-      
       if (catConfig.isTimeBased) {
         if (!lastRec) {
           tiles.push({
@@ -211,14 +188,11 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
           });
           continue;
         }
-        
         const lastDate = new Date(lastRec.date + 'T00:00:00');
         const nextDueDate = new Date(lastDate);
         nextDueDate.setMonth(nextDueDate.getMonth() + interval);
-        
         let color: 'red' | 'yellow' | 'green';
         let message: string | undefined;
-        
         if (nextDueDate <= currentMonthEnd) {
           color = 'red';
           message = 'В этом месяце требуется ТО';
@@ -228,7 +202,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         } else {
           continue;
         }
-        
         tiles.push({
           cat: catConfig.key,
           name: catConfig.name,
@@ -243,7 +216,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         if (!lastRec) {
           const forecastDate = new Date();
           forecastDate.setDate(forecastDate.getDate() + Math.ceil(interval / avgPerDay));
-          
           tiles.push({
             cat: catConfig.key,
             name: catConfig.name,
@@ -254,16 +226,12 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
           });
           continue;
         }
-        
         const lastMileage = Number(lastRec.mileage) || 0;
         const threshold = lastMileage + interval;
-        
         const forecastCurrentEnd = currentMileage + (avgPerDay * getForecastDates(avgPerMonth).daysUntilCurrentEnd);
         const forecastNextEnd = currentMileage + (avgPerDay * getForecastDates(avgPerMonth).daysUntilNextEnd);
-        
         let color: 'red' | 'yellow' | 'green';
         let message: string | undefined;
-        
         if (forecastCurrentEnd >= threshold) {
           color = 'red';
           message = 'В этом месяце требуется ТО';
@@ -273,12 +241,10 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         } else {
           color = 'green';
         }
-        
         const kmUntilThreshold = threshold - currentMileage;
         const daysUntilThreshold = kmUntilThreshold / avgPerDay;
         const forecastDate = new Date();
         forecastDate.setDate(forecastDate.getDate() + daysUntilThreshold);
-        
         tiles.push({
           cat: catConfig.key,
           name: catConfig.name,
@@ -292,14 +258,12 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         });
       }
     }
-    
     tiles.sort((a, b) => {
       if (!a.forecastDate && !b.forecastDate) return 0;
       if (!a.forecastDate) return 1;
       if (!b.forecastDate) return -1;
       return a.forecastDate.getTime() - b.forecastDate.getTime();
     });
-    
     return tiles;
   };
 
@@ -309,19 +273,15 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
       setOsagoStatus('none');
       return;
     }
-
-    const latestOsago = osagoRecords.sort((a: any, b: any) => 
+    const latestOsago = osagoRecords.sort((a: any, b: any) =>
       new Date(b.date).getTime() - new Date(a.date).getTime()
     )[0];
-
     const lastDate = new Date(latestOsago.date);
     const expDate = new Date(lastDate);
     expDate.setFullYear(expDate.getFullYear() + 1);
-    
     const now = new Date();
     const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     const nextMonthEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0);
-    
     if (expDate <= currentMonthEnd) {
       setOsagoStatus('expired');
     } else if (expDate <= nextMonthEnd) {
@@ -334,11 +294,8 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
   const handleMileageSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCarId || !mileageInput) return;
-    
     try {
       await submitMileageCheck(selectedCarId, Number(mileageInput));
-      
-      // Создаём запись в журнале о пробеге
       await createRecord({
         carId: selectedCarId,
         category: 'mileage',
@@ -348,7 +305,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         cost: 0,
         comment: ''
       });
-      
       setShowMileageModal(false);
       setMileageInput('');
       await markNotificationsRead(['mileage']);
@@ -366,9 +322,7 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
   const handleOsagoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCarId || !osagoDateInput) return;
-    
     const currentCar = cars.find(c => c.id === selectedCarId);
-    
     try {
       await createRecord({
         carId: selectedCarId,
@@ -403,7 +357,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
   const handleGraySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCarId || !selectedGrayCategory) return;
-    
     try {
       await createRecord({
         carId: selectedCarId,
@@ -412,7 +365,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         mileage: Number(grayFormData.mileage),
         cost: Number(grayFormData.cost) || 0
       });
-      
       setShowGrayModal(false);
       loadData();
     } catch (err: any) {
@@ -443,17 +395,20 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
     return <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-center">{error}</div>;
   }
 
+  // 🆕 Empty State 2.1: нет автомобилей (обновлён по спецификации v1.0)
   if (cars.length === 0) {
     return (
       <div className="text-center py-10 bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-2xl p-8">
-        <div className="text-6xl mb-4">🚗</div>
-        <h2 className="text-xl font-bold text-gray-100 mb-2">Добавьте ваш автомобиль</h2>
-        <p className="text-gray-400 mb-6">Чтобы начать вести журнал и получать умные прогнозы, добавьте первое авто.</p>
+        <div className="text-6xl mb-4">👋</div>
+        <h2 className="text-xl font-bold text-gray-100 mb-2">У вас пока нет автомобилей</h2>
+        <p className="text-gray-400 mb-6">
+          Добавьте первый автомобиль, чтобы начать отслеживать обслуживание и получать умные прогнозы ТО.
+        </p>
         <button
           onClick={() => onTabChange('cars')}
           className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all font-medium"
         >
-          Перейти к добавлению авто
+          + Добавить автомобиль
         </button>
       </div>
     );
@@ -461,7 +416,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
 
   if (!isMileageEntered) {
     const currentMonthName = new Date().toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
-    
     return (
       <div className="space-y-4">
         <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-4">
@@ -478,7 +432,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
             ))}
           </select>
         </div>
-
         <div className="bg-gradient-to-br from-purple-500/20 to-cyan-500/20 border border-purple-500/30 rounded-2xl p-6 text-center">
           <div className="text-5xl mb-3">📍</div>
           <h3 className="text-lg font-bold text-gray-100 mb-2">Введите пробег за {currentMonthName}</h3>
@@ -504,22 +457,21 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
             <span className="text-sm text-red-400 font-medium flex items-center gap-2">
               🚨 Срок действия ОСАГО истек!
             </span>
-            <button 
-              onClick={() => setShowOsagoModal(true)} 
+            <button
+              onClick={() => setShowOsagoModal(true)}
               className="text-xs bg-red-500/20 hover:bg-red-500/30 text-red-300 px-3 py-1 rounded-full transition font-medium"
             >
               Обновить
             </button>
           </div>
         )}
-        
         {osagoStatus === 'warning' && (
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-full px-4 py-2.5 flex items-center justify-between shadow-[0_0_15px_rgba(234,179,8,0.15)]">
             <span className="text-sm text-yellow-400 font-medium flex items-center gap-2">
               ⚠️ ОСАГО истекает в течение месяца
             </span>
-            <button 
-              onClick={() => setShowOsagoModal(true)} 
+            <button
+              onClick={() => setShowOsagoModal(true)}
               className="text-xs bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 px-3 py-1 rounded-full transition font-medium"
             >
               Обновить
@@ -527,7 +479,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
           </div>
         )}
       </div>
-
       <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-4">
         <label className="block text-sm font-medium text-gray-300 mb-2">Выберите автомобиль</label>
         <select
@@ -541,15 +492,12 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
             </option>
           ))}
         </select>
-        
         {isDefaultTempo && (
           <p className="text-xs text-yellow-400 mt-2 flex items-center gap-1">
             ⚠️ Используется дефолтный темп (1500 км/мес). Введите пробег за несколько месяцев для точного прогноза
           </p>
         )}
       </div>
-
-      {/* 🆕 Информационная карточка о последнем вводе пробега */}
       {lastMileageCheck && (
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 shadow-[0_0_15px_rgba(34,197,94,0.1)]">
           <div className="flex items-center justify-between">
@@ -570,7 +518,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
           </div>
         </div>
       )}
-
       <div>
         <h2 className="text-lg font-bold text-gray-100 mb-3 flex items-center gap-2">
           🧠 Умный прогноз ТО
@@ -578,7 +525,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
             средний темп: {avgPerMonth} км/мес
           </span>
         </h2>
-        
         {tiles.length === 0 ? (
           <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-6 text-center shadow-[0_0_15px_rgba(34,197,94,0.1)]">
             <div className="text-4xl mb-2">✅</div>
@@ -608,7 +554,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
                 </div>
               ))}
             </div>
-
             {tiles.length > 6 && (
               <button
                 onClick={() => setShowOthers(!showOthers)}
@@ -617,7 +562,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
                 {showOthers ? '▲ Скрыть' : '▼'} Другие категории ({tiles.length - 6})
               </button>
             )}
-
             {showOthers && tiles.length > 6 && (
               <div className="grid grid-cols-2 gap-3 mt-3">
                 {tiles.slice(6).map(tile => (
@@ -636,7 +580,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
           </>
         )}
       </div>
-
       {showMileageModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm">
@@ -666,7 +609,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
           </div>
         </div>
       )}
-
       {showOsagoModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm">
@@ -695,7 +637,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
           </div>
         </div>
       )}
-
       {showGrayModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -716,22 +657,18 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
                   <input required type="number" className="w-full px-3 py-2.5 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all" value={grayFormData.mileage} onChange={e => setGrayFormData({...grayFormData, mileage: e.target.value})} placeholder="Напр. 195000" />
                 </div>
               </div>
-              
               <div>
                 <label className="text-xs text-gray-400 mb-1 block">Выполненные работы</label>
                 <textarea required rows={2} className="w-full px-3 py-2.5 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all" value={grayFormData.work} onChange={e => setGrayFormData({...grayFormData, work: e.target.value})} placeholder="Например: Замена масла и фильтра" />
               </div>
-
               <div>
                 <label className="text-xs text-gray-400 mb-1 block">Стоимость (₽)</label>
                 <input type="number" className="w-full px-3 py-2.5 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all" value={grayFormData.cost} onChange={e => setGrayFormData({...grayFormData, cost: e.target.value})} placeholder="0" />
               </div>
-
               <div>
                 <label className="text-xs text-gray-400 mb-1 block">Комментарий (необязательно)</label>
                 <input className="w-full px-3 py-2.5 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all" value={grayFormData.comment} onChange={e => setGrayFormData({...grayFormData, comment: e.target.value})} placeholder="Например: Масло Shell 5W-30" />
               </div>
-
               <button type="submit" className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all mt-2">
                 Сохранить запись
               </button>
@@ -739,7 +676,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
           </div>
         </div>
       )}
-
       {showMileageErrorModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
