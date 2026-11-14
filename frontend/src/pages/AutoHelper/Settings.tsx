@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { getIntervals, saveIntervals, getSettings, saveSettings } from '../../api/auto';
 import { getPredictableCategories } from './categories';
+import { useToast } from '../../hooks/useToast';
 import Skeleton from '../../components/Skeleton';
 
 const Settings: React.FC = () => {
+  const { success, error: showError } = useToast();
   const [intervals, setIntervals] = useState<Record<string, number>>({});
-  const [settings, setSettings] = useState({ mileageReminderTime: '09:00' });
+  const [settings, setSettings] = useState({
+    mileageReminderTime: '09:00',
+    disableOsagoReminder: false
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -27,7 +32,10 @@ const Settings: React.FC = () => {
       });
 
       setIntervals(intervalsRes.intervals || defaultIntervals);
-      setSettings(settingsRes.settings || { mileageReminderTime: '09:00' });
+      setSettings(settingsRes.settings || {
+        mileageReminderTime: '09:00',
+        disableOsagoReminder: false
+      });
     } catch (err) {
       console.error('Ошибка загрузки настроек:', err);
       const defaultIntervals: Record<string, number> = {};
@@ -45,11 +53,11 @@ const Settings: React.FC = () => {
       setSaving(true);
       await Promise.all([
         saveIntervals(intervals),
-        saveSettings(settings.mileageReminderTime)
+        saveSettings(settings.mileageReminderTime, settings.disableOsagoReminder)
       ]);
-      alert('Настройки успешно сохранены!');
+      success('Настройки успешно сохранены!');
     } catch (err) {
-      alert('Ошибка сохранения');
+      showError('Ошибка сохранения');
     } finally {
       setSaving(false);
     }
@@ -63,13 +71,12 @@ const Settings: React.FC = () => {
   };
 
   const handleReset = () => {
-    if (window.confirm('Вы уверены, что хотите сбросить все интервалы к значениям по умолчанию?')) {
-      const defaultIntervals: Record<string, number> = {};
-      getPredictableCategories().forEach(c => {
-        defaultIntervals[c.key] = c.defaultInterval;
-      });
-      setIntervals(defaultIntervals);
-    }
+    const defaultIntervals: Record<string, number> = {};
+    getPredictableCategories().forEach(c => {
+      defaultIntervals[c.key] = c.defaultInterval;
+    });
+    setIntervals(defaultIntervals);
+    success('Интервалы сброшены к значениям по умолчанию');
   };
 
   const getUnit = (categoryKey: string): string => {
@@ -83,16 +90,12 @@ const Settings: React.FC = () => {
   if (loading) {
     return (
       <div className="space-y-6">
-        {/* Скелетон блока "Время напоминания" */}
         <Skeleton variant="card" height="100px" />
-        {/* Скелетон заголовка + кнопки "Сохранить" */}
         <div className="flex justify-between items-center">
           <Skeleton variant="text" width="180px" />
           <Skeleton variant="button" width="100px" />
         </div>
-        {/* Скелетон информационного блока */}
         <Skeleton variant="rect" height="50px" />
-        {/* Скелетон списка интервалов (5 строк) */}
         <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl divide-y divide-white/10">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="flex items-center justify-between p-4">
@@ -104,7 +107,6 @@ const Settings: React.FC = () => {
             </div>
           ))}
         </div>
-        {/* Скелетон кнопки сброса */}
         <Skeleton variant="button" width="100%" />
       </div>
     );
@@ -126,6 +128,34 @@ const Settings: React.FC = () => {
           <span className="text-sm text-gray-400">
             Ежемесячное напоминание (1-го числа)
           </span>
+        </div>
+      </div>
+
+      {/* 🆕 Toggle отключения напоминаний об ОСАГО (Раздел 5) */}
+      <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <h3 className="font-semibold text-gray-100 flex items-center gap-2">
+              🔕 Напоминания об ОСАГО
+            </h3>
+            <p className="text-sm text-gray-400 mt-1">
+              Отключить уведомления об истечении срока действия полиса ОСАГО
+            </p>
+          </div>
+          <button
+            role="switch"
+            aria-checked={settings.disableOsagoReminder}
+            onClick={() => setSettings(prev => ({ ...prev, disableOsagoReminder: !prev.disableOsagoReminder }))}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:ring-offset-2 focus:ring-offset-slate-900 ${
+              settings.disableOsagoReminder ? 'bg-cyan-600' : 'bg-slate-700'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                settings.disableOsagoReminder ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
         </div>
       </div>
 
