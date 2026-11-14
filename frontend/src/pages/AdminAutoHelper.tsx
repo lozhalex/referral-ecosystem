@@ -11,8 +11,6 @@ export default function AdminAutoHelper() {
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // Состояние для модального окна редактирования
   const [editingRecord, setEditingRecord] = useState<any | null>(null);
   const [editForm, setEditForm] = useState({ date: '', mileage: '', category: '', work: '', cost: '', comment: '' });
   const navigate = useNavigate();
@@ -57,7 +55,7 @@ export default function AdminAutoHelper() {
       await updateAdminRecord(editingRecord.id, editForm);
       success('Запись успешно обновлена');
       setEditingRecord(null);
-      loadData(); // Перезагружаем данные
+      loadData();
     } catch (err: any) {
       showError(err.response?.data?.message || 'Ошибка сохранения');
     }
@@ -74,9 +72,8 @@ export default function AdminAutoHelper() {
     }
   };
 
-  // Фильтрация записей по телефону или госномеру
-  const filteredRecords = records.filter(r => 
-    r.user?.phone?.includes(searchQuery) || 
+  const filteredRecords = records.filter(r =>
+    r.user?.phone?.includes(searchQuery) ||
     r.car?.gosnomer?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -87,20 +84,35 @@ export default function AdminAutoHelper() {
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex items-center justify-between mb-6">
-  <div className="flex items-center gap-4">
-    <button
-      onClick={() => navigate('/admin')}
-      className="flex items-center gap-2 text-gray-400 hover:text-white transition text-sm"
-    >
-      <span>←</span>
-      <span>В админ-панель</span>
-    </button>
-    <h1 className="text-2xl font-bold text-gray-100">Администрирование: Помощник автомобилиста</h1>
-  </div>
-  <div className="flex bg-slate-800 rounded-lg p-1 border border-white/10">
-    ...
-  </div>
-</div>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate('/admin')}
+            className="flex items-center gap-2 text-gray-400 hover:text-white transition text-sm"
+          >
+            <span>←</span>
+            <span>В админ-панель</span>
+          </button>
+          <h1 className="text-2xl font-bold text-gray-100">Администрирование: Помощник автомобилиста</h1>
+        </div>
+        <div className="flex bg-slate-800 rounded-lg p-1 border border-white/10">
+          <button
+            onClick={() => setActiveTab('cars')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+              activeTab === 'cars' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            Автомобили
+          </button>
+          <button
+            onClick={() => setActiveTab('records')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+              activeTab === 'records' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            Журнал ТО
+          </button>
+        </div>
+      </div>
 
       {activeTab === 'cars' && (
         <div className="bg-slate-900 border border-white/10 rounded-xl overflow-hidden">
@@ -143,7 +155,6 @@ export default function AdminAutoHelper() {
               className="w-full px-4 py-3 bg-slate-900 border border-white/10 text-gray-100 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all placeholder-gray-500"
             />
           </div>
-
           <div className="bg-slate-900 border border-white/10 rounded-xl overflow-x-auto">
             <table className="w-full text-left text-sm text-gray-300 min-w-[800px]">
               <thead className="bg-slate-800 text-gray-400 uppercase text-xs">
@@ -169,13 +180,13 @@ export default function AdminAutoHelper() {
                     <td className="px-4 py-3 max-w-xs truncate" title={record.work}>{record.work}</td>
                     <td className="px-4 py-3">{record.cost} ₽</td>
                     <td className="px-4 py-3 whitespace-nowrap space-x-2">
-                      <button 
+                      <button
                         onClick={() => handleEditClick(record)}
                         className="text-xs bg-yellow-500/20 text-yellow-400 px-3 py-1.5 rounded hover:bg-yellow-500/30 transition"
                       >
                         Изменить
                       </button>
-                      <button 
+                      <button
                         onClick={() => handleDelete(record.id)}
                         className="text-xs bg-red-500/20 text-red-400 px-3 py-1.5 rounded hover:bg-red-500/30 transition"
                       >
@@ -193,7 +204,6 @@ export default function AdminAutoHelper() {
         </div>
       )}
 
-      {/* Модальное окно редактирования */}
       {editingRecord && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
