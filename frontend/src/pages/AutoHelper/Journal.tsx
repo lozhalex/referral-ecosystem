@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getJournal, createRecord, getCars, generateServiceQR, revokeServiceQR } from '../../api/auto';
 import { CATEGORIES, getCategoryName } from './categories';
 import { QRCodeSVG } from 'qrcode.react';
-import Tooltip from '../../components/Tooltip';
+import { useToast } from '../../hooks/useToast';
 
 interface JournalProps {
   selectedCarId: number | null;
@@ -46,6 +46,7 @@ const getCategoryDisplayName = (key: string): string => {
 };
 
 const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
+  const { success, error: showError } = useToast();
   const [cars, setCars] = useState<any[]>([]);
   const [records, setRecords] = useState<JournalRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,7 +102,10 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCarId) return alert('Выберите автомобиль');
+    if (!selectedCarId) {
+      showError('Выберите автомобиль');
+      return;
+    }
     try {
       await createRecord({
         carId: selectedCarId,
@@ -110,9 +114,10 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         cost: Number(formData.cost) || 0
       });
       setIsModalOpen(false);
+      success('Запись успешно добавлена!');
       loadData();
     } catch (err) {
-      alert('Ошибка сохранения записи');
+      showError('Ошибка сохранения записи');
     }
   };
 
@@ -127,7 +132,7 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         setShowQRModal(true);
       }
     } catch (err) {
-      alert('Ошибка генерации QR-кода');
+      showError('Ошибка генерации QR-кода');
     } finally {
       setQrGenerating(false);
     }
@@ -140,8 +145,9 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
       setShowQRModal(false);
       setQrToken('');
       setQrCarInfo(null);
+      success('Доступ сервисмена отменён');
     } catch (err) {
-      alert('Ошибка отмены доступа');
+      showError('Ошибка отмены доступа');
     }
   };
 
@@ -172,32 +178,25 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         </button>
       </div>
 
-      {/* 🆕 Сценарий 4.2: тултип на кнопку QR для сервисмена */}
-      <Tooltip
-        text="Сервисмен внесёт запись сам, а вы получите push-уведомление. QR-код действителен 1 час и привязан к этому автомобилю."
-        position="bottom"
-        className="w-full"
+      <button
+        onClick={handleGenerateQR}
+        disabled={qrGenerating}
+        className="w-full bg-gradient-to-r from-purple-500/20 to-cyan-500/20 border border-purple-500/30 rounded-xl p-4 text-left hover:shadow-lg hover:shadow-purple-500/10 transition-all disabled:opacity-50"
       >
-        <button
-          onClick={handleGenerateQR}
-          disabled={qrGenerating}
-          className="w-full bg-gradient-to-r from-purple-500/20 to-cyan-500/20 border border-purple-500/30 rounded-xl p-4 text-left hover:shadow-lg hover:shadow-purple-500/10 transition-all disabled:opacity-50"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold text-purple-300 flex items-center gap-2">
-                🔑 Показать QR для сервисмена
-              </h3>
-              <p className="text-xs text-purple-400/80 mt-1">
-                Действителен 1 час. Сервисмен сможет внести данные о ТО.
-              </p>
-            </div>
-            <span className="px-4 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg text-sm font-medium">
-              {qrGenerating ? 'Генерация...' : 'Показать'}
-            </span>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-purple-300 flex items-center gap-2">
+              🔑 Показать QR для сервисмена
+            </h3>
+            <p className="text-xs text-purple-400/80 mt-1">
+              Действителен 1 час. Сервисмен сможет внести данные о ТО.
+            </p>
           </div>
-        </button>
-      </Tooltip>
+          <span className="px-4 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg text-sm font-medium">
+            {qrGenerating ? 'Генерация...' : 'Показать'}
+          </span>
+        </div>
+      </button>
 
       {records.length === 0 ? (
         <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-6 text-center">
@@ -238,7 +237,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         </div>
       )}
 
-      {/* Модалка добавления записи */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -275,11 +273,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
               <div>
                 <label className="text-xs text-gray-400 mb-1 block">Комментарий (необязательно)</label>
                 <input className={inputClass} value={formData.comment} onChange={e => setFormData({...formData, comment: e.target.value})} placeholder="Например: Масло Shell 5W-30" />
-                {/* 🆕 Сценарий 4.3: подсказка под полем "Комментарий" */}
-                <p className="text-[10px] text-gray-500 mt-1 flex items-center gap-1">
-                  <span>💬</span>
-                  <span>Укажите марку масла, название сервиса или другие важные детали. Это поможет при продаже авто или гарантийном случае.</span>
-                </p>
               </div>
               <button type="submit" className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all mt-2">
                 Сохранить запись
@@ -289,7 +282,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         </div>
       )}
 
-      {/* Модалка с QR-кодом для сервисмена */}
       {showQRModal && qrToken && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">

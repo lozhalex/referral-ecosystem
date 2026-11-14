@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getDashboard, getCars, submitMileageCheck, getMileageChecks, createRecord, markNotificationsRead } from '../../api/auto';
 import { getCategoryName, getPredictableCategories } from './categories';
-import Tooltip from '../../components/Tooltip';
+import { useToast } from '../../hooks/useToast';
 
 interface DashboardProps {
   selectedCarId: number | null;
@@ -39,6 +39,7 @@ interface LastMileageCheck {
 const DEFAULT_AVG_PER_MONTH = 1500;
 
 const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTabChange }) => {
+  const { success, error: showError, info } = useToast();
   const [showMileageErrorModal, setShowMileageErrorModal] = useState(false);
   const [lastRecordedMileage, setLastRecordedMileage] = useState(0);
   const [cars, setCars] = useState<Car[]>([]);
@@ -64,8 +65,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
     work: '',
     comment: ''
   });
-  // 🆕 Модалка с подробностями об ОСАГО (сценарий 4.5)
-  const [showOsagoInfoModal, setShowOsagoInfoModal] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -276,7 +275,7 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
       setOsagoStatus('none');
       return;
     }
-    const latestOsago = osagoRecords.sort((a: any, b: any) =>
+    const latestOsago = osagoRecords.sort((a: any, b: any) => 
       new Date(b.date).getTime() - new Date(a.date).getTime()
     )[0];
     const lastDate = new Date(latestOsago.date);
@@ -311,13 +310,14 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
       setShowMileageModal(false);
       setMileageInput('');
       await markNotificationsRead(['mileage']);
+      success('Пробег успешно сохранён!');
       loadData();
     } catch (err: any) {
       if (err.response?.data?.code === 'MILEAGE_DECREASED') {
         setLastRecordedMileage(err.response.data.lastMileage);
         setShowMileageErrorModal(true);
       } else {
-        alert(err.response?.data?.message || 'Ошибка сохранения пробега');
+        showError(err.response?.data?.message || 'Ошибка сохранения пробега');
       }
     }
   };
@@ -338,9 +338,10 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
       });
       setShowOsagoModal(false);
       await markNotificationsRead(['osago']);
+      success('Дата ОСАГО обновлена!');
       loadData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Ошибка сохранения даты ОСАГО');
+      showError(err.response?.data?.message || 'Ошибка сохранения даты ОСАГО');
     }
   };
 
@@ -369,9 +370,10 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         cost: Number(grayFormData.cost) || 0
       });
       setShowGrayModal(false);
+      success('Запись успешно добавлена!');
       loadData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Ошибка сохранения');
+      showError(err.response?.data?.message || 'Ошибка сохранения');
     }
   };
 
@@ -388,21 +390,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
-  };
-
-  // 🆕 Форматирование тултипа для плитки ТО (сценарий 4.1)
-  const getTileTooltip = (tile: ServiceTile): string => {
-    const parts: string[] = [];
-    if (tile.lastDate) {
-      parts.push(`Последняя замена: ${formatDate(tile.lastDate)}${tile.lastMileage ? ` (${tile.lastMileage.toLocaleString('ru-RU')} км)` : ''}`);
-    } else {
-      parts.push('Последняя замена: не указана');
-    }
-    if (tile.forecastDate) {
-      parts.push(`Следующая замена: ~${formatDate(tile.forecastDate.toISOString())}`);
-    }
-    parts.push(`Интервал: ${tile.interval} ${tile.isTimeBased ? 'мес' : 'км'}`);
-    return `🔧 ${tile.name}\n${parts.join('\n')}`;
   };
 
   if (loading) {
@@ -472,21 +459,12 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
             <span className="text-sm text-red-400 font-medium flex items-center gap-2">
               🚨 Срок действия ОСАГО истек!
             </span>
-            <div className="flex items-center gap-2">
-              {/* 🆕 Сценарий 4.5: кнопка "Узнать подробнее" про ОСАГО */}
-              <button
-                onClick={() => setShowOsagoInfoModal(true)}
-                className="text-xs bg-red-500/20 hover:bg-red-500/30 text-red-300 px-2 py-1 rounded-full transition font-medium border border-red-500/30"
-              >
-                ℹ️ Подробнее
-              </button>
-              <button
-                onClick={() => setShowOsagoModal(true)}
-                className="text-xs bg-red-500/20 hover:bg-red-500/30 text-red-300 px-3 py-1 rounded-full transition font-medium"
-              >
-                Обновить
-              </button>
-            </div>
+            <button
+              onClick={() => setShowOsagoModal(true)}
+              className="text-xs bg-red-500/20 hover:bg-red-500/30 text-red-300 px-3 py-1 rounded-full transition font-medium"
+            >
+              Обновить
+            </button>
           </div>
         )}
         {osagoStatus === 'warning' && (
@@ -494,21 +472,12 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
             <span className="text-sm text-yellow-400 font-medium flex items-center gap-2">
               ⚠️ ОСАГО истекает в течение месяца
             </span>
-            <div className="flex items-center gap-2">
-              {/* 🆕 Сценарий 4.5 */}
-              <button
-                onClick={() => setShowOsagoInfoModal(true)}
-                className="text-xs bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 px-2 py-1 rounded-full transition font-medium border border-yellow-500/30"
-              >
-                ℹ️ Подробнее
-              </button>
-              <button
-                onClick={() => setShowOsagoModal(true)}
-                className="text-xs bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 px-3 py-1 rounded-full transition font-medium"
-              >
-                Обновить
-              </button>
-            </div>
+            <button 
+              onClick={() => setShowOsagoModal(true)} 
+              className="text-xs bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 px-3 py-1 rounded-full transition font-medium"
+            >
+              Обновить
+            </button>
           </div>
         )}
       </div>
@@ -525,18 +494,10 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
             </option>
           ))}
         </select>
-        {/* 🆕 Сценарий 4.4: тултип на предупреждение о дефолтном темпе */}
         {isDefaultTempo && (
-          <Tooltip
-            text="⚠️ Системе нужно минимум 2 ввода пробега за разные месяцы, чтобы рассчитать ваш личный темп. Пока используется безопасный стандарт: 1500 км/мес."
-            position="bottom"
-            className="mt-2 w-full"
-          >
-            <div className="flex items-center gap-1 text-xs text-yellow-400 cursor-help">
-              <span>⚠️</span>
-              <span>Используется дефолтный темп (1500 км/мес). Введите пробег за несколько месяцев для точного прогноза</span>
-            </div>
-          </Tooltip>
+          <p className="text-xs text-yellow-400 mt-2 flex items-center gap-1">
+            ⚠️ Используется дефолтный темп (1500 км/мес). Введите пробег за несколько месяцев для точного прогноза
+          </p>
         )}
       </div>
       {lastMileageCheck && (
@@ -584,25 +545,15 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
           <>
             <div className="grid grid-cols-2 gap-3">
               {tiles.slice(0, 6).map(tile => (
-                <Tooltip
+                <div
                   key={tile.cat}
-                  text={getTileTooltip(tile)}
-                  position="top"
-                  className="w-full"
+                  onClick={() => tile.color === 'gray' ? handleGrayTileClick(tile.cat) : onTabChange('journal')}
+                  className={`border rounded-xl p-3 cursor-pointer hover:scale-[1.02] transition-all duration-300 ${getTileColorClass(tile.color)}`}
                 >
-                  <div
-                    onClick={() => tile.color === 'gray' ? handleGrayTileClick(tile.cat) : onTabChange('journal')}
-                    className={`border rounded-xl p-3 cursor-pointer hover:scale-[1.02] transition-all duration-300 relative ${getTileColorClass(tile.color)}`}
-                  >
-                    <div className="font-semibold text-sm pr-5">{tile.name}</div>
-                    {tile.message && <div className="text-xs mt-1 opacity-90">{tile.message}</div>}
-                    {tile.color === 'gray' && <div className="text-xs mt-1 opacity-70">Внесите данные</div>}
-                    {/* 🆕 Иконка ℹ️ в правом верхнем углу плитки */}
-                    <div className="absolute top-2 right-2 w-5 h-5 flex items-center justify-center text-xs text-white/50 hover:text-white/90 transition-colors">
-                      ℹ️
-                    </div>
-                  </div>
-                </Tooltip>
+                  <div className="font-semibold text-sm">{tile.name}</div>
+                  {tile.message && <div className="text-xs mt-1 opacity-90">{tile.message}</div>}
+                  {tile.color === 'gray' && <div className="text-xs mt-1 opacity-70">Внесите данные</div>}
+                </div>
               ))}
             </div>
             {tiles.length > 6 && (
@@ -616,24 +567,15 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
             {showOthers && tiles.length > 6 && (
               <div className="grid grid-cols-2 gap-3 mt-3">
                 {tiles.slice(6).map(tile => (
-                  <Tooltip
+                  <div
                     key={tile.cat}
-                    text={getTileTooltip(tile)}
-                    position="top"
-                    className="w-full"
+                    onClick={() => tile.color === 'gray' ? handleGrayTileClick(tile.cat) : onTabChange('journal')}
+                    className={`border rounded-xl p-3 cursor-pointer hover:scale-[1.02] transition-all duration-300 ${getTileColorClass(tile.color)}`}
                   >
-                    <div
-                      onClick={() => tile.color === 'gray' ? handleGrayTileClick(tile.cat) : onTabChange('journal')}
-                      className={`border rounded-xl p-3 cursor-pointer hover:scale-[1.02] transition-all duration-300 relative ${getTileColorClass(tile.color)}`}
-                    >
-                      <div className="font-semibold text-sm pr-5">{tile.name}</div>
-                      {tile.message && <div className="text-xs mt-1 opacity-90">{tile.message}</div>}
-                      {tile.color === 'gray' && <div className="text-xs mt-1 opacity-70">Внесите данные</div>}
-                      <div className="absolute top-2 right-2 w-5 h-5 flex items-center justify-center text-xs text-white/50 hover:text-white/90 transition-colors">
-                        ℹ️
-                      </div>
-                    </div>
-                  </Tooltip>
+                    <div className="font-semibold text-sm">{tile.name}</div>
+                    {tile.message && <div className="text-xs mt-1 opacity-90">{tile.message}</div>}
+                    {tile.color === 'gray' && <div className="text-xs mt-1 opacity-70">Внесите данные</div>}
+                  </div>
                 ))}
               </div>
             )}
@@ -754,7 +696,7 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
               </button>
               <button
                 onClick={() => {
-                  alert('Функция "Заявка в ТП" находится в разработке и будет доступна в ближайших обновлениях.');
+                  info('Функция "Заявка в ТП" находится в разработке и будет доступна в ближайших обновлениях.');
                   setShowMileageErrorModal(false);
                 }}
                 className="w-full py-2.5 bg-white/5 text-gray-300 rounded-lg font-medium hover:bg-white/10 transition border border-white/10"
@@ -766,38 +708,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
                 className="w-full py-2 text-sm text-gray-500 hover:text-gray-300 transition"
               >
                 Отмена
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* 🆕 Модалка с информацией об ОСАГО (сценарий 4.5) */}
-      {showOsagoInfoModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm p-6">
-            <h3 className="text-lg font-bold text-gray-100 mb-3 flex items-center gap-2">
-              🛡️ ОСАГО и бонусы СМАРТ
-            </h3>
-            <p className="text-sm text-gray-300 mb-4 leading-relaxed">
-              Для партнёров СМАРТ доступны дополнительные бонусы при самостоятельном оформлении полиса на Sravni.ru.
-            </p>
-            <p className="text-sm text-gray-400 mb-6 leading-relaxed">
-              Хотите узнать, как получить дополнительные бонусы?
-            </p>
-            <div className="space-y-3">
-              <a
-                href="https://www.sravni.ru/osago/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all text-center"
-              >
-                Узнать подробнее на Sravni.ru ↗
-              </a>
-              <button
-                onClick={() => setShowOsagoInfoModal(false)}
-                className="w-full py-2 text-sm text-gray-400 hover:text-white transition"
-              >
-                Закрыть
               </button>
             </div>
           </div>

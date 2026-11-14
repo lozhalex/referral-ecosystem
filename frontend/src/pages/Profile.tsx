@@ -5,9 +5,11 @@ import { markRcbRegistered, requestRcbPayment, updateRcbLink } from '../api/rcb'
 import { hasRole, isPartner } from '../utils/roles';
 import { CATEGORIES, getCategoryName } from './AutoHelper/categories';
 import { Html5Qrcode } from 'html5-qrcode';
+import { useToast } from '../hooks/useToast';
 
 const Profile: React.FC = () => {
   const navigate = useNavigate();
+  const { success, error: showError } = useToast();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -19,7 +21,6 @@ const Profile: React.FC = () => {
   const [rcbLinkInput, setRcbLinkInput] = useState('');
   const [savingLink, setSavingLink] = useState(false);
 
-  // === Состояния панели сервисмена ===
   const [showServicePanel, setShowServicePanel] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [manualToken, setManualToken] = useState('');
@@ -61,7 +62,6 @@ const Profile: React.FC = () => {
     loadProfile();
   }, []);
 
-  // 🆕 Инициализация сканера ТОЛЬКО когда контейнер уже отрисован в DOM
   useEffect(() => {
     if (isScanning && !scannerRef.current) {
       const scanner = new Html5Qrcode(scannerContainerId);
@@ -89,7 +89,6 @@ const Profile: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isScanning]);
 
-  // Очистка сканера при размонтировании
   useEffect(() => {
     return () => {
       if (scannerRef.current) {
@@ -165,17 +164,16 @@ const Profile: React.FC = () => {
     try {
       const res = await updateRcbLink(rcbLinkInput.trim());
       if (res.success) {
-        alert('Ссылка сохранена!');
+        success('Ссылка сохранена!');
         await loadProfile();
       }
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Ошибка');
+      showError(err.response?.data?.message || 'Ошибка');
     } finally {
       setSavingLink(false);
     }
   };
 
-  // === Функции панели сервисмена ===
   const stopScanner = async () => {
     if (scannerRef.current) {
       try {
@@ -302,7 +300,6 @@ const Profile: React.FC = () => {
 
   return (
     <div className="min-h-screen p-4 pb-24 max-w-md mx-auto">
-      {/* Шапка */}
       <div className="flex items-center justify-between mb-8 mt-2">
         <button onClick={() => navigate('/')} className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition">
           <span>←</span> На главную
@@ -314,7 +311,6 @@ const Profile: React.FC = () => {
         </span>
       </div>
 
-      {/* Аватар и Имя */}
       <div className="flex items-center gap-4 mb-8">
         <div className="w-16 h-16 rounded-full bg-gradient-to-br from-neon-purple to-neon-cyan flex items-center justify-center text-white font-bold text-2xl font-display shadow-neon-purple">
           {user.phone.slice(-2)}
@@ -325,13 +321,11 @@ const Profile: React.FC = () => {
         </div>
       </div>
 
-      {/* Телефон */}
       <div className="glass p-4 mb-4">
         <p className="text-xs text-slate-400 mb-1 uppercase tracking-wider">Номер телефона</p>
         <p className="text-lg font-semibold text-white">{user.phone}</p>
       </div>
 
-      {/* Баланс и Рефералы */}
       <div className="grid grid-cols-2 gap-3 mb-6">
         <div className="glass p-4">
           <p className="text-xs text-slate-400 mb-1">Баланс</p>
@@ -343,7 +337,6 @@ const Profile: React.FC = () => {
         </div>
       </div>
 
-      {/* Системная роль */}
       {hasRole(user.role, ['admin', 'SUPER_ADMIN', 'cashier', 'controller', 'service_master' as any]) && (
         <div className="glass p-4 mb-6 border border-neon-purple/20">
           <p className="text-xs text-slate-400 mb-1 uppercase tracking-wider">Системная роль</p>
@@ -351,7 +344,6 @@ const Profile: React.FC = () => {
         </div>
       )}
 
-      {/* ПАНЕЛЬ СЕРВИСМЕНА */}
       {isServiceMaster && (
         <div className="glass p-5 mb-6 border border-neon-cyan/30 shadow-[0_0_15px_rgba(34,211,238,0.1)]">
           <button
@@ -543,7 +535,6 @@ const Profile: React.FC = () => {
         </div>
       )}
 
-      {/* ТРЕКЕР РЦБ */}
       <div className={`glass p-5 mb-6 border ${isPartner(user) ? 'border-neon-green/30 shadow-neon-purple' : 'border-neon-purple/30'}`}>
         <h3 className="text-lg font-bold text-white mb-4 font-display flex items-center gap-2">
           {isPartner(user) ? (
@@ -584,77 +575,6 @@ const Profile: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-5">
-            {/* 🆕 Блок: Зачем становиться партнёром СМАРТ (Раздел 3 спецификации v1.0) */}
-            <div className="bg-gradient-to-br from-neon-purple/10 to-neon-cyan/10 border border-neon-purple/20 rounded-xl p-4">
-              <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2 font-display">
-                💎 Зачем становиться партнёром СМАРТ?
-              </h4>
-              <ul className="space-y-2 text-sm text-slate-300">
-                <li className="flex items-start gap-2">
-                  <span className="text-neon-cyan mt-0.5">✓</span>
-                  <span>Доступ ко всем модулям экосистемы — сейчас и в будущем.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-neon-cyan mt-0.5">✓</span>
-                  <span>Личная реферальная ссылка — получайте бонусы за каждого приглашённого.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-neon-cyan mt-0.5">✓</span>
-                  <span>Приоритетная поддержка.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-neon-cyan mt-0.5">✓</span>
-                  <span>Участие в закрытых мероприятиях и акциях.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-neon-cyan mt-0.5">✓</span>
-                  <span>Эксклюзивные бонусы и кэшбэк при самостоятельном оформлении полиса ОСАГО через партнёрские сервисы (Sravni.ru).</span>
-                </li>
-              </ul>
-            </div>
-
-            {/* 🆕 Блок: Как стать партнёром — 4 шага */}
-            <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-              <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2 font-display">
-                🗺️ Как стать партнёром — 4 шага
-              </h4>
-              <ol className="space-y-3 text-sm text-slate-300">
-                <li className="flex items-start gap-3">
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-neon-purple/20 text-neon-purple text-xs font-bold flex items-center justify-center border border-neon-purple/30">1</span>
-                  <span>
-                    <strong className="text-white">Зарегистрируйтесь в РЦБ</strong> (бесплатно) — нажмите кнопку «Перейти к регистрации», заполните анкету на сайте rcpay.ru.
-                  </span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-neon-purple/20 text-neon-purple text-xs font-bold flex items-center justify-center border border-neon-purple/30">2</span>
-                  <span>
-                    <strong className="text-white">Оплатите тариф СМАРТ</strong> (1990 ₽) — в личном кабинете РЦБ выберите тариф и внесите оплату.
-                  </span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-neon-purple/20 text-neon-purple text-xs font-bold flex items-center justify-center border border-neon-purple/30">3</span>
-                  <span>
-                    <strong className="text-white">Вернитесь в Бумеранг</strong> — нажмите «Я оплатил тариф СМАРТ, проверить» в профиле.
-                  </span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-neon-purple/20 text-neon-purple text-xs font-bold flex items-center justify-center border border-neon-purple/30">4</span>
-                  <span>
-                    <strong className="text-white">Получите статус партнёра</strong> — администратор проверит оплату в течение 24 часов и активирует ваш статус.
-                  </span>
-                </li>
-              </ol>
-            </div>
-
-            {/* ⚠️ Предупреждение */}
-            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-3 flex items-start gap-2">
-              <span className="text-yellow-400 text-lg flex-shrink-0">⚠️</span>
-              <p className="text-xs text-yellow-200/90 leading-relaxed">
-                <strong>Важно:</strong> статус активируется вручную администратором после проверки факта оплаты в РЦБ. Если прошло больше 24 часов — напишите в поддержку.
-              </p>
-            </div>
-
-            {/* Существующие шаги трекера */}
             <div className="flex items-center gap-3">
               <span className="text-neon-green text-xl">✅</span>
               <span className="text-sm text-slate-300">Регистрация в RefPro — <span className="font-semibold text-white">Выполнено</span></span>
@@ -713,7 +633,6 @@ const Profile: React.FC = () => {
         )}
       </div>
 
-      {/* Проекты */}
       <div className="mb-6">
         <h2 className="text-sm font-semibold text-slate-400 mb-3 uppercase tracking-wider px-1">Мои проекты</h2>
         <div className="space-y-3">
@@ -734,7 +653,6 @@ const Profile: React.FC = () => {
         </div>
       </div>
 
-      {/* Кнопки действий */}
       <div className="space-y-3">
         <button onClick={() => setShowInviteModal(true)} className="w-full py-3.5 btn-neon flex items-center justify-center gap-2 text-sm">
           <span>🔗</span> Пригласить друга
@@ -755,14 +673,12 @@ const Profile: React.FC = () => {
         </button>
       </div>
 
-      {/* Уведомление о копировании */}
       {copied && (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-neon-green text-dark-900 px-5 py-2.5 rounded-xl shadow-neon-green text-sm font-bold z-50">
           ✅ Ссылка скопирована!
         </div>
       )}
 
-      {/* Модалка приглашения */}
       {showInviteModal && (
         <div className="fixed inset-0 bg-dark-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="glass p-6 w-full max-w-sm border border-white/10 shadow-2xl">
@@ -789,7 +705,6 @@ const Profile: React.FC = () => {
         </div>
       )}
 
-      {/* Модалка выхода */}
       {showLogoutModal && (
         <div className="fixed inset-0 bg-dark-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="glass p-6 w-full max-w-sm text-center border border-white/10 shadow-2xl">
