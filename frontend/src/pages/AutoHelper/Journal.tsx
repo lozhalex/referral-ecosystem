@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getJournal, createRecord, getCars, generateServiceQR, revokeServiceQR } from '../../api/auto';
 import { CATEGORIES, getCategoryName } from './categories';
 import { QRCodeSVG } from 'qrcode.react';
+import Tooltip from '../../components/Tooltip';
 
 interface JournalProps {
   selectedCarId: number | null;
@@ -148,20 +149,12 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
 
   if (loading) return <div className="text-center py-10 text-cyan-400 animate-pulse">Загрузка...</div>;
 
-  // 🆕 Empty State 2.1: нет автомобилей (обновлён по спецификации v1.0)
   if (cars.length === 0) {
     return (
-      <div className="text-center py-10 bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-2xl p-8">
-        <div className="text-6xl mb-4">👋</div>
-        <h2 className="text-xl font-bold text-gray-100 mb-2">У вас пока нет автомобилей</h2>
-        <p className="text-gray-400 mb-6">
-          Добавьте первый автомобиль, чтобы начать отслеживать обслуживание и получать умные прогнозы ТО.
-        </p>
-        <button
-          onClick={() => onCarChange(null)}
-          className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all font-medium"
-        >
-          + Добавить автомобиль
+      <div className="text-center py-10 bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-6">
+        <p className="text-gray-400 mb-4">Сначала добавьте автомобиль во вкладке "Авто"</p>
+        <button onClick={() => onCarChange(null)} className="px-4 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all">
+          Перейти к авто
         </button>
       </div>
     );
@@ -179,50 +172,46 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         </button>
       </div>
 
-      {/* Кнопка QR для сервисмена */}
-      <button
-        onClick={handleGenerateQR}
-        disabled={qrGenerating}
-        className="w-full bg-gradient-to-r from-purple-500/20 to-cyan-500/20 border border-purple-500/30 rounded-xl p-4 text-left hover:shadow-lg hover:shadow-purple-500/10 transition-all disabled:opacity-50"
+      {/* 🆕 Сценарий 4.2: тултип на кнопку QR для сервисмена */}
+      <Tooltip
+        text="Сервисмен внесёт запись сам, а вы получите push-уведомление. QR-код действителен 1 час и привязан к этому автомобилю."
+        position="bottom"
+        className="w-full"
       >
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-semibold text-purple-300 flex items-center gap-2">
-              🔑 Показать QR для сервисмена
-            </h3>
-            <p className="text-xs text-purple-400/80 mt-1">
-              Действителен 1 час. Сервисмен сможет внести данные о ТО.
-            </p>
+        <button
+          onClick={handleGenerateQR}
+          disabled={qrGenerating}
+          className="w-full bg-gradient-to-r from-purple-500/20 to-cyan-500/20 border border-purple-500/30 rounded-xl p-4 text-left hover:shadow-lg hover:shadow-purple-500/10 transition-all disabled:opacity-50"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-purple-300 flex items-center gap-2">
+                🔑 Показать QR для сервисмена
+              </h3>
+              <p className="text-xs text-purple-400/80 mt-1">
+                Действителен 1 час. Сервисмен сможет внести данные о ТО.
+              </p>
+            </div>
+            <span className="px-4 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg text-sm font-medium">
+              {qrGenerating ? 'Генерация...' : 'Показать'}
+            </span>
           </div>
-          <span className="px-4 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg text-sm font-medium">
-            {qrGenerating ? 'Генерация...' : 'Показать'}
-          </span>
-        </div>
-      </button>
+        </button>
+      </Tooltip>
 
-      {/* 🆕 Empty State 2.2: нет записей (обновлён по спецификации v1.0) */}
       {records.length === 0 ? (
         <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-6 text-center">
           <div className="text-3xl mb-2">📓</div>
           <p className="text-gray-100 font-medium mb-2">Записей пока нет</p>
           <p className="text-sm text-gray-400 mb-4">
-            Добавьте первую запись задним числом из вашего блокнота или покажите QR-код сервисмену на СТО, чтобы он внёс данные за вас.
+            💡 <strong>Совет:</strong> Вы можете добавлять записи задним числом. Просто укажите прошлую дату и пробег, чтобы перенести историю обслуживания из вашего блокнота.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button
-              onClick={handleOpenModal}
-              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all text-sm font-medium"
-            >
-              + Добавить запись
-            </button>
-            <button
-              onClick={handleGenerateQR}
-              disabled={qrGenerating}
-              className="px-4 py-2 bg-white/5 text-gray-300 rounded-lg hover:bg-white/10 transition-all text-sm font-medium border border-white/10 disabled:opacity-50"
-            >
-              🔑 Показать QR для сервисмена
-            </button>
-          </div>
+          <button
+            onClick={handleOpenModal}
+            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all text-sm font-medium"
+          >
+            Добавить первую запись
+          </button>
         </div>
       ) : (
         <div className="space-y-3">
@@ -286,6 +275,11 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
               <div>
                 <label className="text-xs text-gray-400 mb-1 block">Комментарий (необязательно)</label>
                 <input className={inputClass} value={formData.comment} onChange={e => setFormData({...formData, comment: e.target.value})} placeholder="Например: Масло Shell 5W-30" />
+                {/* 🆕 Сценарий 4.3: подсказка под полем "Комментарий" */}
+                <p className="text-[10px] text-gray-500 mt-1 flex items-center gap-1">
+                  <span>💬</span>
+                  <span>Укажите марку масла, название сервиса или другие важные детали. Это поможет при продаже авто или гарантийном случае.</span>
+                </p>
               </div>
               <button type="submit" className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all mt-2">
                 Сохранить запись
