@@ -37,7 +37,11 @@ app.use(cors({
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      callback(new Error('Не разрешенный источник (CORS)'), false);
+      // 🔧 ИСПРАВЛЕНИЕ: НЕ выбрасываем ошибку!
+      // callback(null, false) = "не добавляй CORS-заголовки", браузер сам заблокирует.
+      // Раньше было callback(new Error(...), false) — это роняло процесс.
+      console.warn(`[CORS] Заблокирован origin: ${origin}`);
+      callback(null, false);
     }
   },
   credentials: true,
@@ -110,8 +114,32 @@ cron.schedule('0 3 * * *', async () => {
 });
 
 console.log('✅ Cron-задача разморозки бонусов зарегистрирована');
-// =================================================================
 
+// =================================================================
+// 🆕 GLOBAL ERROR HANDLER — перехватывает все необработанные ошибки,
+// чтобы процесс НЕ падал и PM2 не перезапускал сервер.
+// =================================================================
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('[ERROR]', err?.message || err);
+  if (res.headersSent) {
+    return next(err);
+  }
+  res.status(500).json({
+    success: false,
+    message: 'Внутренняя ошибка сервера'
+  });
+});
+
+// Защита от uncaught exceptions — логируем, но НЕ убиваем процесс
+process.on('uncaughtException', (err) => {
+  console.error('[UNCAUGHT EXCEPTION]', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[UNHANDLED REJECTION]', reason);
+});
+
+// =================================================================
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
 });
