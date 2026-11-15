@@ -48,12 +48,12 @@ const ROLE_LABELS: { [key: string]: string } = {
 };
 
 const ROLE_BADGE_CLASS: { [key: string]: string } = {
-  user: 'bg-gray-100 text-gray-800',
-  admin: 'bg-purple-100 text-purple-800',
-  SUPER_ADMIN: 'bg-red-100 text-red-800',
-  cashier: 'bg-blue-100 text-blue-800',
-  controller: 'bg-indigo-100 text-indigo-800',
-  service_master: 'bg-cyan-100 text-cyan-800'
+  user: 'bg-gray-500/20 text-gray-300',
+  admin: 'bg-purple-500/20 text-purple-300',
+  SUPER_ADMIN: 'bg-red-500/20 text-red-300',
+  cashier: 'bg-blue-500/20 text-blue-300',
+  controller: 'bg-indigo-500/20 text-indigo-300',
+  service_master: 'bg-cyan-500/20 text-cyan-300'
 };
 
 export default function AdminDashboard() {
@@ -292,29 +292,29 @@ export default function AdminDashboard() {
   if (!token) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-slate-950 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {alerts && (alerts.largeAdjustments.length > 0 || alerts.frequentChanges.length > 0) && (
-          <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg shadow-sm">
+          <div className="mb-6 bg-red-500/10 border-l-4 border-red-500 p-4 rounded-r-lg">
             <div className="flex items-start justify-between">
               <div className="flex items-start gap-3 flex-1">
                 <div className="flex-shrink-0">
-                  <svg className="h-6 w-6 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                  <svg className="h-6 w-6 text-red-400" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-sm font-bold text-red-800 mb-2">⚠️ Обнаружены подозрительные операции с балансом</h3>
+                  <h3 className="text-sm font-bold text-red-400 mb-2">⚠️ Обнаружены подозрительные операции с балансом</h3>
                 </div>
               </div>
-              <button onClick={() => setAlerts(null)} className="ml-4 px-3 py-1 bg-red-200 text-red-800 text-xs font-semibold rounded hover:bg-red-300 transition">Разобрался ✓</button>
+              <button onClick={() => setAlerts(null)} className="ml-4 px-3 py-1 bg-red-500/20 text-red-300 text-xs font-semibold rounded hover:bg-red-500/30 transition">Разобрался ✓</button>
             </div>
           </div>
         )}
 
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Админ-панель</h1>
-          <p className="mt-2 text-gray-600">Центр управления экосистемой</p>
+          <h1 className="text-3xl font-bold text-gray-100">Админ-панель</h1>
+          <p className="mt-2 text-gray-400">Центр управления экосистемой</p>
           <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
             <button onClick={() => navigate('/admin/auto')} className="flex flex-col items-center justify-center gap-2 p-4 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-xl shadow-md hover:shadow-lg transition font-bold text-base">
               <span className="text-2xl">🚗</span>
@@ -324,63 +324,63 @@ export default function AdminDashboard() {
               <span className="text-2xl">🎟️</span>
               <span>Мероприятия</span>
             </button>
-            <button onClick={() => navigate('/profile')} className="flex flex-col items-center justify-center gap-2 p-4 bg-white border-2 border-gray-200 text-gray-700 rounded-xl shadow-sm hover:bg-gray-50 hover:border-gray-300 transition font-bold text-base">
+            <button onClick={() => navigate('/profile')} className="flex flex-col items-center justify-center gap-2 p-4 bg-slate-800 border border-white/10 text-gray-300 rounded-xl shadow-sm hover:bg-slate-700 transition font-bold text-base">
               <span className="text-2xl">👤</span>
               <span>В профиль</span>
             </button>
           </div>
         </div>
 
-        <div className="flex border-b border-gray-200 mb-6 overflow-x-auto">
-          <button onClick={() => setActiveTab('users')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition whitespace-nowrap ${activeTab === 'users' ? 'bg-white text-blue-600 border-t border-l border-r border-gray-200' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}>👥 Пользователи</button>
-          <button onClick={() => setActiveTab('tree')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition whitespace-nowrap ${activeTab === 'tree' ? 'bg-white text-blue-600 border-t border-l border-r border-gray-200' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}>🌳 Визуальное дерево</button>
-          <button onClick={() => setActiveTab('logs')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition whitespace-nowrap ${activeTab === 'logs' ? 'bg-white text-blue-600 border-t border-l border-r border-gray-200' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}>📋 Аудит</button>
-          <button onClick={() => setActiveTab('rcb')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition whitespace-nowrap ${activeTab === 'rcb' ? 'bg-white text-blue-600 border-t border-l border-r border-gray-200' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}>🌉 Заявки РЦБ</button>
+        <div className="flex border-b border-white/10 mb-6 overflow-x-auto">
+          <button onClick={() => setActiveTab('users')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition whitespace-nowrap ${activeTab === 'users' ? 'bg-slate-800 text-cyan-400 border-t border-l border-r border-white/10' : 'text-gray-400 hover:text-gray-200 hover:bg-slate-800/50'}`}>👥 Пользователи</button>
+          <button onClick={() => setActiveTab('tree')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition whitespace-nowrap ${activeTab === 'tree' ? 'bg-slate-800 text-cyan-400 border-t border-l border-r border-white/10' : 'text-gray-400 hover:text-gray-200 hover:bg-slate-800/50'}`}>🌳 Визуальное дерево</button>
+          <button onClick={() => setActiveTab('logs')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition whitespace-nowrap ${activeTab === 'logs' ? 'bg-slate-800 text-cyan-400 border-t border-l border-r border-white/10' : 'text-gray-400 hover:text-gray-200 hover:bg-slate-800/50'}`}>📋 Аудит</button>
+          <button onClick={() => setActiveTab('rcb')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition whitespace-nowrap ${activeTab === 'rcb' ? 'bg-slate-800 text-cyan-400 border-t border-l border-r border-white/10' : 'text-gray-400 hover:text-gray-200 hover:bg-slate-800/50'}`}>🌉 Заявки РЦБ</button>
         </div>
 
-        {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">{error}</div>}
+        {error && <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg mb-6">{error}</div>}
 
         {activeTab === 'users' && (
           <>
-            <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <div className="bg-slate-900 border border-white/10 rounded-lg p-6 mb-6">
               <form onSubmit={handleSearch} className="flex gap-4">
-                <input type="text" value={searchPhone} onChange={(e) => setSearchPhone(e.target.value)} placeholder="Поиск по телефону" className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
-                <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Найти</button>
-                <button type="button" onClick={() => { setSearchPhone(''); loadUsers(); }} className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Сбросить</button>
+                <input type="text" value={searchPhone} onChange={(e) => setSearchPhone(e.target.value)} placeholder="Поиск по телефону" className="flex-1 px-4 py-2 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none" />
+                <button type="submit" className="px-6 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg hover:shadow-lg transition">Найти</button>
+                <button type="button" onClick={() => { setSearchPhone(''); loadUsers(); }} className="px-6 py-2 bg-slate-700 text-gray-300 rounded-lg hover:bg-slate-600 transition">Сбросить</button>
               </form>
             </div>
-            <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="bg-slate-900 border border-white/10 rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-white/5">
+                  <thead className="bg-slate-800">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Телефон</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Роль</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">💳 Статус</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Баланс</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Рефералы</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Дата</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Действия</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Телефон</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Роль</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">💳 Статус</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Баланс</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Рефералы</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Дата</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Действия</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="divide-y divide-white/5">
                     {loading ? <tr><td colSpan={8} className="px-6 py-4 text-center text-gray-500">Загрузка...</td></tr> : users.length === 0 ? <tr><td colSpan={8} className="px-6 py-4 text-center text-gray-500">Не найдено</td></tr> : users.map((user) => (
-                      <tr key={user.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.id}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.phone}</td>
+                      <tr key={user.id} className="hover:bg-white/5 transition">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{user.id}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300 font-mono">{user.phone}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${ROLE_BADGE_CLASS[user.role] || 'bg-gray-100 text-gray-800'}`}>
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${ROLE_BADGE_CLASS[user.role] || 'bg-gray-500/20 text-gray-300'}`}>
                             {ROLE_LABELS[user.role] || user.role}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {user.isPaidMember ? <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">✅ Платный</span> : <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">⚪ Бесплатный</span>}
+                          {user.isPaidMember ? <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-500/20 text-green-300">✅ Платный</span> : <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-500/20 text-gray-400">⚪ Бесплатный</span>}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.balance} ₽</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.referralCount}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{user.balance} ₽</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{user.referralCount}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(user.createdAt)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm"><button onClick={() => loadUserDetail(user.id)} className="text-blue-600 hover:text-blue-900 font-medium">Подробнее</button></td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm"><button onClick={() => loadUserDetail(user.id)} className="text-cyan-400 hover:text-cyan-300 font-medium">Подробнее</button></td>
                       </tr>
                     ))}
                   </tbody>
@@ -393,30 +393,30 @@ export default function AdminDashboard() {
         {activeTab === 'tree' && <ReferralTree />}
 
         {activeTab === 'rcb' && (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Заявки на активацию статуса Партнера РЦБ (1990 ₽)</h2>
-              <p className="text-sm text-gray-500 mt-1">Проверьте факт оплаты в системе РЦБ перед одобрением.</p>
+          <div className="bg-slate-900 border border-white/10 rounded-lg overflow-hidden">
+            <div className="p-6 border-b border-white/10">
+              <h2 className="text-lg font-semibold text-gray-100">Заявки на активацию статуса Партнера РЦБ (1990 ₽)</h2>
+              <p className="text-sm text-gray-400 mt-1">Проверьте факт оплаты в системе РЦБ перед одобрением.</p>
             </div>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-white/5">
+                <thead className="bg-slate-800">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Телефон</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID в РЦБ</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ссылка РЦБ</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Дата заявки</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Действия</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Телефон</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">ID в РЦБ</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Ссылка РЦБ</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Дата заявки</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Действия</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="divide-y divide-white/5">
                   {rcbLoading ? <tr><td colSpan={6} className="px-6 py-4 text-center text-gray-500">Загрузка...</td></tr> : rcbRequests.length === 0 ? <tr><td colSpan={6} className="px-6 py-4 text-center text-gray-500">Нет активных заявок</td></tr> : rcbRequests.map((req) => (
-                    <tr key={req.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{req.id}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{req.phone}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{req.rcbId || '-'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 truncate max-w-xs">
+                    <tr key={req.id} className="hover:bg-white/5 transition">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{req.id}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300 font-mono">{req.phone}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{req.rcbId || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-cyan-400 truncate max-w-xs">
                         {req.rcbReferralLink ? <a href={req.rcbReferralLink} target="_blank" rel="noopener noreferrer" className="hover:underline">{req.rcbReferralLink}</a> : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateTime(req.createdAt)}</td>
@@ -424,7 +424,7 @@ export default function AdminDashboard() {
                         <button
                           onClick={() => handleApproveRcb(req.id, req.phone)}
                           disabled={rcbApprovingId === req.id}
-                          className="px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 transition disabled:opacity-50 flex items-center gap-1"
+                          className="px-3 py-1.5 bg-green-500/20 text-green-300 text-xs font-semibold rounded-lg hover:bg-green-500/30 transition disabled:opacity-50 flex items-center gap-1"
                         >
                           {rcbApprovingId === req.id ? 'Обработка...' : '✅ Одобрить'}
                         </button>
@@ -438,36 +438,36 @@ export default function AdminDashboard() {
         )}
 
         {activeTab === 'logs' && (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="p-6 border-b border-gray-200 flex flex-wrap gap-3 justify-between items-center">
-              <h2 className="text-lg font-semibold text-gray-900">Журнал аудита</h2>
+          <div className="bg-slate-900 border border-white/10 rounded-lg overflow-hidden">
+            <div className="p-6 border-b border-white/10 flex flex-wrap gap-3 justify-between items-center">
+              <h2 className="text-lg font-semibold text-gray-100">Журнал аудита</h2>
               <div className="flex gap-3">
-                <button onClick={handleExportTree} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2">💾 Скачать backup дерева (JSON)</button>
-                <button onClick={() => setShowImportModal(true)} className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition flex items-center gap-2">📤 Восстановить из backup (JSON)</button>
-                <button onClick={handleExportLogs} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2">📥 Скачать логи (CSV)</button>
+                <button onClick={handleExportTree} className="px-4 py-2 bg-blue-500/20 text-blue-300 rounded-lg hover:bg-blue-500/30 transition flex items-center gap-2">💾 Скачать backup дерева (JSON)</button>
+                <button onClick={() => setShowImportModal(true)} className="px-4 py-2 bg-amber-500/20 text-amber-300 rounded-lg hover:bg-amber-500/30 transition flex items-center gap-2">📤 Восстановить из backup (JSON)</button>
+                <button onClick={handleExportLogs} className="px-4 py-2 bg-green-500/20 text-green-300 rounded-lg hover:bg-green-500/30 transition flex items-center gap-2">📥 Скачать логи (CSV)</button>
               </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-white/5">
+                <thead className="bg-slate-800">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Дата</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Админ</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Цель</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Действие</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Данные</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Дата</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Админ</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Цель</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Действие</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Данные</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="divide-y divide-white/5">
                   {logsLoading ? <tr><td colSpan={6} className="px-6 py-4 text-center text-gray-500">Загрузка...</td></tr> : logs.length === 0 ? <tr><td colSpan={6} className="px-6 py-4 text-center text-gray-500">Записей нет</td></tr> : logs.map((log) => (
-                    <tr key={log.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{log.id}</td>
+                    <tr key={log.id} className="hover:bg-white/5 transition">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{log.id}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateTime(log.createdAt)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{log.adminPhone}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{log.targetPhone || 'ВСЕ'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${log.action === 'MOVE' ? 'bg-yellow-100 text-yellow-800' : log.action === 'IMPORT' ? 'bg-red-100 text-red-800' : log.action === 'MEMBERSHIP_TOGGLE' ? 'bg-blue-100 text-blue-800' : log.action === 'RCB_APPROVE' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{log.action}</span></td>
-                      <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-600 font-mono max-w-xs truncate" title={JSON.stringify(log.newData || log.oldData)}>{log.newData ? JSON.stringify(log.newData) : (log.oldData ? JSON.stringify(log.oldData) : '-')}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{log.adminPhone}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{log.targetPhone || 'ВСЕ'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${log.action === 'MOVE' ? 'bg-yellow-500/20 text-yellow-300' : log.action === 'IMPORT' ? 'bg-red-500/20 text-red-300' : log.action === 'MEMBERSHIP_TOGGLE' ? 'bg-blue-500/20 text-blue-300' : log.action === 'RCB_APPROVE' ? 'bg-green-500/20 text-green-300' : 'bg-gray-500/20 text-gray-300'}`}>{log.action}</span></td>
+                      <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-400 font-mono max-w-xs truncate" title={JSON.stringify(log.newData || log.oldData)}>{log.newData ? JSON.stringify(log.newData) : (log.oldData ? JSON.stringify(log.oldData) : '-')}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -477,51 +477,51 @@ export default function AdminDashboard() {
         )}
 
         {selectedUser && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-slate-900 border border-white/10 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6">
                 <div className="flex justify-between items-start mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">Карточка пользователя</h2>
-                  <button onClick={() => { setSelectedUser(null); setShowMoveModal(false); setShowRoleModal(false); setShowResetModal(false); }} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
+                  <h2 className="text-2xl font-bold text-gray-100">Карточка пользователя</h2>
+                  <button onClick={() => { setSelectedUser(null); setShowMoveModal(false); setShowRoleModal(false); setShowResetModal(false); }} className="text-gray-400 hover:text-gray-200 text-2xl">✕</button>
                 </div>
                 <div className="space-y-4">
-                  <div><label className="text-sm font-medium text-gray-500">ID</label><p className="text-gray-900">{selectedUser.id}</p></div>
-                  <div><label className="text-sm font-medium text-gray-500">Телефон</label><p className="text-gray-900">{selectedUser.phone}</p></div>
-                  <div><label className="text-sm font-medium text-gray-500">Роль</label>
-                    <p className="text-gray-900">
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${ROLE_BADGE_CLASS[selectedUser.role] || 'bg-gray-100 text-gray-800'}`}>
+                  <div><label className="text-sm font-medium text-gray-400">ID</label><p className="text-gray-100">{selectedUser.id}</p></div>
+                  <div><label className="text-sm font-medium text-gray-400">Телефон</label><p className="text-gray-100 font-mono">{selectedUser.phone}</p></div>
+                  <div><label className="text-sm font-medium text-gray-400">Роль</label>
+                    <p className="text-gray-100">
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${ROLE_BADGE_CLASS[selectedUser.role] || 'bg-gray-500/20 text-gray-300'}`}>
                         {ROLE_LABELS[selectedUser.role] || selectedUser.role}
                       </span>
                     </p>
                   </div>
-                  <div><label className="text-sm font-medium text-gray-500">💳 Статус участия</label><p className="text-gray-900">{selectedUser.isPaidMember ? '✅ Платный участник' : '⚪ Бесплатный участник'}</p></div>
-                  <div><label className="text-sm font-medium text-gray-500">Баланс</label><p className="text-gray-900">{selectedUser.balance} ₽</p></div>
-                  <div><label className="text-sm font-medium text-gray-500">Дата регистрации</label><p className="text-gray-900">{formatDate(selectedUser.createdAt)}</p></div>
-                  <div className="pt-4 border-t border-gray-200 grid grid-cols-2 gap-3">
+                  <div><label className="text-sm font-medium text-gray-400">💳 Статус участия</label><p className="text-gray-100">{selectedUser.isPaidMember ? '✅ Платный участник' : '⚪ Бесплатный участник'}</p></div>
+                  <div><label className="text-sm font-medium text-gray-400">Баланс</label><p className="text-gray-100">{selectedUser.balance} ₽</p></div>
+                  <div><label className="text-sm font-medium text-gray-400">Дата регистрации</label><p className="text-gray-100">{formatDate(selectedUser.createdAt)}</p></div>
+                  <div className="pt-4 border-t border-white/10 grid grid-cols-2 gap-3">
                     <button onClick={() => setShowAdjustModal(true)} className="py-2 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium flex items-center justify-center gap-2">💰 Баланс</button>
                     <button onClick={() => setShowMoveModal(true)} className="py-2 px-4 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition font-medium flex items-center justify-center gap-2">🔄 Реферер</button>
                     <button onClick={() => { setRoleForm({ role: selectedUser.role }); setShowRoleModal(true); }} className="py-2 px-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium flex items-center justify-center gap-2">🛡️ Роль</button>
                     <button onClick={handleResetPassword} disabled={resetLoading} className="py-2 px-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium flex items-center justify-center gap-2 disabled:opacity-50">{resetLoading ? 'Сброс...' : '🔑 Сброс пароля'}</button>
-                    <button onClick={handleToggleMembership} className={`py-2 px-4 rounded-lg transition font-medium flex items-center justify-center gap-2 col-span-2 ${selectedUser.isPaidMember ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' : 'bg-green-600 text-white hover:bg-green-700'}`}>
+                    <button onClick={handleToggleMembership} className={`py-2 px-4 rounded-lg transition font-medium flex items-center justify-center gap-2 col-span-2 ${selectedUser.isPaidMember ? 'bg-slate-700 text-gray-300 hover:bg-slate-600' : 'bg-green-600 text-white hover:bg-green-700'}`}>
                       {selectedUser.isPaidMember ? '⬇️ Сделать бесплатным' : '⬆️ Сделать платным'}
                     </button>
                   </div>
-                  <div><label className="text-sm font-medium text-gray-500">Текущий пригласитель</label><p className="text-gray-900">{selectedUser.referredBy ? `${selectedUser.referredBy.phone} (ID: ${selectedUser.referredBy.id})` : 'Нет (корневой)'}</p></div>
+                  <div><label className="text-sm font-medium text-gray-400">Текущий пригласитель</label><p className="text-gray-100">{selectedUser.referredBy ? `${selectedUser.referredBy.phone} (ID: ${selectedUser.referredBy.id})` : 'Нет (корневой)'}</p></div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500 mb-2 block">Рефералы ({selectedUser.referrals.length})</label>
+                    <label className="text-sm font-medium text-gray-400 mb-2 block">Рефералы ({selectedUser.referrals.length})</label>
                     {selectedUser.referrals.length === 0 ? <p className="text-gray-500 text-sm">Нет рефералов</p> : (
                       <ul className="space-y-2 max-h-40 overflow-y-auto">
-                        {selectedUser.referrals.map((ref) => <li key={ref.id} className="text-sm text-gray-900 bg-gray-50 px-3 py-2 rounded">{ref.phone} — {formatDate(ref.createdAt)}</li>)}
+                        {selectedUser.referrals.map((ref) => <li key={ref.id} className="text-sm text-gray-300 bg-slate-800 px-3 py-2 rounded font-mono">{ref.phone} — {formatDate(ref.createdAt)}</li>)}
                       </ul>
                     )}
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500 mb-2 block">История транзакций ({selectedUser.transactions.length})</label>
+                    <label className="text-sm font-medium text-gray-400 mb-2 block">История транзакций ({selectedUser.transactions.length})</label>
                     {selectedUser.transactions.length === 0 ? <p className="text-gray-500 text-sm">Нет транзакций</p> : (
                       <ul className="space-y-2 max-h-40 overflow-y-auto">
                         {selectedUser.transactions.map((tx) => (
-                          <li key={tx.id} className="text-sm bg-gray-50 px-3 py-2 rounded">
-                            <div className="flex justify-between"><span className="font-medium">{tx.type}</span><span className={tx.amount > 0 ? 'text-green-600' : 'text-red-600'}>{tx.amount > 0 ? '+' : ''}{tx.amount} ₽</span></div>
+                          <li key={tx.id} className="text-sm bg-slate-800 px-3 py-2 rounded">
+                            <div className="flex justify-between"><span className="font-medium text-gray-300">{tx.type}</span><span className={tx.amount > 0 ? 'text-green-400' : 'text-red-400'}>{tx.amount > 0 ? '+' : ''}{tx.amount} ₽</span></div>
                             <div className="text-gray-500 text-xs mt-1">{tx.description}</div>
                           </li>
                         ))}
@@ -535,44 +535,44 @@ export default function AdminDashboard() {
         )}
 
         {showAdjustModal && selectedUser && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-gray-900">Изменение баланса</h3><button onClick={() => setShowAdjustModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button></div>
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-slate-900 border border-white/10 rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-gray-100">Изменение баланса</h3><button onClick={() => setShowAdjustModal(false)} className="text-gray-400 hover:text-gray-200 text-2xl">✕</button></div>
               <form onSubmit={handleAdjustSubmit} className="space-y-4">
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">Сумма</label><input type="number" required value={adjustForm.amount} onChange={(e) => setAdjustForm({ ...adjustForm, amount: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">Тип операции</label><select value={adjustForm.type} onChange={(e) => setAdjustForm({ ...adjustForm, type: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg"><option value="MANUAL_ADJUSTMENT">Ручная корректировка</option><option value="BONUS">Бонус / Подарок</option><option value="PENALTY">Штраф / Возврат</option></select></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">Причина (мин. 10 символов)</label><textarea required minLength={10} rows={3} value={adjustForm.description} onChange={(e) => setAdjustForm({ ...adjustForm, description: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div>
-                <div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowAdjustModal(false)} className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" disabled={adjustLoading}>Отмена</button><button type="submit" disabled={adjustLoading} className="flex-1 py-2 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">{adjustLoading ? 'Сохранение...' : 'Сохранить'}</button></div>
+                <div><label className="block text-sm font-medium text-gray-400 mb-1">Сумма</label><input type="number" required value={adjustForm.amount} onChange={(e) => setAdjustForm({ ...adjustForm, amount: e.target.value })} className="w-full px-3 py-2 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 outline-none" /></div>
+                <div><label className="block text-sm font-medium text-gray-400 mb-1">Тип операции</label><select value={adjustForm.type} onChange={(e) => setAdjustForm({ ...adjustForm, type: e.target.value })} className="w-full px-3 py-2 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 outline-none"><option value="MANUAL_ADJUSTMENT">Ручная корректировка</option><option value="BONUS">Бонус / Подарок</option><option value="PENALTY">Штраф / Возврат</option></select></div>
+                <div><label className="block text-sm font-medium text-gray-400 mb-1">Причина (мин. 10 символов)</label><textarea required minLength={10} rows={3} value={adjustForm.description} onChange={(e) => setAdjustForm({ ...adjustForm, description: e.target.value })} className="w-full px-3 py-2 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 outline-none" /></div>
+                <div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowAdjustModal(false)} className="flex-1 py-2 px-4 border border-white/10 text-gray-300 rounded-lg hover:bg-slate-800" disabled={adjustLoading}>Отмена</button><button type="submit" disabled={adjustLoading} className="flex-1 py-2 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">{adjustLoading ? 'Сохранение...' : 'Сохранить'}</button></div>
               </form>
             </div>
           </div>
         )}
 
         {showMoveModal && selectedUser && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-gray-900">Смена реферера</h3><button onClick={() => setShowMoveModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button></div>
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-slate-900 border border-white/10 rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-gray-100">Смена реферера</h3><button onClick={() => setShowMoveModal(false)} className="text-gray-400 hover:text-gray-200 text-2xl">✕</button></div>
               <form onSubmit={handleMoveSubmit} className="space-y-4">
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800"><p>Текущий пригласитель: <strong>{selectedUser.referredBy ? selectedUser.referredBy.phone : 'Нет'}</strong></p><p className="mt-1 text-xs">Это действие будет записано в журнал аудита.</p></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">ID нового пригласителя (пусто = корневой)</label><input type="number" value={moveForm.newReferredId} onChange={(e) => setMoveForm({ ...moveForm, newReferredId: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div>
-                <div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowMoveModal(false)} className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" disabled={moveLoading}>Отмена</button><button type="submit" disabled={moveLoading} className="flex-1 py-2 px-4 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50">{moveLoading ? 'Сохранение...' : 'Сохранить'}</button></div>
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-sm text-amber-300"><p>Текущий пригласитель: <strong>{selectedUser.referredBy ? selectedUser.referredBy.phone : 'Нет'}</strong></p><p className="mt-1 text-xs">Это действие будет записано в журнал аудита.</p></div>
+                <div><label className="block text-sm font-medium text-gray-400 mb-1">ID нового пригласителя (пусто = корневой)</label><input type="number" value={moveForm.newReferredId} onChange={(e) => setMoveForm({ ...moveForm, newReferredId: e.target.value })} className="w-full px-3 py-2 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 outline-none" /></div>
+                <div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowMoveModal(false)} className="flex-1 py-2 px-4 border border-white/10 text-gray-300 rounded-lg hover:bg-slate-800" disabled={moveLoading}>Отмена</button><button type="submit" disabled={moveLoading} className="flex-1 py-2 px-4 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50">{moveLoading ? 'Сохранение...' : 'Сохранить'}</button></div>
               </form>
             </div>
           </div>
         )}
 
         {showRoleModal && selectedUser && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-gray-900">Смена роли</h3><button onClick={() => setShowRoleModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button></div>
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-slate-900 border border-white/10 rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-gray-100">Смена роли</h3><button onClick={() => setShowRoleModal(false)} className="text-gray-400 hover:text-gray-200 text-2xl">✕</button></div>
               <form onSubmit={handleRoleSubmit} className="space-y-4">
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-purple-800">
+                <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3 text-sm text-purple-300">
                   <p>Пользователь: <strong>{selectedUser.phone}</strong></p>
                   <p className="mt-1">Текущая роль: <strong>{ROLE_LABELS[selectedUser.role] || selectedUser.role}</strong></p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Новая роль</label>
-                  <select value={roleForm.role} onChange={(e) => setRoleForm({ ...roleForm, role: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Новая роль</label>
+                  <select value={roleForm.role} onChange={(e) => setRoleForm({ ...roleForm, role: e.target.value })} className="w-full px-3 py-2 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 outline-none">
                     <option value="user">user — Пользователь</option>
                     <option value="admin">admin — Администратор</option>
                     <option value="SUPER_ADMIN">SUPER_ADMIN — Супер-админ</option>
@@ -582,7 +582,7 @@ export default function AdminDashboard() {
                   </select>
                 </div>
                 <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setShowRoleModal(false)} className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" disabled={roleLoading}>Отмена</button>
+                  <button type="button" onClick={() => setShowRoleModal(false)} className="flex-1 py-2 px-4 border border-white/10 text-gray-300 rounded-lg hover:bg-slate-800" disabled={roleLoading}>Отмена</button>
                   <button type="submit" disabled={roleLoading} className="flex-1 py-2 px-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50">{roleLoading ? 'Сохранение...' : 'Сохранить'}</button>
                 </div>
               </form>
@@ -591,27 +591,27 @@ export default function AdminDashboard() {
         )}
 
         {showResetModal && selectedUser && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-gray-900">Пароль сброшен!</h3><button onClick={() => { setShowResetModal(false); setGeneratedPassword(''); }} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button></div>
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                <p className="text-sm text-green-800 mb-2">Новый временный пароль для <strong>{selectedUser.phone}</strong>:</p>
-                <p className="text-3xl font-bold text-green-900 text-center tracking-widest">{generatedPassword}</p>
-                <p className="text-xs text-green-700 mt-2 text-center">⚠️ Скопируйте пароль сейчас! Он не будет показан снова.</p>
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-slate-900 border border-white/10 rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-gray-100">Пароль сброшен!</h3><button onClick={() => { setShowResetModal(false); setGeneratedPassword(''); }} className="text-gray-400 hover:text-gray-200 text-2xl">✕</button></div>
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 mb-4">
+                <p className="text-sm text-green-300 mb-2">Новый временный пароль для <strong>{selectedUser.phone}</strong>:</p>
+                <p className="text-3xl font-bold text-green-400 text-center tracking-widest">{generatedPassword}</p>
+                <p className="text-xs text-green-400 mt-2 text-center">⚠️ Скопируйте пароль сейчас! Он не будет показан снова.</p>
               </div>
-              <button onClick={() => { setShowResetModal(false); setGeneratedPassword(''); }} className="w-full py-2 px-4 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Закрыть</button>
+              <button onClick={() => { setShowResetModal(false); setGeneratedPassword(''); }} className="w-full py-2 px-4 bg-slate-700 text-gray-300 rounded-lg hover:bg-slate-600">Закрыть</button>
             </div>
           </div>
         )}
 
         {showImportModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-gray-900">Восстановление дерева</h3><button onClick={() => { setShowImportModal(false); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button></div>
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800 mb-4"><p className="font-bold">⚠️ ВНИМАНИЕ!</p><p className="mt-1">Это действие полностью перезапишет текущие связи `referredById` и пересчитает счетчики рефералов на основе данных из файла.</p></div>
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-slate-900 border border-white/10 rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-gray-100">Восстановление дерева</h3><button onClick={() => { setShowImportModal(false); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="text-gray-400 hover:text-gray-200 text-2xl">✕</button></div>
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-300 mb-4"><p className="font-bold">⚠️ ВНИМАНИЕ!</p><p className="mt-1">Это действие полностью перезапишет текущие связи `referredById` и пересчитает счетчики рефералов на основе данных из файла.</p></div>
               <div className="space-y-4">
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">Выберите файл backup дерева (.json)</label><input type="file" ref={fileInputRef} accept=".json" onChange={handleImportTree} className="w-full px-3 py-2 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100" /></div>
-                <div className="flex gap-3 pt-2"><button type="button" onClick={() => { setShowImportModal(false); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" disabled={importLoading}>Отмена</button></div>
+                <div><label className="block text-sm font-medium text-gray-400 mb-1">Выберите файл backup дерева (.json)</label><input type="file" ref={fileInputRef} accept=".json" onChange={handleImportTree} className="w-full px-3 py-2 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-500/20 file:text-amber-300 hover:file:bg-amber-500/30" /></div>
+                <div className="flex gap-3 pt-2"><button type="button" onClick={() => { setShowImportModal(false); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="flex-1 py-2 px-4 border border-white/10 text-gray-300 rounded-lg hover:bg-slate-800" disabled={importLoading}>Отмена</button></div>
               </div>
             </div>
           </div>
