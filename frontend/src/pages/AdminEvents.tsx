@@ -224,10 +224,7 @@ export default function AdminEvents() {
                   />
                 </div>
               </div>
-              <button
-                type="submit"
-                className="w-full py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-semibold hover:shadow-lg hover:shadow-green-500/25 transition"
-              >
+              <button type="submit" className="w-full py-3 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg font-semibold hover:shadow-lg hover:shadow-purple-500/25 transition">
                 Создать мероприятие
               </button>
             </form>
