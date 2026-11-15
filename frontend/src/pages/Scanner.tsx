@@ -6,9 +6,9 @@ import { apiClient } from '../api/client';
 export default function Scanner() {
   const navigate = useNavigate();
   const [scanning, setScanning] = useState(false);
-  const [result, setResult] = useState<{ 
-    success: boolean; 
-    message: string; 
+  const [result, setResult] = useState<{
+    success: boolean;
+    message: string;
     cashback?: { participant: number; referrer: number };
     eventTitle?: string;
   } | null>(null);
@@ -27,10 +27,8 @@ export default function Scanner() {
     setError('');
     setResult(null);
     setScanning(true);
-
     const html5QrCode = new Html5Qrcode("qr-reader");
     setScanner(html5QrCode);
-
     try {
       await html5QrCode.start(
         { facingMode: "environment" },
@@ -47,7 +45,6 @@ export default function Scanner() {
     } catch (err: any) {
       console.error("Camera error:", err);
       setScanning(false);
-      
       let errorMsg = 'Не удалось запустить камеру.';
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
         errorMsg = 'Доступ к камере запрещён. Проверьте настройки браузера.';
@@ -58,7 +55,6 @@ export default function Scanner() {
       } else {
         errorMsg += ` (${err.name || 'Unknown error'})`;
       }
-      
       setError(errorMsg);
     }
   };
@@ -76,7 +72,6 @@ export default function Scanner() {
         qrCode
         // eventId больше не нужен — бэкенд сам определит мероприятие по QR
       });
-
       if (response.data.success) {
         setResult({
           success: true,
@@ -99,33 +94,32 @@ export default function Scanner() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white shadow-sm border-b">
+    <div className="min-h-screen bg-slate-950">
+      <div className="bg-slate-900/60 border-b border-white/10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <button
             onClick={() => navigate('/')}
-            className="text-sm text-gray-600 hover:text-blue-600"
+            className="text-sm text-gray-400 hover:text-white transition"
           >
             ← На главную
           </button>
-          <h1 className="text-xl font-bold text-gray-900">📷 Сканер</h1>
+          <h1 className="text-xl font-bold text-gray-100">📷 Сканер</h1>
           <div className="w-20"></div>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-xl shadow-sm border p-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-4 text-center">
+        <div className="bg-slate-900 border border-white/10 rounded-xl p-6">
+          <h2 className="text-lg font-bold text-gray-100 mb-4 text-center">
             Сканирование QR-кода
           </h2>
-          <p className="text-sm text-gray-500 text-center mb-4">
+          <p className="text-sm text-gray-400 text-center mb-4">
             Наведите камеру на QR-код билета. Мероприятие определится автоматически.
           </p>
-
           {!scanning ? (
             <button
               onClick={startScanning}
-              className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+              className="w-full py-3 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg font-semibold hover:shadow-lg hover:shadow-purple-500/25 transition"
             >
               📷 Запустить камеру
             </button>
@@ -134,31 +128,35 @@ export default function Scanner() {
               <div id="qr-reader" className="mb-4"></div>
               <button
                 onClick={stopScanning}
-                className="w-full py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                className="w-full py-2 bg-slate-800 text-gray-300 rounded-lg hover:bg-slate-700 transition border border-white/10"
               >
                 Остановить камеру
               </button>
             </div>
           )}
-
           {error && (
-            <div className="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+            <div className="mt-4 bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg">
               {error}
             </div>
           )}
-
           {result && (
-            <div className={`mt-4 p-4 rounded-lg ${result.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-              <p className={`font-semibold ${result.success ? 'text-green-800' : 'text-red-800'}`}>
+            <div className={`mt-4 p-4 rounded-lg ${
+              result.success 
+                ? 'bg-green-500/10 border border-green-500/30' 
+                : 'bg-red-500/10 border border-red-500/30'
+            }`}>
+              <p className={`font-semibold ${
+                result.success ? 'text-green-400' : 'text-red-400'
+              }`}>
                 {result.message}
               </p>
               {result.eventTitle && (
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-gray-400 mt-1">
                   🎟️ Мероприятие: {result.eventTitle}
                 </p>
               )}
               {result.cashback && (
-                <div className="mt-2 text-sm text-green-700">
+                <div className="mt-2 text-sm text-green-400">
                   <p>Кэшбек участнику: {result.cashback.participant} ₽</p>
                   <p>Бонус рефереру: {result.cashback.referrer} ₽</p>
                 </div>
@@ -168,17 +166,16 @@ export default function Scanner() {
                   setResult(null);
                   startScanning();
                 }}
-                className="mt-3 w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="mt-3 w-full py-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg hover:shadow-lg hover:shadow-purple-500/25 transition"
               >
                 Сканировать следующий
               </button>
             </div>
           )}
         </div>
-
-        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="font-semibold text-blue-900 mb-2">Инструкция:</h3>
-          <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+        <div className="mt-6 bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-4">
+          <h3 className="font-semibold text-cyan-300 mb-2">Инструкция:</h3>
+          <ol className="text-sm text-cyan-400 space-y-1 list-decimal list-inside">
             <li>Нажмите "Запустить камеру"</li>
             <li>Наведите камеру на QR-код билета</li>
             <li>Мероприятие определится автоматически</li>
