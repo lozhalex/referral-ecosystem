@@ -52,9 +52,9 @@ export default function Tickets() {
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { label: string; bg: string; text: string }> = {
-      ACTIVE: { label: 'Активен', bg: 'bg-green-100', text: 'text-green-800' },
-      USED: { label: 'Использован', bg: 'bg-gray-100', text: 'text-gray-600' },
-      EXPIRED: { label: 'Истёк', bg: 'bg-red-100', text: 'text-red-800' },
+      ACTIVE: { label: 'Активен', bg: 'bg-green-500/20', text: 'text-green-300' },
+      USED: { label: 'Использован', bg: 'bg-gray-500/20', text: 'text-gray-400' },
+      EXPIRED: { label: 'Истёк', bg: 'bg-red-500/20', text: 'text-red-300' },
     };
     const c = config[status] || config.ACTIVE;
     return (
@@ -66,26 +66,26 @@ export default function Tickets() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <p className="text-gray-500">Загрузка...</p>
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <p className="text-gray-400">Загрузка...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white shadow-sm border-b">
+    <div className="min-h-screen bg-slate-950">
+      <div className="bg-slate-900/60 border-b border-white/10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <button
             onClick={() => navigate('/')}
-            className="text-sm text-gray-600 hover:text-blue-600"
+            className="text-sm text-gray-400 hover:text-white transition"
           >
             ← На главную
           </button>
-          <h1 className="text-xl font-bold text-gray-900">🎫 Мои билеты</h1>
+          <h1 className="text-xl font-bold text-gray-100">🎫 Мои билеты</h1>
           <button
             onClick={() => navigate('/events')}
-            className="text-sm text-blue-600 hover:underline"
+            className="text-sm text-cyan-400 hover:text-cyan-300 transition"
           >
             Мероприятия
           </button>
@@ -95,10 +95,10 @@ export default function Tickets() {
       <div className="max-w-4xl mx-auto px-4 py-8">
         {tickets.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-500 text-lg mb-4">У вас пока нет билетов</p>
+            <p className="text-gray-400 text-lg mb-4">У вас пока нет билетов</p>
             <button
               onClick={() => navigate('/events')}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="px-6 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg hover:shadow-lg hover:shadow-purple-500/25 transition"
             >
               Получить билет
             </button>
@@ -109,22 +109,20 @@ export default function Tickets() {
               <div
                 key={ticket.id}
                 onClick={() => setSelectedTicket(ticket)}
-                className="bg-white rounded-xl shadow-sm border p-6 cursor-pointer hover:shadow-md transition"
+                className="bg-slate-900 border border-white/10 rounded-xl p-6 cursor-pointer hover:bg-slate-800/50 transition"
               >
                 <div className="flex justify-between items-start mb-3">
-                  <h2 className="text-lg font-bold text-gray-900">{ticket.event.title}</h2>
+                  <h2 className="text-lg font-bold text-gray-100">{ticket.event.title}</h2>
                   {getStatusBadge(ticket.status)}
                 </div>
-
-                <div className="space-y-1 text-sm text-gray-500 mb-4">
+                <div className="space-y-1 text-sm text-gray-400 mb-4">
                   {ticket.event.location && <p>📍 {ticket.event.location}</p>}
                   <p>📅 {formatDate(ticket.event.eventDate)}</p>
                   {ticket.scannedAt && (
                     <p>✅ Использован: {formatDate(ticket.scannedAt)}</p>
                   )}
                 </div>
-
-                <p className="text-xs text-blue-600">Нажмите, чтобы показать QR-код →</p>
+                <p className="text-xs text-cyan-400">Нажмите, чтобы показать QR-код →</p>
               </div>
             ))}
           </div>
@@ -133,20 +131,20 @@ export default function Tickets() {
 
       {selectedTicket && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={() => setSelectedTicket(null)}
         >
           <div
-            className="bg-white rounded-xl shadow-2xl p-8 max-w-sm w-full text-center"
+            className="bg-slate-900 border border-white/10 rounded-xl shadow-2xl p-8 max-w-sm w-full text-center"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-xl font-bold text-gray-900 mb-2">
+            <h3 className="text-xl font-bold text-gray-100 mb-2">
               {selectedTicket.event.title}
             </h3>
-            <p className="text-sm text-gray-500 mb-6">
+            <p className="text-sm text-gray-400 mb-6">
               {formatDate(selectedTicket.event.eventDate)}
             </p>
-
+            {/* QR-код остаётся на белом фоне — иначе сканер не прочитает */}
             <div className="bg-white p-4 rounded-lg mb-4 inline-block">
               <QRCodeSVG
                 value={selectedTicket.qrCode}
@@ -154,13 +152,11 @@ export default function Tickets() {
                 level="H"
               />
             </div>
-
-            <p className="text-xs text-gray-400 mb-4 break-all">
+            <p className="text-xs text-gray-500 mb-4 break-all font-mono">
               {selectedTicket.qrCode}
             </p>
-
             {selectedTicket.status === 'ACTIVE' ? (
-              <p className="text-sm text-green-600 font-medium mb-4">
+              <p className="text-sm text-green-400 font-medium mb-4">
                 ✅ Билет активен. Покажите QR на входе.
               </p>
             ) : (
@@ -168,10 +164,9 @@ export default function Tickets() {
                 Билет уже использован
               </p>
             )}
-
             <button
               onClick={() => setSelectedTicket(null)}
-              className="w-full py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              className="w-full py-2 bg-slate-800 text-gray-300 rounded-lg hover:bg-slate-700 transition border border-white/10"
             >
               Закрыть
             </button>
