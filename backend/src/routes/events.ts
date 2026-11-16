@@ -5,11 +5,10 @@ import { requireAdmin } from '../middleware/requireAdmin';
 const router = Router();
 const prisma = new PrismaClient();
 
-// GET /api/events — список активных мероприятий с контролерами
+// GET /api/events — список всех мероприятий (сортировка по дате)
 router.get('/', async (req: Request, res: Response) => {
   try {
     const events = await prisma.event.findMany({
-      where: { isActive: true },
       orderBy: { eventDate: 'asc' },
       include: {
         _count: { select: { tickets: true, controllers: true } },
@@ -20,7 +19,6 @@ router.get('/', async (req: Request, res: Response) => {
         }
       }
     });
-
     const result = events.map(e => ({
       id: e.id,
       title: e.title,
@@ -30,11 +28,11 @@ router.get('/', async (req: Request, res: Response) => {
       cashbackAmount: e.cashbackAmount,
       referrerBonus: e.referrerBonus,
       isActive: e.isActive,
+      posterUrl: e.posterUrl, // 🆕
       ticketsCount: e._count.tickets,
       controllersCount: e._count.controllers,
       controllers: e.controllers
     }));
-
     res.json({ success: true, events: result });
   } catch (err) {
     console.error('❌ Events list error:', err);
@@ -45,12 +43,10 @@ router.get('/', async (req: Request, res: Response) => {
 // POST /api/events — создание мероприятия (только admin)
 router.post('/', requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { title, description, location, eventDate, cashbackAmount, referrerBonus } = req.body;
-
+    const { title, description, location, eventDate, cashbackAmount, referrerBonus, posterUrl } = req.body;
     if (!title || !eventDate) {
       return res.status(400).json({ success: false, message: 'Название и дата обязательны' });
     }
-
     const event = await prisma.event.create({
       data: {
         title,
@@ -58,14 +54,43 @@ router.post('/', requireAdmin, async (req: Request, res: Response) => {
         location: location || null,
         eventDate: new Date(eventDate),
         cashbackAmount: Number(cashbackAmount) || 50,
-        referrerBonus: Number(referrerBonus) || 100
+        referrerBonus: Number(referrerBonus) || 100,
+        posterUrl: posterUrl || null // 🆕
       }
     });
-
     res.json({ success: true, event });
   } catch (err) {
     console.error('❌ Event create error:', err);
     res.status(500).json({ success: false, message: 'Ошибка сервера при создании мероприятия' });
+  }
+});
+
+// 🆕 PUT /api/events/:id — редактирование мероприятия (только admin)
+router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const eventId = Number(req.params.id);
+    const { title, description, location, eventDate, cashbackAmount, referrerBonus, posterUrl } = req.body;
+    
+    if (!title || !eventDate) {
+      return res.status(400).json({ success: false, message: 'Название и дата обязательны' });
+    }
+
+    const event = await prisma.event.update({
+      where: { id: eventId },
+      data: {
+        title,
+        description: description || null,
+        location: location || null,
+        eventDate: new Date(eventDate),
+        cashbackAmount: Number(cashbackAmount) || 50,
+        referrerBonus: Number(referrerBonus) || 100,
+        posterUrl: posterUrl || null
+      }
+    });
+    res.json({ success: true, event });
+  } catch (err) {
+    console.error('❌ Event update error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера при редактировании мероприятия' });
   }
 });
 
@@ -74,29 +99,23 @@ router.post('/:id/controllers', requireAdmin, async (req: Request, res: Response
   try {
     const eventId = Number(req.params.id);
     const { userId } = req.body;
-
     if (!userId) {
       return res.status(400).json({ success: false, message: 'userId обязателен' });
     }
-
     const event = await prisma.event.findUnique({ where: { id: eventId } });
     if (!event) {
       return res.status(404).json({ success: false, message: 'Мероприятие не найдено' });
     }
-
     const user = await prisma.user.findUnique({ where: { id: Number(userId) } });
     if (!user) {
       return res.status(404).json({ success: false, message: 'Пользователь не найден' });
     }
-
     if (user.role !== 'controller' && user.role !== 'admin') {
       await prisma.user.update({ where: { id: Number(userId) }, data: { role: 'controller' } });
     }
-
     const controller = await prisma.eventController.create({
       data: { eventId, userId: Number(userId) }
     });
-
     res.json({ success: true, controller });
   } catch (err: any) {
     if (err.code === 'P2002') {
@@ -107,18 +126,16 @@ router.post('/:id/controllers', requireAdmin, async (req: Request, res: Response
   }
 });
 
-// 🆕 DELETE /api/events/:eventId/controllers/:userId — удаление контролера (только admin)
+// DELETE /api/events/:eventId/controllers/:userId — удаление контролера (только admin)
 router.delete('/:eventId/controllers/:userId', requireAdmin, async (req: Request, res: Response) => {
   try {
     const eventId = Number(req.params.eventId);
     const userId = Number(req.params.userId);
-
     await prisma.eventController.delete({
       where: {
         eventId_userId: { eventId, userId }
       }
     });
-
     res.json({ success: true, message: 'Контролер успешно удален с мероприятия' });
   } catch (err: any) {
     if (err.code === 'P2025') {
