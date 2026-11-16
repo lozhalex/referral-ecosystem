@@ -1,6 +1,5 @@
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Key, Wallet, Users, Car, Ticket, ShieldCheck, Smartphone } from 'lucide-react';
+import { Key, Wallet, Users, Car, Ticket, ShieldCheck } from 'lucide-react';
 
 export default function HomeGuest() {
   const navigate = useNavigate();
