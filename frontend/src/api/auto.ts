@@ -32,6 +32,18 @@ export const createRecord = async (data: any) => {
   return response.data;
 };
 
+// 🆕 Редактирование записи
+export const updateRecord = async (id: number, data: any) => {
+  const response = await apiClient.put(`${API_URL}/journal/${id}`, data);
+  return response.data;
+};
+
+// 🆕 Удаление записи
+export const deleteRecord = async (id: number) => {
+  const response = await apiClient.delete(`${API_URL}/journal/${id}`);
+  return response.data;
+};
+
 export const getIntervals = async () => {
   const response = await apiClient.get(`${API_URL}/intervals`);
   return response.data;
@@ -95,16 +107,6 @@ export const validateServiceQR = async (token: string) => {
 
 export const recordViaServiceQR = async (token: string, data: any) => {
   const response = await apiClient.post(`${API_URL}/service-access/qr/record`, { token, ...data });
-  return response.data;
-};
-
-export const updateRecord = async (id: number, data: any) => {
-  const response = await apiClient.put(`${API_URL}/journal/${id}`, data);
-  return response.data;
-};
-
-export const deleteRecord = async (id: number) => {
-  const response = await apiClient.delete(`${API_URL}/journal/${id}`);
   return response.data;
 };
 

@@ -121,7 +121,6 @@ router.post('/journal', async (req: any, res: Response) => {
         authorId: authorId || req.user.userId
       }
     });
-
     if (carId && mileage && (!source || source === 'owner')) {
       await prisma.car.updateMany({
         where: {
@@ -135,6 +134,79 @@ router.post('/journal', async (req: any, res: Response) => {
     res.json({ success: true, record });
   } catch (err) {
     console.error('Auto journal create error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
+// 🆕 Редактирование записи (с проверкой владельца)
+router.put('/journal/:id', async (req: any, res: Response) => {
+  try {
+    const recordId = Number(req.params.id);
+    const { date, mileage, category, subcat, work, cost, comment } = req.body;
+
+    const originalRecord = await prisma.serviceRecord.findUnique({
+      where: { id: recordId }
+    });
+
+    if (!originalRecord) {
+      return res.status(404).json({ success: false, message: 'Запись не найдена' });
+    }
+    if (originalRecord.userId !== req.user.userId) {
+      return res.status(403).json({ success: false, message: 'Нет доступа к этой записи' });
+    }
+
+    const updatedRecord = await prisma.serviceRecord.update({
+      where: { id: recordId },
+      data: {
+        date: date || originalRecord.date,
+        mileage: Number(mileage) || originalRecord.mileage,
+        category: category || originalRecord.category,
+        subcat: subcat || originalRecord.subcat,
+        work: work || originalRecord.work,
+        cost: Number(cost) || originalRecord.cost,
+        comment: comment || originalRecord.comment
+      }
+    });
+
+    // Если пробег увеличился — обновляем пробег авто
+    if (originalRecord.carId && Number(mileage) > originalRecord.mileage) {
+      await prisma.car.updateMany({
+        where: {
+          id: originalRecord.carId,
+          userId: req.user.userId,
+          mileage: { lt: Number(mileage) }
+        },
+        data: { mileage: Number(mileage) }
+      });
+    }
+
+    res.json({ success: true, record: updatedRecord });
+  } catch (err) {
+    console.error('Auto journal update error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
+// 🆕 Удаление записи (с проверкой владельца)
+router.delete('/journal/:id', async (req: any, res: Response) => {
+  try {
+    const recordId = Number(req.params.id);
+
+    const record = await prisma.serviceRecord.findUnique({
+      where: { id: recordId }
+    });
+
+    if (!record) {
+      return res.status(404).json({ success: false, message: 'Запись не найдена' });
+    }
+    if (record.userId !== req.user.userId) {
+      return res.status(403).json({ success: false, message: 'Нет доступа к этой записи' });
+    }
+
+    await prisma.serviceRecord.delete({ where: { id: recordId } });
+    res.json({ success: true, message: 'Запись удалена' });
+  } catch (err) {
+    console.error('Auto journal delete error:', err);
     res.status(500).json({ success: false, message: 'Ошибка сервера' });
   }
 });
@@ -194,12 +266,10 @@ router.post('/mileage-check', async (req: any, res: Response) => {
     const { carId, km } = req.body;
     const now = new Date();
     const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
-
     const lastCheck = await prisma.mileageCheck.findFirst({
       where: { carId: Number(carId), userId: req.user.userId },
       orderBy: { yearMonth: 'desc' }
     });
-
     if (lastCheck && Number(km) < lastCheck.km) {
       return res.status(400).json({
         success: false,
@@ -208,7 +278,6 @@ router.post('/mileage-check', async (req: any, res: Response) => {
         message: `Пробег уменьшился. Последний зафиксированный: ${lastCheck.km} км`
       });
     }
-
     await prisma.mileageCheck.upsert({
       where: {
         carId_yearMonth: {
@@ -224,7 +293,6 @@ router.post('/mileage-check', async (req: any, res: Response) => {
         km: Number(km)
       }
     });
-
     await prisma.car.updateMany({
       where: {
         id: Number(carId),
@@ -233,7 +301,6 @@ router.post('/mileage-check', async (req: any, res: Response) => {
       },
       data: { mileage: Number(km) }
     });
-
     res.json({ success: true });
   } catch (err) {
     console.error('Auto mileage check error:', err);
@@ -286,7 +353,7 @@ router.get('/dashboard', async (req: any, res: Response) => {
 });
 
 // ==========================================
-// 6. НАСТРОЙКИ ПОЛЬЗОВАТЕЛЯ (🆕 с disableOsagoReminder)
+// 6. НАСТРОЙКИ ПОЛЬЗОВАТЕЛЯ
 // ==========================================
 router.get('/settings', async (req: any, res: Response) => {
   try {
@@ -326,7 +393,7 @@ router.post('/settings', async (req: any, res: Response) => {
 });
 
 // ==========================================
-// 7. УВЕДОМЛЕНИЯ (🆕 с фильтрацией ОСАГО)
+// 7. УВЕДОМЛЕНИЯ
 // ==========================================
 router.get('/notifications', async (req: any, res: Response) => {
   try {
@@ -334,13 +401,10 @@ router.get('/notifications', async (req: any, res: Response) => {
     const now = new Date();
     const currentYearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
     const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-    // 🆕 Читаем настройки пользователя
     const settings = await prisma.userAutoSettings.findUnique({
       where: { userId: req.user.userId }
     });
     const disableOsago = settings?.disableOsagoReminder || false;
-
     const cars = await prisma.car.findMany({
       where: { userId: req.user.userId, isDeleted: false }
     });
@@ -349,7 +413,6 @@ router.get('/notifications', async (req: any, res: Response) => {
     });
     const checkedCarIds = new Set(mileageStatus.map(m => m.carId));
     const carsWithoutMileage = cars.filter(car => !checkedCarIds.has(car.id));
-
     if (carsWithoutMileage.length > 0) {
       notifications.push({
         type: 'mileage',
@@ -358,7 +421,6 @@ router.get('/notifications', async (req: any, res: Response) => {
         carNames: carsWithoutMileage.map(c => `${c.marka} ${c.model}`).join(', ')
       });
     }
-
     const records = await prisma.serviceRecord.findMany({
       where: { userId: req.user.userId }
     });
@@ -372,7 +434,6 @@ router.get('/notifications', async (req: any, res: Response) => {
         byCategory[rec.category] = rec;
       }
     }
-
     const timeBasedCats = ['brake_fluid', 'antifreeze', 'ac_recharge', 'osago'];
     for (const catKey of timeBasedCats) {
       const lastRec = byCategory[catKey];
@@ -390,12 +451,9 @@ router.get('/notifications', async (req: any, res: Response) => {
         });
       }
     }
-
-    // 🆕 Фильтруем уведомления по ОСАГО если пользователь их отключил
     const filteredNotifications = disableOsago
       ? notifications.filter(n => n.type !== 'service' || n.category !== 'osago')
       : notifications;
-
     res.json({
       success: true,
       notifications: filteredNotifications,
@@ -419,7 +477,7 @@ router.post('/notifications/read', async (req: any, res: Response) => {
 });
 
 // ==========================================
-// 8. PUSH-УВЕДОМЛЕНИЯ (Инфраструктура)
+// 8. PUSH-УВЕДОМЛЕНИЯ
 // ==========================================
 router.get('/push/vapid-public-key', async (req: any, res: Response) => {
   try {
@@ -459,12 +517,10 @@ router.post('/service-access/qr/generate', async (req: any, res: Response) => {
       where: { id: Number(carId), userId: req.user.userId, isDeleted: false }
     });
     if (!car) return res.status(404).json({ success: false, message: 'Автомобиль не найден' });
-
     await prisma.serviceAccessQR.updateMany({
       where: { carId: Number(carId), clientId: req.user.userId, usedAt: null, expiresAt: { gt: new Date() } },
       data: { expiresAt: new Date() }
     });
-
     const token = uuidv4();
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
     const qr = await prisma.serviceAccessQR.create({
@@ -495,7 +551,6 @@ router.post('/service-access/qr/validate', async (req: any, res: Response) => {
     });
     if (!qr) return res.status(404).json({ success: false, message: 'QR-код не найден' });
     if (qr.expiresAt < new Date()) return res.status(410).json({ success: false, message: 'QR-код истёк' });
-
     const recentRecords = await prisma.serviceRecord.findMany({
       where: { carId: qr.carId, userId: qr.clientId },
       orderBy: { date: 'desc' },
@@ -528,7 +583,6 @@ router.post('/service-access/qr/record', async (req: any, res: Response) => {
     });
     if (!qr) return res.status(404).json({ success: false, message: 'QR-код не найден' });
     if (qr.expiresAt < new Date()) return res.status(410).json({ success: false, message: 'QR-код истёк' });
-
     const record = await prisma.serviceRecord.create({
       data: {
         userId: qr.clientId,
@@ -582,79 +636,5 @@ function getCategoryName(key: string): string {
   };
   return names[key] || key;
 }
-
-// ==========================================
-// 🆕 РЕДАКТИРОВАНИЕ И УДАЛЕНИЕ ЗАПИСЕЙ ЖУРНАЛА
-// ==========================================
-router.put('/journal/:id', async (req: any, res: Response) => {
-  try {
-    const recordId = Number(req.params.id);
-    const { date, mileage, category, subcat, work, cost, comment } = req.body;
-
-    const originalRecord = await prisma.serviceRecord.findUnique({
-      where: { id: recordId }
-    });
-
-    if (!originalRecord) {
-      return res.status(404).json({ success: false, message: 'Запись не найдена' });
-    }
-    if (originalRecord.userId !== req.user.userId) {
-      return res.status(403).json({ success: false, message: 'Нет доступа к этой записи' });
-    }
-
-    const updatedRecord = await prisma.serviceRecord.update({
-      where: { id: recordId },
-      data: {
-        date: date || originalRecord.date,
-        mileage: Number(mileage) || originalRecord.mileage,
-        category: category || originalRecord.category,
-        subcat: subcat || originalRecord.subcat,
-        work: work || originalRecord.work,
-        cost: Number(cost) || originalRecord.cost,
-        comment: comment || originalRecord.comment
-      }
-    });
-
-    // Если категория не 'mileage' и пробег увеличился — обновляем пробег авто
-    if (originalRecord.carId && category !== 'mileage' && Number(mileage) > originalRecord.mileage) {
-      await prisma.car.updateMany({
-        where: {
-          id: originalRecord.carId,
-          userId: req.user.userId,
-          mileage: { lt: Number(mileage) }
-        },
-        data: { mileage: Number(mileage) }
-      });
-    }
-
-    res.json({ success: true, record: updatedRecord });
-  } catch (err) {
-    console.error('Auto journal update error:', err);
-    res.status(500).json({ success: false, message: 'Ошибка сервера' });
-  }
-});
-
-router.delete('/journal/:id', async (req: any, res: Response) => {
-  try {
-    const recordId = Number(req.params.id);
-
-    const record = await prisma.serviceRecord.findUnique({
-      where: { id: recordId }
-    });
-
-    if (!record) {
-      return res.status(404).json({ success: false, message: 'Запись не найдена' });
-    }
-    if (record.userId !== req.user.userId) {
-      return res.status(403).json({ success: false, message: 'Нет доступа к этой записи' });
-    }
-
-    await prisma.serviceRecord.delete({ where: { id: recordId } });
-    res.json({ success: true, message: 'Запись удалена' });
-  } catch (err) {
-    console.error('Auto journal delete error:', err);
-    res.status(500).json({ success: false, message: 'Ошибка сервера' });
-  }
-});
 
 export default router;
