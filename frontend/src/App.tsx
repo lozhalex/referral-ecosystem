@@ -1,10 +1,11 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
 import ChangePassword from './pages/ChangePassword';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminAutoHelper from './pages/AdminAutoHelper';
+import Home from './pages/Home';
 import HomeGuest from './pages/HomeGuest';
 import ProjectStub from './pages/ProjectStub';
 import Events from './pages/Events';
@@ -17,11 +18,11 @@ import ReferralCapture from './components/ReferralCapture';
 
 // 🆕 Компонент-обёртка для главной страницы:
 // - Гость → видит лендинг HomeGuest
-// - Авторизованный → редирект на /auto
+// - Авторизованный → видит Home (с Header, проектами, уведомлениями)
 const HomeRouter = () => {
   const token = localStorage.getItem('token');
   if (token) {
-    return <Navigate to="/auto" replace />;
+    return <Home />;
   }
   return <HomeGuest />;
 };
@@ -46,7 +47,6 @@ function App() {
         <Route path="/building" element={<ProjectStub />} />
         <Route path="/eco" element={<ProjectStub />} />
         <Route path="/dating" element={<ProjectStub />} />
-        <Route path="/ecosystem" element={<ProjectStub />} /> {/* 🆕 Заглушка, позже заменим на Ecosystem.tsx */}
 
         {/* 🛡️ Защищенные маршруты (требуют авторизации) */}
         <Route element={<ProtectedRoute />}>
