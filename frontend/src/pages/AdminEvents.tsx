@@ -132,6 +132,7 @@ export default function AdminEvents() {
     }
   };
 
+  // ✅ Эта функция теперь точно используется в модалке ниже
   const handleRemoveController = async (eventId: number, userId: number) => {
     if (!confirm('Убрать этого контролёра с мероприятия?')) return;
     try {
@@ -284,13 +285,41 @@ export default function AdminEvents() {
         )}
       </div>
 
+      {/* Модалка назначения/удаления контролёров */}
       {selectedEventId !== null && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => { setSelectedEventId(null); setSelectedUserId(null); }}>
           <div className="bg-slate-900 border border-white/10 rounded-xl shadow-2xl p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-gray-100 mb-4">Назначить контролёра</h3>
+            <h3 className="text-lg font-bold text-gray-100 mb-4">Управление контролёрами</h3>
+            
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-400 mb-2">Выберите пользователя:</label>
-              <div className="max-h-60 overflow-y-auto space-y-2">
+              <label className="block text-sm font-medium text-gray-400 mb-2">Назначенные контролёры:</label>
+              <div className="max-h-40 overflow-y-auto space-y-2 mb-4">
+                {events.find(e => e.id === selectedEventId)?.controllers.length === 0 ? (
+                  <p className="text-xs text-gray-500 italic">Пока никто не назначен</p>
+                ) : (
+                  events.find(e => e.id === selectedEventId)?.controllers.map(ctrl => (
+                    <div key={ctrl.id} className="flex items-center justify-between bg-slate-800/50 border border-white/10 rounded-lg p-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-300">{ctrl.user.phone}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${ctrl.user.role === 'admin' ? 'bg-purple-500/20 text-purple-300' : 'bg-cyan-500/20 text-cyan-300'}`}>
+                          {ctrl.user.role === 'admin' ? 'Админ' : 'Контролёр'}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveController(selectedEventId, ctrl.user.id)}
+                        className="text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 px-2 py-1 rounded transition"
+                      >
+                        ❌ Убрать
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="border-t border-white/10 pt-4">
+              <label className="block text-sm font-medium text-gray-400 mb-2">Добавить нового:</label>
+              <div className="max-h-40 overflow-y-auto space-y-2 mb-4">
                 {users.map(user => (
                   <div key={user.id} onClick={() => setSelectedUserId(user.id)} className={`p-3 border rounded-lg cursor-pointer transition ${selectedUserId === user.id ? 'border-cyan-500 bg-cyan-500/10' : 'border-white/10 hover:bg-white/5'}`}>
                     <div className="flex justify-between items-center">
@@ -302,10 +331,14 @@ export default function AdminEvents() {
                   </div>
                 ))}
               </div>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={handleAssignController} disabled={!selectedUserId} className={`flex-1 py-2 rounded-lg font-medium transition ${selectedUserId ? 'bg-gradient-to-r from-purple-600 to-cyan-600 text-white hover:shadow-lg' : 'bg-slate-800 text-gray-500 cursor-not-allowed border border-white/10'}`}>Назначить</button>
-              <button onClick={() => { setSelectedEventId(null); setSelectedUserId(null); }} className="flex-1 py-2 bg-slate-800 text-gray-300 rounded-lg hover:bg-slate-700 transition border border-white/10">Отмена</button>
+              <div className="flex gap-2">
+                <button onClick={handleAssignController} disabled={!selectedUserId} className={`flex-1 py-2 rounded-lg font-medium transition ${selectedUserId ? 'bg-gradient-to-r from-purple-600 to-cyan-600 text-white hover:shadow-lg' : 'bg-slate-800 text-gray-500 cursor-not-allowed border border-white/10'}`}>
+                  Назначить
+                </button>
+                <button onClick={() => { setSelectedEventId(null); setSelectedUserId(null); }} className="flex-1 py-2 bg-slate-800 text-gray-300 rounded-lg hover:bg-slate-700 transition border border-white/10">
+                  Закрыть
+                </button>
+              </div>
             </div>
           </div>
         </div>
