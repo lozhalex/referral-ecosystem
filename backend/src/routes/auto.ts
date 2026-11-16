@@ -583,4 +583,78 @@ function getCategoryName(key: string): string {
   return names[key] || key;
 }
 
+// ==========================================
+// 🆕 РЕДАКТИРОВАНИЕ И УДАЛЕНИЕ ЗАПИСЕЙ ЖУРНАЛА
+// ==========================================
+router.put('/journal/:id', async (req: any, res: Response) => {
+  try {
+    const recordId = Number(req.params.id);
+    const { date, mileage, category, subcat, work, cost, comment } = req.body;
+
+    const originalRecord = await prisma.serviceRecord.findUnique({
+      where: { id: recordId }
+    });
+
+    if (!originalRecord) {
+      return res.status(404).json({ success: false, message: 'Запись не найдена' });
+    }
+    if (originalRecord.userId !== req.user.userId) {
+      return res.status(403).json({ success: false, message: 'Нет доступа к этой записи' });
+    }
+
+    const updatedRecord = await prisma.serviceRecord.update({
+      where: { id: recordId },
+      data: {
+        date: date || originalRecord.date,
+        mileage: Number(mileage) || originalRecord.mileage,
+        category: category || originalRecord.category,
+        subcat: subcat || originalRecord.subcat,
+        work: work || originalRecord.work,
+        cost: Number(cost) || originalRecord.cost,
+        comment: comment || originalRecord.comment
+      }
+    });
+
+    // Если категория не 'mileage' и пробег увеличился — обновляем пробег авто
+    if (originalRecord.carId && category !== 'mileage' && Number(mileage) > originalRecord.mileage) {
+      await prisma.car.updateMany({
+        where: {
+          id: originalRecord.carId,
+          userId: req.user.userId,
+          mileage: { lt: Number(mileage) }
+        },
+        data: { mileage: Number(mileage) }
+      });
+    }
+
+    res.json({ success: true, record: updatedRecord });
+  } catch (err) {
+    console.error('Auto journal update error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
+router.delete('/journal/:id', async (req: any, res: Response) => {
+  try {
+    const recordId = Number(req.params.id);
+
+    const record = await prisma.serviceRecord.findUnique({
+      where: { id: recordId }
+    });
+
+    if (!record) {
+      return res.status(404).json({ success: false, message: 'Запись не найдена' });
+    }
+    if (record.userId !== req.user.userId) {
+      return res.status(403).json({ success: false, message: 'Нет доступа к этой записи' });
+    }
+
+    await prisma.serviceRecord.delete({ where: { id: recordId } });
+    res.json({ success: true, message: 'Запись удалена' });
+  } catch (err) {
+    console.error('Auto journal delete error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
 export default router;

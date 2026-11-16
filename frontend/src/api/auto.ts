@@ -98,6 +98,16 @@ export const recordViaServiceQR = async (token: string, data: any) => {
   return response.data;
 };
 
+export const updateRecord = async (id: number, data: any) => {
+  const response = await apiClient.put(`${API_URL}/journal/${id}`, data);
+  return response.data;
+};
+
+export const deleteRecord = async (id: number) => {
+  const response = await apiClient.delete(`${API_URL}/journal/${id}`);
+  return response.data;
+};
+
 export const revokeServiceQR = async (token: string) => {
   const response = await apiClient.post(`${API_URL}/service-access/qr/revoke`, { token });
   return response.data;

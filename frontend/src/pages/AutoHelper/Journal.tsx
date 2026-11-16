@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getJournal, createRecord, getCars, generateServiceQR, revokeServiceQR } from '../../api/auto';
+import { getJournal, createRecord, getCars, generateServiceQR, revokeServiceQR, submitMileageCheck, updateRecord, deleteRecord } from '../../api/auto';
 import { CATEGORIES, getCategoryName } from './categories';
 import { QRCodeSVG } from 'qrcode.react';
 import Skeleton from '../../components/Skeleton';
@@ -18,6 +18,11 @@ interface JournalRecord {
   cost: number;
   comment: string;
   source?: string;
+}
+
+interface LastMileageCheck {
+  date: string;
+  km: number;
 }
 
 const LOCAL_CATEGORY_NAMES: { [key: string]: string } = {
@@ -54,6 +59,25 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
   const [qrToken, setQrToken] = useState('');
   const [qrCarInfo, setQrCarInfo] = useState<any>(null);
   const [qrGenerating, setQrGenerating] = useState(false);
+
+  // 🆕 Состояния для блока ввода пробега
+  const [lastMileageCheck, setLastMileageCheck] = useState<LastMileageCheck | null>(null);
+  const [mileageInput, setMileageInput] = useState('');
+  const [mileageSaving, setMileageSaving] = useState(false);
+  const [showMileageError, setShowMileageError] = useState(false);
+  const [lastRecordedMileage, setLastRecordedMileage] = useState(0);
+
+  // 🆕 Состояния для редактирования записи
+  const [editingRecord, setEditingRecord] = useState<JournalRecord | null>(null);
+  const [editForm, setEditForm] = useState({
+    date: '',
+    mileage: '',
+    category: 'to',
+    work: '',
+    cost: '',
+    comment: ''
+  });
+
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     mileage: '',
@@ -76,6 +100,22 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
       ]);
       setCars(carsRes.cars || []);
       setRecords(journalRes.records || []);
+
+      // 🆕 Загружаем последний введённый пробег
+      if (selectedCarId) {
+        const mileageData = await (await import('../../api/auto')).getMileageChecks(selectedCarId);
+        const checks = mileageData.checks || [];
+        if (checks.length > 0) {
+          const lastCheck = checks[checks.length - 1];
+          setLastMileageCheck({
+            date: lastCheck.checkDate,
+            km: lastCheck.km
+          });
+        } else {
+          setLastMileageCheck(null);
+        }
+      }
+
       if (!selectedCarId && carsRes.cars?.length > 0) {
         onCarChange(carsRes.cars[0].id);
       }
@@ -116,6 +156,75 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
     }
   };
 
+  // 🆕 Обработчик сохранения пробега
+  const handleMileageSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCarId || !mileageInput) return;
+    setMileageSaving(true);
+    try {
+      await submitMileageCheck(selectedCarId, Number(mileageInput));
+      await createRecord({
+        carId: selectedCarId,
+        category: 'mileage',
+        date: new Date().toISOString().split('T')[0],
+        mileage: Number(mileageInput),
+        work: `Ввод пробега: ${Number(mileageInput).toLocaleString('ru-RU')} км`,
+        cost: 0,
+        comment: ''
+      });
+      setMileageInput('');
+      await loadData();
+    } catch (err: any) {
+      if (err.response?.data?.code === 'MILEAGE_DECREASED') {
+        setLastRecordedMileage(err.response.data.lastMileage);
+        setShowMileageError(true);
+      } else {
+        alert(err.response?.data?.message || 'Ошибка сохранения пробега');
+      }
+    } finally {
+      setMileageSaving(false);
+    }
+  };
+
+  // 🆕 Обработчики редактирования
+  const handleEditClick = (record: JournalRecord) => {
+    setEditingRecord(record);
+    setEditForm({
+      date: record.date,
+      mileage: String(record.mileage),
+      category: record.category,
+      work: record.work,
+      cost: String(record.cost),
+      comment: record.comment || ''
+    });
+  };
+
+  const handleEditSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRecord) return;
+    try {
+      await updateRecord(editingRecord.id, {
+        ...editForm,
+        mileage: Number(editForm.mileage),
+        cost: Number(editForm.cost) || 0
+      });
+      setEditingRecord(null);
+      await loadData();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Ошибка сохранения');
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('Удалить эту запись? Это действие нельзя отменить.')) return;
+    try {
+      await deleteRecord(id);
+      await loadData();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Ошибка удаления');
+    }
+  };
+
   const handleGenerateQR = async () => {
     if (!selectedCarId) return;
     setQrGenerating(true);
@@ -147,18 +256,14 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
 
   const inputClass = "w-full px-3 py-2.5 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all placeholder-gray-500";
 
-  // 🆕 Скелетон загрузки журнала
   if (loading) {
     return (
       <div className="space-y-4">
-        {/* Скелетон заголовка + кнопки */}
         <div className="flex justify-between items-center">
           <Skeleton variant="text" width="140px" />
           <Skeleton variant="button" width="140px" />
         </div>
-        {/* Скелетон кнопки QR */}
         <Skeleton variant="rect" height="80px" />
-        {/* Скелетон списка записей (3 карточки) */}
         {Array.from({ length: 3 }).map((_, i) => (
           <Skeleton key={i} variant="card" height="100px" />
         ))}
@@ -177,8 +282,49 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
     );
   }
 
+  const currentCar = cars.find(c => c.id === selectedCarId);
+  const today = new Date().toISOString().split('T')[0];
+
   return (
     <div className="space-y-4">
+      {/* 🆕 ЗАКРЕПЛЁННЫЙ БЛОК ВВОДА ПРОБЕГА */}
+      <div className="bg-gradient-to-br from-cyan-500/10 to-purple-500/10 border border-cyan-500/30 rounded-2xl p-5 sticky top-2 z-10 backdrop-blur-md">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold text-gray-100 flex items-center gap-2">
+            📊 Ввод пробега
+          </h3>
+          {lastMileageCheck && (
+            <span className="text-xs text-gray-400">
+              Последний: <span className="text-cyan-400 font-bold">{lastMileageCheck.km.toLocaleString('ru-RU')} км</span> ({new Date(lastMileageCheck.date).toLocaleDateString('ru-RU')})
+            </span>
+          )}
+        </div>
+        <form onSubmit={handleMileageSubmit} className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="date"
+            value={today}
+            readOnly
+            className="px-3 py-2.5 bg-slate-800/30 border border-white/10 text-gray-400 rounded-lg text-sm sm:w-36 cursor-not-allowed"
+          />
+          <input
+            type="number"
+            required
+            value={mileageInput}
+            onChange={(e) => setMileageInput(e.target.value)}
+            placeholder={`Текущий пробег (было: ${currentCar?.mileage?.toLocaleString('ru-RU') || 0} км)`}
+            min={lastMileageCheck?.km || 0}
+            className={inputClass + " flex-1"}
+          />
+          <button
+            type="submit"
+            disabled={mileageSaving || !mileageInput}
+            className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all disabled:opacity-50 whitespace-nowrap"
+          >
+            {mileageSaving ? '...' : 'Сохранить'}
+          </button>
+        </form>
+      </div>
+
       <div className="flex justify-between items-center">
         <h2 className="text-lg font-bold text-gray-100">Журнал обслуживания</h2>
         <button
@@ -227,12 +373,27 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         <div className="space-y-3">
           {records.map(rec => (
             <div key={rec.id} className="bg-slate-900/60 backdrop-blur-md rounded-xl p-4 border border-white/10 hover:border-cyan-500/30 transition-all duration-300">
-              <div className="flex justify-between items-start mb-1">
-                <span className="font-bold text-gray-100">{getCategoryDisplayName(rec.category)}</span>
-                <span className="font-semibold text-cyan-400">{rec.cost} ₽</span>
+              <div className="flex justify-between items-start mb-1 gap-2">
+                <span className="font-bold text-gray-100 flex-1">{getCategoryDisplayName(rec.category)}</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => handleEditClick(rec)}
+                    className="p-1.5 text-yellow-400 hover:bg-yellow-500/20 rounded-lg transition"
+                    title="Редактировать"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() => handleDelete(rec.id)}
+                    className="p-1.5 text-red-400 hover:bg-red-500/20 rounded-lg transition"
+                    title="Удалить"
+                  >
+                    🗑
+                  </button>
+                </div>
               </div>
               <div className="text-sm text-gray-400 mb-1">
-                {new Date(rec.date).toLocaleDateString('ru-RU')} • {rec.mileage} км
+                {new Date(rec.date).toLocaleDateString('ru-RU')} • {rec.mileage.toLocaleString('ru-RU')} км
               </div>
               {rec.work && <div className="text-sm text-gray-300">{rec.work}</div>}
               {rec.comment && <div className="text-xs text-gray-500 mt-1 italic">"{rec.comment}"</div>}
@@ -248,6 +409,7 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         </div>
       )}
 
+      {/* Модалка создания записи */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -293,6 +455,56 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         </div>
       )}
 
+      {/* 🆕 Модалка редактирования записи */}
+      {editingRecord && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b border-white/10 flex justify-between items-center sticky top-0 bg-slate-900 z-10">
+              <h3 className="font-bold text-gray-100">Редактирование записи</h3>
+              <button onClick={() => setEditingRecord(null)} className="text-gray-400 hover:text-white text-xl transition-colors">&times;</button>
+            </div>
+            <form onSubmit={handleEditSave} className="p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">Дата</label>
+                  <input required type="date" className={inputClass} value={editForm.date} onChange={e => setEditForm({...editForm, date: e.target.value})} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">Пробег (км)</label>
+                  <input required type="number" className={inputClass} value={editForm.mileage} onChange={e => setEditForm({...editForm, mileage: e.target.value})} />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">Категория</label>
+                <select className={inputClass} value={editForm.category} onChange={e => setEditForm({...editForm, category: e.target.value})}>
+                  {CATEGORIES.map(c => <option key={c.key} value={c.key} className="bg-slate-800">{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">Выполненные работы</label>
+                <textarea required rows={2} className={inputClass} value={editForm.work} onChange={e => setEditForm({...editForm, work: e.target.value})} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">Стоимость (₽)</label>
+                <input type="number" className={inputClass} value={editForm.cost} onChange={e => setEditForm({...editForm, cost: e.target.value})} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">Комментарий</label>
+                <input className={inputClass} value={editForm.comment} onChange={e => setEditForm({...editForm, comment: e.target.value})} />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setEditingRecord(null)} className="flex-1 py-2.5 bg-white/5 text-gray-300 rounded-lg font-medium hover:bg-white/10 transition border border-white/10">
+                  Отмена
+                </button>
+                <button type="submit" className="flex-1 py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all">
+                  Сохранить
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {showQRModal && qrToken && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
@@ -319,6 +531,26 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
               className="w-full py-2 text-sm text-gray-500 hover:text-gray-300 transition mt-2"
             >
               Закрыть
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 🆕 Модалка ошибки уменьшения пробега */}
+      {showMileageError && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+            <div className="text-4xl mb-4">⚠️</div>
+            <h3 className="text-lg font-bold text-gray-100 mb-2">Пробег уменьшился</h3>
+            <p className="text-sm text-gray-400 mb-6">
+              Последний зафиксированный пробег: <span className="text-cyan-400 font-bold">{lastRecordedMileage} км</span>.<br/>
+              Новый пробег не может быть меньше предыдущего.
+            </p>
+            <button
+              onClick={() => setShowMileageError(false)}
+              className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
+            >
+              Понятно
             </button>
           </div>
         </div>

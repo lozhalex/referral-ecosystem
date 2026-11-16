@@ -19,7 +19,6 @@ const Profile: React.FC = () => {
   const [rcbMessage, setRcbMessage] = useState('');
   const [rcbLinkInput, setRcbLinkInput] = useState('');
   const [savingLink, setSavingLink] = useState(false);
-
   const [showServicePanel, setShowServicePanel] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [manualToken, setManualToken] = useState('');
@@ -38,7 +37,6 @@ const Profile: React.FC = () => {
     cost: '',
     comment: ''
   });
-
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerId = 'qr-scanner-container';
 
@@ -278,16 +276,13 @@ const Profile: React.FC = () => {
     return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
   };
 
-  // 🆕 Скелетон загрузки профиля
   if (loading) {
     return (
       <div className="min-h-screen p-4 pb-24 max-w-md mx-auto space-y-6">
-        {/* Скелетон шапки */}
         <div className="flex items-center justify-between">
           <Skeleton variant="text" width="100px" />
           <Skeleton variant="button" width="140px" />
         </div>
-        {/* Скелетон аватара + имени */}
         <div className="flex items-center gap-4">
           <Skeleton variant="circle" width="64px" height="64px" />
           <div className="flex-1 space-y-2">
@@ -295,18 +290,13 @@ const Profile: React.FC = () => {
             <Skeleton variant="text" width="180px" />
           </div>
         </div>
-        {/* Скелетон блока телефона */}
         <Skeleton variant="card" height="80px" />
-        {/* Скелетон баланса и рефералов */}
         <div className="grid grid-cols-2 gap-3">
           <Skeleton variant="card" height="80px" />
           <Skeleton variant="card" height="80px" />
         </div>
-        {/* Скелетон трекера РЦБ */}
         <Skeleton variant="card" height="200px" />
-        {/* Скелетон проектов */}
         <Skeleton variant="card" height="160px" />
-        {/* Скелетон кнопок действий */}
         <div className="space-y-3">
           <Skeleton variant="button" width="100%" />
           <Skeleton variant="button" width="100%" />
@@ -335,9 +325,7 @@ const Profile: React.FC = () => {
         <button onClick={() => navigate('/')} className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition">
           <span>←</span> На главную
         </button>
-        <span className={`text-xs font-bold px-3 py-1.5 rounded-full border ${
-          isPartner(user) ? 'text-neon-green border-neon-green/30 bg-neon-green/10' : 'text-slate-400 border-white/10 bg-white/5'
-        }`}>
+        <span className={`text-xs font-bold px-3 py-1.5 rounded-full border ${isPartner(user) ? 'text-neon-green border-neon-green/30 bg-neon-green/10' : 'text-slate-400 border-white/10 bg-white/5'}`}>
           {isPartner(user) ? 'ПАРТНЕР СМАРТ' : 'БЕСПЛАТНЫЙ УЧАСТНИК'}
         </span>
       </div>
@@ -586,18 +574,18 @@ const Profile: React.FC = () => {
             </p>
             <form onSubmit={handleSaveRcbLink} className="mt-4">
               <label className="text-xs text-slate-400 block mb-2 uppercase tracking-wider">Реферальная ссылка РЦБ</label>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="url"
                   value={rcbLinkInput}
                   onChange={(e) => setRcbLinkInput(e.target.value)}
                   placeholder="https://rcpay.ru/r/..."
-                  className="flex-1 text-sm px-4 py-3 bg-dark-900/50 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:ring-1 focus:ring-neon-purple focus:border-neon-purple outline-none transition"
+                  className="flex-1 min-w-0 text-sm px-4 py-3 bg-dark-900/50 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:ring-1 focus:ring-neon-purple focus:border-neon-purple outline-none transition"
                 />
                 <button
                   type="submit"
                   disabled={savingLink}
-                  className="text-sm bg-white/10 text-white px-5 py-3 rounded-xl hover:bg-white/20 transition disabled:opacity-50 whitespace-nowrap font-medium border border-white/10"
+                  className="text-sm bg-white/10 text-white px-5 py-3 rounded-xl hover:bg-white/20 transition disabled:opacity-50 whitespace-nowrap font-medium border border-white/10 sm:w-auto w-full"
                 >
                   {savingLink ? '...' : 'Сохранить'}
                 </button>
