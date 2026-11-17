@@ -30,7 +30,6 @@ export default function Events() {
     try {
       const response = await apiClient.get('/api/events');
       if (response.data.success) {
-        // Фильтруем только будущие, сортируем по дате, берем первые 8 (4 колонки x 2 ряда)
         const now = new Date();
         const upcoming = response.data.events
           .filter((e: Event) => new Date(e.eventDate) >= now)
@@ -63,20 +62,34 @@ export default function Events() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return new Date(dateString).toLocaleDateString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   if (loading) {
-    return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><p className="text-gray-400">Загрузка...</p></div>;
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <p className="text-gray-400">Загрузка...</p>
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-slate-950">
       <div className="bg-slate-900/60 border-b border-white/10">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <button onClick={() => navigate('/')} className="text-sm text-gray-400 hover:text-white transition">← На главную</button>
+          <button onClick={() => navigate('/')} className="text-sm text-gray-400 hover:text-white transition">
+            ← На главную
+          </button>
           <h1 className="text-xl font-bold text-gray-100">🎟️ Мероприятия</h1>
-          <button onClick={() => navigate('/tickets')} className="text-sm text-cyan-400 hover:text-cyan-300 transition">Мои билеты</button>
+          <button onClick={() => navigate('/tickets')} className="text-sm text-cyan-400 hover:text-cyan-300 transition">
+            Мои билеты
+          </button>
         </div>
       </div>
 
@@ -91,21 +104,38 @@ export default function Events() {
         {events.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-400 text-lg mb-4">Пока нет доступных мероприятий</p>
-            <button onClick={() => navigate('/')} className="px-6 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg hover:shadow-lg hover:shadow-purple-500/25 transition">На главную</button>
+            <button
+              onClick={() => navigate('/')}
+              className="px-6 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg hover:shadow-lg hover:shadow-purple-500/25 transition"
+            >
+              На главную
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {events.map(event => (
-              <div 
-                key={event.id} 
+              <div
+                key={event.id}
                 onClick={() => setSelectedEvent(event)}
                 className="bg-slate-900 border border-white/10 rounded-xl overflow-hidden cursor-pointer hover:border-cyan-500/30 transition-all group flex flex-col"
               >
                 <div className="aspect-[2/3] w-full relative bg-slate-800">
                   {event.posterUrl ? (
-                    <img src={event.posterUrl} alt={event.title} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
+                    <img
+                      src={event.posterUrl}
+                      alt={event.title}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                      }}
+                    />
                   ) : null}
-                  <div className={`absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-600 to-cyan-600 ${event.posterUrl ? 'hidden' : ''}`}>
+                  <div
+                    className={`absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-600 to-cyan-600 ${
+                      event.posterUrl ? 'hidden' : ''
+                    }`}
+                  >
                     <span className="text-white font-bold text-center px-2 text-sm">{event.title}</span>
                   </div>
                 </div>
@@ -121,21 +151,45 @@ export default function Events() {
       </div>
 
       {selectedEvent && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setSelectedEvent(null)}>
-          <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="aspect-video w-full relative bg-slate-800">
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setSelectedEvent(null)}
+        >
+          <div
+            className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 🔧 ИСПРАВЛЕНО: афиша теперь показывается полностью без обрезки */}
+            <div className="w-full relative bg-slate-800 max-h-[60vh] flex items-center justify-center">
               {selectedEvent.posterUrl ? (
-                <img src={selectedEvent.posterUrl} alt={selectedEvent.title} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
+                <img
+                  src={selectedEvent.posterUrl}
+                  alt={selectedEvent.title}
+                  className="w-full max-h-[60vh] object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
               ) : null}
-              <div className={`absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-600 to-cyan-600 ${selectedEvent.posterUrl ? 'hidden' : ''}`}>
+              <div
+                className={`absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-600 to-cyan-600 ${
+                  selectedEvent.posterUrl ? 'hidden' : ''
+                }`}
+              >
                 <span className="text-white font-bold text-center px-4">{selectedEvent.title}</span>
               </div>
-              <button onClick={() => setSelectedEvent(null)} className="absolute top-3 right-3 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition">✕</button>
+              <button
+                onClick={() => setSelectedEvent(null)}
+                className="absolute top-3 right-3 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition"
+              >
+                ✕
+              </button>
             </div>
-            
+
             <div className="p-6 space-y-4">
               <h2 className="text-2xl font-bold text-gray-100">{selectedEvent.title}</h2>
-              
+
               <div className="space-y-2 text-sm">
                 {selectedEvent.location && <p className="text-gray-300">📍 {selectedEvent.location}</p>}
                 <p className="text-gray-300">📅 {formatDate(selectedEvent.eventDate)}</p>
@@ -143,7 +197,9 @@ export default function Events() {
 
               {selectedEvent.description && (
                 <div className="bg-slate-800/50 border border-white/10 rounded-lg p-4">
-                  <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">{selectedEvent.description}</p>
+                  <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">
+                    {selectedEvent.description}
+                  </p>
                 </div>
               )}
 

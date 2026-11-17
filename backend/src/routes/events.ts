@@ -28,7 +28,7 @@ router.get('/', async (req: Request, res: Response) => {
       cashbackAmount: e.cashbackAmount,
       referrerBonus: e.referrerBonus,
       isActive: e.isActive,
-      posterUrl: e.posterUrl, // 🆕
+      posterUrl: e.posterUrl,
       ticketsCount: e._count.tickets,
       controllersCount: e._count.controllers,
       controllers: e.controllers
@@ -53,9 +53,9 @@ router.post('/', requireAdmin, async (req: Request, res: Response) => {
         description: description || null,
         location: location || null,
         eventDate: new Date(eventDate),
-        cashbackAmount: Number(cashbackAmount) || 50,
-        referrerBonus: Number(referrerBonus) || 100,
-        posterUrl: posterUrl || null // 🆕
+        cashbackAmount: cashbackAmount !== undefined ? Number(cashbackAmount) : 50,
+        referrerBonus: referrerBonus !== undefined ? Number(referrerBonus) : 100,
+        posterUrl: posterUrl || null
       }
     });
     res.json({ success: true, event });
@@ -66,11 +66,12 @@ router.post('/', requireAdmin, async (req: Request, res: Response) => {
 });
 
 // 🆕 PUT /api/events/:id — редактирование мероприятия (только admin)
+// 🔧 ИСПРАВЛЕНО: Number(0) || 50 давало 50, теперь 0 сохраняется корректно
 router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
   try {
     const eventId = Number(req.params.id);
     const { title, description, location, eventDate, cashbackAmount, referrerBonus, posterUrl } = req.body;
-    
+
     if (!title || !eventDate) {
       return res.status(400).json({ success: false, message: 'Название и дата обязательны' });
     }
@@ -79,12 +80,12 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
       where: { id: eventId },
       data: {
         title,
-        description: description || null,
-        location: location || null,
+        description: description !== undefined ? description : null,
+        location: location !== undefined ? location : null,
         eventDate: new Date(eventDate),
-        cashbackAmount: Number(cashbackAmount) || 50,
-        referrerBonus: Number(referrerBonus) || 100,
-        posterUrl: posterUrl || null
+        cashbackAmount: cashbackAmount !== undefined ? Number(cashbackAmount) : 50,
+        referrerBonus: referrerBonus !== undefined ? Number(referrerBonus) : 100,
+        posterUrl: posterUrl !== undefined ? posterUrl : null
       }
     });
     res.json({ success: true, event });
