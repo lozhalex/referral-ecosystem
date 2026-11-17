@@ -131,12 +131,13 @@ export default function Events() {
                       SOLD OUT
                     </div>
                   )}
-                  <div className="aspect-[2/3] w-full relative bg-slate-800">
+                  {/* 🔧 ИСПРАВЛЕНО: object-contain вместо object-cover — афиша видна полностью */}
+                  <div className="aspect-[2/3] w-full relative bg-gradient-to-br from-slate-800 to-slate-900">
                     {event.posterUrl ? (
                       <img
                         src={event.posterUrl}
                         alt={event.title}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';
                           e.currentTarget.nextElementSibling?.classList.remove('hidden');
@@ -215,7 +216,6 @@ export default function Events() {
                 <p className="text-gray-300">📅 {formatDate(selectedEvent.eventDate)}</p>
               </div>
 
-              {/* 🆕 Счётчик мест */}
               {selectedEvent.maxTickets !== null && selectedEvent.maxTickets !== undefined && (
                 <div className={`p-3 rounded-lg border ${
                   selectedEvent.maxTickets <= 0
@@ -257,7 +257,6 @@ export default function Events() {
                 </div>
               </div>
 
-              {/* 🆕 Блокировка кнопки при SOLD OUT */}
               {selectedEvent.maxTickets !== null && selectedEvent.maxTickets !== undefined && selectedEvent.maxTickets <= 0 ? (
                 <button
                   disabled

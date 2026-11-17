@@ -62,7 +62,6 @@ export default function AdminEvents() {
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
 
-  // 🆕 Состояния для вкладки "Билеты"
   const [showTicketsModal, setShowTicketsModal] = useState(false);
   const [ticketsEvent, setTicketsEvent] = useState<Event | null>(null);
   const [ticketsList, setTicketsList] = useState<TicketInfo[]>([]);
@@ -181,7 +180,6 @@ export default function AdminEvents() {
     }
   };
 
-  // 🆕 Открыть модалку билетов
   const openTicketsModal = async (event: Event) => {
     setTicketsEvent(event);
     setShowTicketsModal(true);
@@ -198,7 +196,6 @@ export default function AdminEvents() {
     }
   };
 
-  // 🆕 Удалить билет (админ)
   const handleDeleteTicket = async (ticketId: number) => {
     if (!ticketsEvent) return;
     if (!confirm('Удалить этот билет? Место будет освобождено.')) return;
@@ -206,7 +203,7 @@ export default function AdminEvents() {
       const response = await apiClient.delete(`/api/events/${ticketsEvent.id}/tickets/${ticketId}`);
       if (response.data.success) {
         setSuccess('✅ Билет удален, место освобождено');
-        openTicketsModal(ticketsEvent); // перезагрузить список
+        openTicketsModal(ticketsEvent);
         loadData();
       }
     } catch (err: any) {
@@ -214,7 +211,6 @@ export default function AdminEvents() {
     }
   };
 
-  // 🆕 Экспорт CSV
   const handleExportCSV = () => {
     if (!ticketsEvent) return;
     window.open(`/api/events/${ticketsEvent.id}/tickets/export`, '_blank');
@@ -236,7 +232,6 @@ export default function AdminEvents() {
     .filter(e => activeTab === 'active' ? !isCompleted(e.eventDate) : isCompleted(e.eventDate))
     .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
 
-  // 🆕 Обработчик переключения "Бесплатное" — автообнуление полей
   const handleIsFreeChange = (checked: boolean) => {
     setFormData({
       ...formData,
@@ -380,7 +375,6 @@ export default function AdminEvents() {
                 </div>
               </div>
 
-              {/* 🆕 Блок "Бесплатное" + "Макс. мест" */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-800/30 border border-white/5 rounded-lg p-4">
                 <div className="flex items-center gap-3">
                   <input
@@ -424,7 +418,7 @@ export default function AdminEvents() {
                     <img
                       src={formData.posterUrl}
                       alt="Preview"
-                      className="h-32 w-auto rounded-lg border border-white/10 object-cover"
+                      className="h-40 w-auto max-w-full rounded-lg border border-white/10 object-contain bg-gradient-to-br from-slate-800 to-slate-900"
                       onError={(e) => (e.currentTarget.style.display = 'none')}
                     />
                   </div>
@@ -456,7 +450,6 @@ export default function AdminEvents() {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {filteredEvents.map(event => {
-              // 🆕 SOLD OUT: места закончились
               const isSoldOut = event.maxTickets !== null && event.maxTickets !== undefined && event.maxTickets <= 0;
               const remaining = event.maxTickets !== null && event.maxTickets !== undefined
                 ? event.maxTickets
@@ -471,12 +464,13 @@ export default function AdminEvents() {
                       SOLD OUT
                     </div>
                   )}
-                  <div className="aspect-[2/3] w-full relative bg-slate-800">
+                  {/* 🔧 ИСПРАВЛЕНО: object-contain вместо object-cover */}
+                  <div className="aspect-[2/3] w-full relative bg-gradient-to-br from-slate-800 to-slate-900">
                     {event.posterUrl ? (
                       <img
                         src={event.posterUrl}
                         alt={event.title}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';
                           e.currentTarget.nextElementSibling?.classList.remove('hidden');
@@ -502,7 +496,6 @@ export default function AdminEvents() {
                     <h3 className="font-bold text-gray-100 text-sm mb-1 line-clamp-2">{event.title}</h3>
                     <p className="text-xs text-gray-400 mb-1">📍 {event.location || 'Не указано'}</p>
                     <p className="text-xs text-cyan-400 mb-2">📅 {formatDate(event.eventDate)}</p>
-                    {/* 🆕 Инфо о местах */}
                     {remaining !== null && (
                       <p className={`text-xs mb-2 font-medium ${isSoldOut ? 'text-red-400' : 'text-green-400'}`}>
                         {isSoldOut ? '❌ Мест нет' : `🎫 Осталось: ${remaining}`}
@@ -518,7 +511,6 @@ export default function AdminEvents() {
                       >
                         👮 Контролёры ({event.controllersCount})
                       </button>
-                      {/* 🆕 Кнопка "Билеты" */}
                       <button
                         onClick={() => openTicketsModal(event)}
                         className="w-full py-1.5 text-xs bg-cyan-500/20 text-cyan-300 rounded-lg hover:bg-cyan-500/30 transition border border-cyan-500/30"
@@ -534,7 +526,6 @@ export default function AdminEvents() {
         )}
       </div>
 
-      {/* Модалка управления контролёрами */}
       {selectedEventId !== null && (
         <div
           className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
@@ -641,7 +632,6 @@ export default function AdminEvents() {
         </div>
       )}
 
-      {/* 🆕 Модалка "Билеты мероприятия" */}
       {showTicketsModal && ticketsEvent && (
         <div
           className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"

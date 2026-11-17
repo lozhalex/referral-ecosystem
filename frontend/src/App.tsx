@@ -17,8 +17,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import ReferralCapture from './components/ReferralCapture';
 
 // 🆕 Компонент-обёртка для главной страницы:
-// - Гость → видит лендинг HomeGuest
-// - Авторизованный → видит Home (с Header, проектами, уведомлениями)
+// - Гость (без токена) → видит лендинг HomeGuest
+// - Авторизованный (с токеном) → видит Home со всеми проектами
 const HomeRouter = () => {
   const token = localStorage.getItem('token');
   if (token) {
