@@ -37,7 +37,6 @@ const Profile: React.FC = () => {
     cost: '',
     comment: ''
   });
-  // 🆕 Состояние для модалки "Для чего?"
   const [showInfoModal, setShowInfoModal] = useState<'rcb' | 'smart' | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerId = 'qr-scanner-container';
@@ -123,8 +122,13 @@ const Profile: React.FC = () => {
     }
   };
 
-  const handleMarkRegistered = async () => {
+  // 🔧 ИСПРАВЛЕНО: теперь только открывает сайт РЦБ, не меняет статус
+  const handleGoToRcb = () => {
     window.open('https://rcpay.ru', '_blank');
+  };
+
+  // 🔧 ИСПРАВЛЕНО: подтверждает регистрацию в РЦБ через API
+  const handleMarkRegistered = async () => {
     setRcbActionLoading(true);
     try {
       const res = await markRcbRegistered();
@@ -596,11 +600,13 @@ const Profile: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-5">
-            {/* 🔧 ИСПРАВЛЕНО: RefPro → «Бумеранг» */}
+            {/* Шаг 1: Регистрация в «Бумеранг» */}
             <div className="flex items-center gap-3">
               <span className="text-neon-green text-xl">✅</span>
               <span className="text-sm text-slate-300">Регистрация в «Бумеранг» — <span className="font-semibold text-white">Выполнено</span></span>
             </div>
+
+            {/* Шаг 2: Регистрация в РЦБ */}
             <div className="flex items-start gap-3">
               {user.isRcbRegisteredFree ? (
                 <span className="text-neon-green text-xl mt-0.5">✅</span>
@@ -608,7 +614,6 @@ const Profile: React.FC = () => {
                 <span className="text-slate-500 text-xl mt-0.5">⏳</span>
               )}
               <div className="flex-1">
-                {/* 🆕 Кнопка "Для чего?" рядом с заголовком */}
                 <div className="flex items-center gap-2 mb-2">
                   <p className="text-sm text-slate-300">Регистрация в РЦБ (бесплатно)</p>
                   <button
@@ -619,18 +624,29 @@ const Profile: React.FC = () => {
                   </button>
                 </div>
                 {!user.isRcbRegisteredFree ? (
-                  <button
-                    onClick={handleMarkRegistered}
-                    disabled={rcbActionLoading}
-                    className="text-xs bg-white/10 text-white px-4 py-2 rounded-lg hover:bg-white/20 transition disabled:opacity-50 border border-white/10"
-                  >
-                    {rcbActionLoading ? 'Обработка...' : 'Перейти к регистрации ↗'}
-                  </button>
+                  <div className="flex flex-col gap-2">
+                    {/* 🔧 Две кнопки: основная + второстепенная */}
+                    <button
+                      onClick={handleMarkRegistered}
+                      disabled={rcbActionLoading}
+                      className="text-sm bg-gradient-to-r from-purple-600 to-cyan-600 text-white px-4 py-2.5 rounded-lg hover:shadow-lg hover:shadow-cyan-500/25 transition disabled:opacity-50 font-medium"
+                    >
+                      {rcbActionLoading ? 'Обработка...' : '✅ Я зарегистрирован в РЦБ'}
+                    </button>
+                    <button
+                      onClick={handleGoToRcb}
+                      className="text-xs text-slate-400 hover:text-slate-300 transition flex items-center gap-1"
+                    >
+                      Перейти к регистрации ↗
+                    </button>
+                  </div>
                 ) : (
                   <span className="text-xs text-neon-green font-medium">Аккаунт в РЦБ создан</span>
                 )}
               </div>
             </div>
+
+            {/* Шаг 3: Активация тарифа СМАРТ */}
             <div className="flex items-start gap-3">
               {user.rcbPaymentRequested ? (
                 <span className="text-neon-cyan text-xl mt-0.5 animate-pulse">⏳</span>
@@ -638,7 +654,6 @@ const Profile: React.FC = () => {
                 <span className="text-slate-500 text-xl mt-0.5">🔒</span>
               )}
               <div className="flex-1">
-                {/* 🆕 Кнопка "Для чего?" рядом с заголовком */}
                 <div className="flex items-center gap-2 mb-2">
                   <p className="text-sm text-slate-300">Активация тарифа СМАРТ (1990 ₽)</p>
                   <button
@@ -719,7 +734,6 @@ const Profile: React.FC = () => {
         </div>
       )}
 
-      {/* 🆕 Модалка "Для чего?" */}
       {showInfoModal && (
         <div className="fixed inset-0 bg-dark-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowInfoModal(null)}>
           <div className="glass p-6 w-full max-w-sm border border-white/10 shadow-2xl" onClick={(e) => e.stopPropagation()}>
