@@ -11,6 +11,8 @@ interface Event {
   cashbackAmount: number;
   referrerBonus: number;
   posterUrl: string | null;
+  isFree: boolean;
+  maxTickets: number | null;
   ticketsCount: number;
 }
 
@@ -113,39 +115,58 @@ export default function Events() {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {events.map(event => (
-              <div
-                key={event.id}
-                onClick={() => setSelectedEvent(event)}
-                className="bg-slate-900 border border-white/10 rounded-xl overflow-hidden cursor-pointer hover:border-cyan-500/30 transition-all group flex flex-col"
-              >
-                <div className="aspect-[2/3] w-full relative bg-slate-800">
-                  {event.posterUrl ? (
-                    <img
-                      src={event.posterUrl}
-                      alt={event.title}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                      }}
-                    />
-                  ) : null}
-                  <div
-                    className={`absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-600 to-cyan-600 ${
-                      event.posterUrl ? 'hidden' : ''
-                    }`}
-                  >
-                    <span className="text-white font-bold text-center px-2 text-sm">{event.title}</span>
+            {events.map(event => {
+              const isSoldOut = event.maxTickets !== null && event.maxTickets !== undefined && event.maxTickets <= 0;
+              const remaining = event.maxTickets !== null && event.maxTickets !== undefined ? event.maxTickets : null;
+              return (
+                <div
+                  key={event.id}
+                  onClick={() => !isSoldOut && setSelectedEvent(event)}
+                  className={`bg-slate-900 border border-white/10 rounded-xl overflow-hidden transition-all group flex flex-col relative ${
+                    isSoldOut ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:border-cyan-500/30'
+                  }`}
+                >
+                  {isSoldOut && (
+                    <div className="absolute top-2 left-2 z-10 px-2 py-1 bg-red-500/80 text-white text-xs font-bold rounded-lg border border-red-400/50">
+                      SOLD OUT
+                    </div>
+                  )}
+                  <div className="aspect-[2/3] w-full relative bg-slate-800">
+                    {event.posterUrl ? (
+                      <img
+                        src={event.posterUrl}
+                        alt={event.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className={`absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-600 to-cyan-600 ${
+                        event.posterUrl ? 'hidden' : ''
+                      }`}
+                    >
+                      <span className="text-white font-bold text-center px-2 text-sm">{event.title}</span>
+                    </div>
+                  </div>
+                  <div className="p-3 flex-1 flex flex-col">
+                    <h3 className="font-bold text-gray-100 text-sm mb-1 line-clamp-2">{event.title}</h3>
+                    <p className="text-xs text-gray-400 mb-1">📍 {event.location || 'Не указано'}</p>
+                    <p className="text-xs text-cyan-400 mb-2">📅 {formatDate(event.eventDate)}</p>
+                    {remaining !== null && (
+                      <p className={`text-xs font-medium ${isSoldOut ? 'text-red-400' : 'text-green-400'}`}>
+                        {isSoldOut ? '❌ Мест нет' : `🎫 Осталось: ${remaining}`}
+                      </p>
+                    )}
+                    {event.isFree && (
+                      <p className="text-xs text-green-400">🆓 Бесплатно</p>
+                    )}
                   </div>
                 </div>
-                <div className="p-3 flex-1 flex flex-col">
-                  <h3 className="font-bold text-gray-100 text-sm mb-1 line-clamp-2">{event.title}</h3>
-                  <p className="text-xs text-gray-400 mb-1">📍 {event.location || 'Не указано'}</p>
-                  <p className="text-xs text-cyan-400 mt-auto">📅 {formatDate(event.eventDate)}</p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -159,7 +180,6 @@ export default function Events() {
             className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* 🔧 ИСПРАВЛЕНО: афиша теперь показывается полностью без обрезки */}
             <div className="w-full relative bg-slate-800 max-h-[60vh] flex items-center justify-center">
               {selectedEvent.posterUrl ? (
                 <img
@@ -195,6 +215,29 @@ export default function Events() {
                 <p className="text-gray-300">📅 {formatDate(selectedEvent.eventDate)}</p>
               </div>
 
+              {/* 🆕 Счётчик мест */}
+              {selectedEvent.maxTickets !== null && selectedEvent.maxTickets !== undefined && (
+                <div className={`p-3 rounded-lg border ${
+                  selectedEvent.maxTickets <= 0
+                    ? 'bg-red-500/10 border-red-500/30'
+                    : 'bg-cyan-500/10 border-cyan-500/30'
+                }`}>
+                  <p className={`text-sm font-medium ${
+                    selectedEvent.maxTickets <= 0 ? 'text-red-400' : 'text-cyan-400'
+                  }`}>
+                    {selectedEvent.maxTickets <= 0
+                      ? '❌ Места закончились'
+                      : `🎫 Осталось мест: ${selectedEvent.maxTickets}`}
+                  </p>
+                </div>
+              )}
+
+              {selectedEvent.isFree && (
+                <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/30">
+                  <p className="text-sm font-medium text-green-400">🆓 Бесплатное мероприятие</p>
+                </div>
+              )}
+
               {selectedEvent.description && (
                 <div className="bg-slate-800/50 border border-white/10 rounded-lg p-4">
                   <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">
@@ -214,17 +257,27 @@ export default function Events() {
                 </div>
               </div>
 
-              <button
-                onClick={() => handleGetTicket(selectedEvent.id)}
-                disabled={gettingTicket === selectedEvent.id}
-                className={`w-full py-3 rounded-lg font-semibold transition ${
-                  gettingTicket === selectedEvent.id
-                    ? 'bg-slate-700 text-gray-500 cursor-not-allowed border border-white/10'
-                    : 'bg-gradient-to-r from-purple-600 to-cyan-600 text-white hover:shadow-lg hover:shadow-purple-500/25'
-                }`}
-              >
-                {gettingTicket === selectedEvent.id ? 'Получение...' : 'Получить билет'}
-              </button>
+              {/* 🆕 Блокировка кнопки при SOLD OUT */}
+              {selectedEvent.maxTickets !== null && selectedEvent.maxTickets !== undefined && selectedEvent.maxTickets <= 0 ? (
+                <button
+                  disabled
+                  className="w-full py-3 bg-slate-700 text-gray-500 rounded-lg font-semibold cursor-not-allowed border border-white/10"
+                >
+                  ❌ Места закончились
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleGetTicket(selectedEvent.id)}
+                  disabled={gettingTicket === selectedEvent.id}
+                  className={`w-full py-3 rounded-lg font-semibold transition ${
+                    gettingTicket === selectedEvent.id
+                      ? 'bg-slate-700 text-gray-500 cursor-not-allowed border border-white/10'
+                      : 'bg-gradient-to-r from-purple-600 to-cyan-600 text-white hover:shadow-lg hover:shadow-purple-500/25'
+                  }`}
+                >
+                  {gettingTicket === selectedEvent.id ? 'Получение...' : 'Получить билет'}
+                </button>
+              )}
             </div>
           </div>
         </div>

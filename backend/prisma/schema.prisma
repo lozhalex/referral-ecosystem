@@ -105,7 +105,9 @@ model Event {
   cashbackAmount Int       @default(50)
   referrerBonus  Int       @default(100)
   isActive       Boolean   @default(true)
-  posterUrl      String?   // 🆕 URL афиши мероприятия
+  posterUrl      String?
+  isFree         Boolean   @default(false)   // 🆕 Бесплатное мероприятие
+  maxTickets     Int?      // 🆕 Лимит мест (null = безлимит)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   

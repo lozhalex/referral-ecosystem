@@ -12,6 +12,8 @@ interface Event {
   referrerBonus: number;
   isActive: boolean;
   posterUrl: string | null;
+  isFree: boolean;
+  maxTickets: number | null;
   ticketsCount: number;
   controllersCount: number;
   controllers: {
@@ -24,6 +26,14 @@ interface User {
   id: number;
   phone: string;
   role: string;
+}
+
+interface TicketInfo {
+  id: number;
+  phone: string;
+  status: string;
+  scannedAt: string | null;
+  createdAt: string;
 }
 
 export default function AdminEvents() {
@@ -42,13 +52,21 @@ export default function AdminEvents() {
     description: '',
     location: '',
     eventDate: '',
-    cashbackAmount: 50,
-    referrerBonus: 100,
-    posterUrl: ''
+    cashbackAmount: 0,
+    referrerBonus: 0,
+    posterUrl: '',
+    isFree: false,
+    maxTickets: ''
   });
 
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+
+  // 🆕 Состояния для вкладки "Билеты"
+  const [showTicketsModal, setShowTicketsModal] = useState(false);
+  const [ticketsEvent, setTicketsEvent] = useState<Event | null>(null);
+  const [ticketsList, setTicketsList] = useState<TicketInfo[]>([]);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -76,9 +94,11 @@ export default function AdminEvents() {
       description: '',
       location: '',
       eventDate: '',
-      cashbackAmount: 50,
-      referrerBonus: 100,
-      posterUrl: ''
+      cashbackAmount: 0,
+      referrerBonus: 0,
+      posterUrl: '',
+      isFree: false,
+      maxTickets: ''
     });
     setShowForm(true);
   };
@@ -92,7 +112,9 @@ export default function AdminEvents() {
       eventDate: new Date(event.eventDate).toISOString().slice(0, 16),
       cashbackAmount: event.cashbackAmount,
       referrerBonus: event.referrerBonus,
-      posterUrl: event.posterUrl || ''
+      posterUrl: event.posterUrl || '',
+      isFree: event.isFree,
+      maxTickets: event.maxTickets !== null && event.maxTickets !== undefined ? String(event.maxTickets) : ''
     });
     setShowForm(true);
   };
@@ -102,15 +124,21 @@ export default function AdminEvents() {
     setError('');
     setSuccess('');
     try {
+      const submitData = {
+        ...formData,
+        cashbackAmount: Number(formData.cashbackAmount),
+        referrerBonus: Number(formData.referrerBonus),
+        maxTickets: formData.maxTickets === '' ? null : Number(formData.maxTickets)
+      };
       if (editingEvent) {
-        const response = await apiClient.put(`/api/events/${editingEvent.id}`, formData);
+        const response = await apiClient.put(`/api/events/${editingEvent.id}`, submitData);
         if (response.data.success) {
           setSuccess('✅ Мероприятие успешно обновлено!');
           setShowForm(false);
           loadData();
         }
       } else {
-        const response = await apiClient.post('/api/events', formData);
+        const response = await apiClient.post('/api/events', submitData);
         if (response.data.success) {
           setSuccess('✅ Мероприятие успешно создано!');
           setShowForm(false);
@@ -140,7 +168,6 @@ export default function AdminEvents() {
     }
   };
 
-  // ✅ Эта функция вызывается в модалке ниже (кнопка "❌ Убрать")
   const handleRemoveController = async (eventId: number, userId: number) => {
     if (!confirm('Убрать этого контролёра с мероприятия?')) return;
     try {
@@ -152,6 +179,45 @@ export default function AdminEvents() {
     } catch (err: any) {
       setError(err.response?.data?.message || 'Ошибка при удалении контролёра');
     }
+  };
+
+  // 🆕 Открыть модалку билетов
+  const openTicketsModal = async (event: Event) => {
+    setTicketsEvent(event);
+    setShowTicketsModal(true);
+    setTicketsLoading(true);
+    try {
+      const response = await apiClient.get(`/api/events/${event.id}/tickets`);
+      if (response.data.success) {
+        setTicketsList(response.data.tickets);
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Ошибка загрузки билетов');
+    } finally {
+      setTicketsLoading(false);
+    }
+  };
+
+  // 🆕 Удалить билет (админ)
+  const handleDeleteTicket = async (ticketId: number) => {
+    if (!ticketsEvent) return;
+    if (!confirm('Удалить этот билет? Место будет освобождено.')) return;
+    try {
+      const response = await apiClient.delete(`/api/events/${ticketsEvent.id}/tickets/${ticketId}`);
+      if (response.data.success) {
+        setSuccess('✅ Билет удален, место освобождено');
+        openTicketsModal(ticketsEvent); // перезагрузить список
+        loadData();
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Ошибка удаления билета');
+    }
+  };
+
+  // 🆕 Экспорт CSV
+  const handleExportCSV = () => {
+    if (!ticketsEvent) return;
+    window.open(`/api/events/${ticketsEvent.id}/tickets/export`, '_blank');
   };
 
   const formatDate = (dateString: string) => {
@@ -169,6 +235,16 @@ export default function AdminEvents() {
   const filteredEvents = events
     .filter(e => activeTab === 'active' ? !isCompleted(e.eventDate) : isCompleted(e.eventDate))
     .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
+
+  // 🆕 Обработчик переключения "Бесплатное" — автообнуление полей
+  const handleIsFreeChange = (checked: boolean) => {
+    setFormData({
+      ...formData,
+      isFree: checked,
+      cashbackAmount: checked ? 0 : formData.cashbackAmount,
+      referrerBonus: checked ? 0 : formData.referrerBonus
+    });
+  };
 
   if (loading) {
     return (
@@ -303,6 +379,36 @@ export default function AdminEvents() {
                   />
                 </div>
               </div>
+
+              {/* 🆕 Блок "Бесплатное" + "Макс. мест" */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-800/30 border border-white/5 rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="isFree"
+                    checked={formData.isFree}
+                    onChange={(e) => handleIsFreeChange(e.target.checked)}
+                    className="w-5 h-5 accent-purple-600"
+                  />
+                  <label htmlFor="isFree" className="text-sm font-medium text-gray-300 cursor-pointer">
+                    🆓 Бесплатное мероприятие
+                  </label>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">
+                    Макс. количество мест (0 или пусто = безлимит)
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.maxTickets}
+                    onChange={(e) => setFormData({ ...formData, maxTickets: e.target.value })}
+                    placeholder="Безлимит"
+                    className="w-full px-4 py-2 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 outline-none"
+                    min="0"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-400 mb-1">URL афиши (необязательно)</label>
                 <input
@@ -349,53 +455,81 @@ export default function AdminEvents() {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {filteredEvents.map(event => (
-              <div
-                key={event.id}
-                className="bg-slate-900 border border-white/10 rounded-xl overflow-hidden hover:border-cyan-500/30 transition-all group flex flex-col"
-              >
-                <div className="aspect-[2/3] w-full relative bg-slate-800">
-                  {event.posterUrl ? (
-                    <img
-                      src={event.posterUrl}
-                      alt={event.title}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                      }}
-                    />
-                  ) : null}
-                  <div
-                    className={`absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-600 to-cyan-600 ${
-                      event.posterUrl ? 'hidden' : ''
-                    }`}
-                  >
-                    <span className="text-white font-bold text-center px-2 text-sm">{event.title}</span>
-                  </div>
-                  <button
-                    onClick={() => openEditForm(event)}
-                    className="absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded-lg opacity-0 group-hover:opacity-100 transition hover:bg-black/70"
-                    title="Редактировать"
-                  >
-                    ✏️
-                  </button>
-                </div>
-                <div className="p-3 flex-1 flex flex-col">
-                  <h3 className="font-bold text-gray-100 text-sm mb-1 line-clamp-2">{event.title}</h3>
-                  <p className="text-xs text-gray-400 mb-1">📍 {event.location || 'Не указано'}</p>
-                  <p className="text-xs text-cyan-400 mb-3">📅 {formatDate(event.eventDate)}</p>
-                  <div className="mt-auto pt-2 border-t border-white/5">
-                    <button
-                      onClick={() => setSelectedEventId(event.id)}
-                      className="w-full py-1.5 text-xs bg-purple-500/20 text-purple-300 rounded-lg hover:bg-purple-500/30 transition border border-purple-500/30"
+            {filteredEvents.map(event => {
+              // 🆕 SOLD OUT: места закончились
+              const isSoldOut = event.maxTickets !== null && event.maxTickets !== undefined && event.maxTickets <= 0;
+              const remaining = event.maxTickets !== null && event.maxTickets !== undefined
+                ? event.maxTickets
+                : null;
+              return (
+                <div
+                  key={event.id}
+                  className="bg-slate-900 border border-white/10 rounded-xl overflow-hidden hover:border-cyan-500/30 transition-all group flex flex-col relative"
+                >
+                  {isSoldOut && (
+                    <div className="absolute top-2 left-2 z-10 px-2 py-1 bg-red-500/80 text-white text-xs font-bold rounded-lg border border-red-400/50">
+                      SOLD OUT
+                    </div>
+                  )}
+                  <div className="aspect-[2/3] w-full relative bg-slate-800">
+                    {event.posterUrl ? (
+                      <img
+                        src={event.posterUrl}
+                        alt={event.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className={`absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-600 to-cyan-600 ${
+                        event.posterUrl ? 'hidden' : ''
+                      }`}
                     >
-                      👮 Контролёры ({event.controllersCount})
+                      <span className="text-white font-bold text-center px-2 text-sm">{event.title}</span>
+                    </div>
+                    <button
+                      onClick={() => openEditForm(event)}
+                      className="absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded-lg opacity-0 group-hover:opacity-100 transition hover:bg-black/70"
+                      title="Редактировать"
+                    >
+                      ✏️
                     </button>
                   </div>
+                  <div className="p-3 flex-1 flex flex-col">
+                    <h3 className="font-bold text-gray-100 text-sm mb-1 line-clamp-2">{event.title}</h3>
+                    <p className="text-xs text-gray-400 mb-1">📍 {event.location || 'Не указано'}</p>
+                    <p className="text-xs text-cyan-400 mb-2">📅 {formatDate(event.eventDate)}</p>
+                    {/* 🆕 Инфо о местах */}
+                    {remaining !== null && (
+                      <p className={`text-xs mb-2 font-medium ${isSoldOut ? 'text-red-400' : 'text-green-400'}`}>
+                        {isSoldOut ? '❌ Мест нет' : `🎫 Осталось: ${remaining}`}
+                      </p>
+                    )}
+                    {event.isFree && (
+                      <p className="text-xs text-green-400 mb-2">🆓 Бесплатно</p>
+                    )}
+                    <div className="mt-auto pt-2 border-t border-white/5 space-y-1.5">
+                      <button
+                        onClick={() => setSelectedEventId(event.id)}
+                        className="w-full py-1.5 text-xs bg-purple-500/20 text-purple-300 rounded-lg hover:bg-purple-500/30 transition border border-purple-500/30"
+                      >
+                        👮 Контролёры ({event.controllersCount})
+                      </button>
+                      {/* 🆕 Кнопка "Билеты" */}
+                      <button
+                        onClick={() => openTicketsModal(event)}
+                        className="w-full py-1.5 text-xs bg-cyan-500/20 text-cyan-300 rounded-lg hover:bg-cyan-500/30 transition border border-cyan-500/30"
+                      >
+                        🎫 Билеты ({event.ticketsCount})
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -414,8 +548,6 @@ export default function AdminEvents() {
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-bold text-gray-100 mb-4">Управление контролёрами</h3>
-
-            {/* Блок уже назначенных контролёров — здесь вызывается handleRemoveController */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-400 mb-2">Назначенные контролёры:</label>
               <div className="max-h-40 overflow-y-auto space-y-2 mb-4">
@@ -452,8 +584,6 @@ export default function AdminEvents() {
                 )}
               </div>
             </div>
-
-            {/* Блок добавления нового контролёра */}
             <div className="border-t border-white/10 pt-4">
               <label className="block text-sm font-medium text-gray-400 mb-2">Добавить нового:</label>
               <div className="max-h-40 overflow-y-auto space-y-2 mb-4">
@@ -507,6 +637,87 @@ export default function AdminEvents() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🆕 Модалка "Билеты мероприятия" */}
+      {showTicketsModal && ticketsEvent && (
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setShowTicketsModal(false)}
+        >
+          <div
+            className="bg-slate-900 border border-white/10 rounded-xl shadow-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-100">🎫 Билеты: {ticketsEvent.title}</h3>
+                <p className="text-sm text-gray-400 mt-1">
+                  {ticketsEvent.maxTickets !== null && ticketsEvent.maxTickets !== undefined
+                    ? `Мест: ${ticketsEvent.maxTickets} / Всего билетов: ${ticketsList.length}`
+                    : `Безлимит. Всего билетов: ${ticketsList.length}`}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowTicketsModal(false)}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            {ticketsLoading ? (
+              <p className="text-gray-400 text-center py-8">Загрузка...</p>
+            ) : ticketsList.length === 0 ? (
+              <p className="text-gray-400 text-center py-8">Пока никто не получил билет</p>
+            ) : (
+              <>
+                <div className="space-y-2 mb-4">
+                  {ticketsList.map(ticket => (
+                    <div
+                      key={ticket.id}
+                      className="flex items-center justify-between bg-slate-800/50 border border-white/10 rounded-lg p-3"
+                    >
+                      <div className="flex-1">
+                        <p className="font-mono text-sm text-gray-200">{ticket.phone}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Получен: {new Date(ticket.createdAt).toLocaleString('ru-RU')}
+                          {ticket.scannedAt && ` • Использован: ${new Date(ticket.scannedAt).toLocaleString('ru-RU')}`}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full ${
+                            ticket.status === 'ACTIVE'
+                              ? 'bg-green-500/20 text-green-300'
+                              : ticket.status === 'USED'
+                              ? 'bg-gray-500/20 text-gray-400'
+                              : 'bg-red-500/20 text-red-300'
+                          }`}
+                        >
+                          {ticket.status === 'ACTIVE' ? 'Активен' : ticket.status === 'USED' ? 'Использован' : ticket.status}
+                        </span>
+                        <button
+                          onClick={() => handleDeleteTicket(ticket.id)}
+                          className="text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 px-2 py-1 rounded transition"
+                          title="Удалить билет (место освободится)"
+                        >
+                          🗑
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={handleExportCSV}
+                  className="w-full py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-green-500/25 transition flex items-center justify-center gap-2"
+                >
+                  📥 Скачать список участников (CSV)
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -39,6 +39,21 @@ export default function Tickets() {
     }
   };
 
+  // 🆕 Отмена билета
+  const handleCancelTicket = async (ticketId: number) => {
+    if (!confirm('Отменить билет? Место освободится для других.')) return;
+    try {
+      const response = await apiClient.delete(`/api/tickets/${ticketId}`);
+      if (response.data.success) {
+        alert('✅ Билет отменен');
+        setSelectedTicket(null);
+        loadTickets();
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Ошибка отмены билета');
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('ru-RU', {
@@ -144,7 +159,6 @@ export default function Tickets() {
             <p className="text-sm text-gray-400 mb-6">
               {formatDate(selectedTicket.event.eventDate)}
             </p>
-            {/* QR-код остаётся на белом фоне — иначе сканер не прочитает */}
             <div className="bg-white p-4 rounded-lg mb-4 inline-block">
               <QRCodeSVG
                 value={selectedTicket.qrCode}
@@ -156,9 +170,18 @@ export default function Tickets() {
               {selectedTicket.qrCode}
             </p>
             {selectedTicket.status === 'ACTIVE' ? (
-              <p className="text-sm text-green-400 font-medium mb-4">
-                ✅ Билет активен. Покажите QR на входе.
-              </p>
+              <>
+                <p className="text-sm text-green-400 font-medium mb-4">
+                  ✅ Билет активен. Покажите QR на входе.
+                </p>
+                {/* 🆕 Кнопка отмены */}
+                <button
+                  onClick={() => handleCancelTicket(selectedTicket.id)}
+                  className="w-full py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition border border-red-500/30 text-sm font-medium mb-2"
+                >
+                  🗑 Отменить билет
+                </button>
+              </>
             ) : (
               <p className="text-sm text-gray-500 mb-4">
                 Билет уже использован
