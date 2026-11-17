@@ -37,6 +37,8 @@ const Profile: React.FC = () => {
     cost: '',
     comment: ''
   });
+  // 🆕 Состояние для модалки "Для чего?"
+  const [showInfoModal, setShowInfoModal] = useState<'rcb' | 'smart' | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerId = 'qr-scanner-container';
 
@@ -594,9 +596,10 @@ const Profile: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-5">
+            {/* 🔧 ИСПРАВЛЕНО: RefPro → «Бумеранг» */}
             <div className="flex items-center gap-3">
               <span className="text-neon-green text-xl">✅</span>
-              <span className="text-sm text-slate-300">Регистрация в RefPro — <span className="font-semibold text-white">Выполнено</span></span>
+              <span className="text-sm text-slate-300">Регистрация в «Бумеранг» — <span className="font-semibold text-white">Выполнено</span></span>
             </div>
             <div className="flex items-start gap-3">
               {user.isRcbRegisteredFree ? (
@@ -605,7 +608,16 @@ const Profile: React.FC = () => {
                 <span className="text-slate-500 text-xl mt-0.5">⏳</span>
               )}
               <div className="flex-1">
-                <p className="text-sm text-slate-300 mb-2">Регистрация в РЦБ (бесплатно)</p>
+                {/* 🆕 Кнопка "Для чего?" рядом с заголовком */}
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-sm text-slate-300">Регистрация в РЦБ (бесплатно)</p>
+                  <button
+                    onClick={() => setShowInfoModal('rcb')}
+                    className="text-xs text-neon-cyan underline underline-offset-2 hover:text-white transition whitespace-nowrap"
+                  >
+                    Для чего?
+                  </button>
+                </div>
                 {!user.isRcbRegisteredFree ? (
                   <button
                     onClick={handleMarkRegistered}
@@ -626,7 +638,16 @@ const Profile: React.FC = () => {
                 <span className="text-slate-500 text-xl mt-0.5">🔒</span>
               )}
               <div className="flex-1">
-                <p className="text-sm text-slate-300 mb-2">Активация тарифа СМАРТ (1990 ₽)</p>
+                {/* 🆕 Кнопка "Для чего?" рядом с заголовком */}
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-sm text-slate-300">Активация тарифа СМАРТ (1990 ₽)</p>
+                  <button
+                    onClick={() => setShowInfoModal('smart')}
+                    className="text-xs text-neon-cyan underline underline-offset-2 hover:text-white transition whitespace-nowrap"
+                  >
+                    Для чего?
+                  </button>
+                </div>
                 {!user.rcbPaymentRequested && user.isRcbRegisteredFree && (
                   <>
                     <p className="text-xs text-slate-400 mb-3 leading-relaxed">
@@ -695,6 +716,53 @@ const Profile: React.FC = () => {
       {copied && (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-neon-green text-dark-900 px-5 py-2.5 rounded-xl shadow-neon-green text-sm font-bold z-50">
           ✅ Ссылка скопирована!
+        </div>
+      )}
+
+      {/* 🆕 Модалка "Для чего?" */}
+      {showInfoModal && (
+        <div className="fixed inset-0 bg-dark-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowInfoModal(null)}>
+          <div className="glass p-6 w-full max-w-sm border border-white/10 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xl font-bold text-white mb-3 font-display">
+              {showInfoModal === 'rcb' ? 'Зачем нужна регистрация в РЦБ?' : 'Зачем нужен тариф СМАРТ?'}
+            </h3>
+            <div className="text-sm text-slate-300 leading-relaxed space-y-3 mb-5">
+              {showInfoModal === 'rcb' ? (
+                <>
+                  <p>
+                    РЦБ — это внешняя партнёрская система, через которую в Бумеранге проходят оплаты и реферальные начисления.
+                  </p>
+                  <p>
+                    Бесплатная регистрация создаёт ваш личный аккаунт в РЦБ. Это <strong className="text-white">обязательный шаг</strong> перед активацией партнёрского статуса.
+                  </p>
+                  <p className="text-slate-400 text-xs">
+                    Без аккаунта в РЦБ вы не сможете оплатить тариф СМАРТ и получать бонусы за приглашённых.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p>
+                    Тариф <strong className="text-white">СМАРТ</strong> — это партнёрский статус участника закрытого клуба Бумеранг.
+                  </p>
+                  <p className="text-slate-400 text-xs">Что он даёт:</p>
+                  <ul className="space-y-1.5 text-sm">
+                    <li className="flex gap-2"><span className="text-neon-green">✓</span> Доступ ко всем модулям экосистемы</li>
+                    <li className="flex gap-2"><span className="text-neon-green">✓</span> Личную реферальную ссылку</li>
+                    <li className="flex gap-2"><span className="text-neon-green">✓</span> Бонусы за каждого приглашённого участника</li>
+                  </ul>
+                  <p className="text-slate-400 text-xs">
+                    Оплата 1990 ₽ проходит внутри РЦБ. После подтверждения оплаты администратором статус активируется автоматически.
+                  </p>
+                </>
+              )}
+            </div>
+            <button
+              onClick={() => setShowInfoModal(null)}
+              className="w-full py-3 btn-neon font-medium text-sm"
+            >
+              Понятно
+            </button>
+          </div>
         </div>
       )}
 
