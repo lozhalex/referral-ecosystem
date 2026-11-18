@@ -1,11 +1,15 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { requireAdmin } from '../middleware/requireAdmin';
+import { authenticateToken } from '../middleware/authenticateToken';
 
 const router = Router();
 const prisma = new PrismaClient();
 
-// GET /api/events — список активных мероприятий
+// 🆕 Подключаем аутентификацию ко ВСЕМ роутам
+router.use(authenticateToken);
+
+// GET /api/events — список активных мероприятий с контролерами
 router.get('/', async (req: Request, res: Response) => {
   try {
     const events = await prisma.event.findMany({
@@ -14,7 +18,9 @@ router.get('/', async (req: Request, res: Response) => {
       include: {
         _count: { select: { tickets: true, controllers: true } },
         controllers: {
-          include: { user: { select: { id: true, phone: true, role: true } } }
+          include: {
+            user: { select: { id: true, phone: true, role: true } }
+          }
         }
       }
     });
@@ -100,18 +106,20 @@ router.post('/:id/controllers', requireAdmin, async (req: Request, res: Response
   try {
     const eventId = Number(req.params.id);
     const { userId } = req.body;
-    if (!userId) return res.status(400).json({ success: false, message: 'userId обязателен' });
-    
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'userId обязателен' });
+    }
     const event = await prisma.event.findUnique({ where: { id: eventId } });
-    if (!event) return res.status(404).json({ success: false, message: 'Мероприятие не найдено' });
-    
+    if (!event) {
+      return res.status(404).json({ success: false, message: 'Мероприятие не найдено' });
+    }
     const user = await prisma.user.findUnique({ where: { id: Number(userId) } });
-    if (!user) return res.status(404).json({ success: false, message: 'Пользователь не найден' });
-    
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Пользователь не найден' });
+    }
     if (user.role !== 'controller' && user.role !== 'admin') {
       await prisma.user.update({ where: { id: Number(userId) }, data: { role: 'controller' } });
     }
-    
     const controller = await prisma.eventController.create({
       data: { eventId, userId: Number(userId) }
     });
@@ -131,7 +139,9 @@ router.delete('/:eventId/controllers/:userId', requireAdmin, async (req: Request
     const eventId = Number(req.params.eventId);
     const userId = Number(req.params.userId);
     await prisma.eventController.delete({
-      where: { eventId_userId: { eventId, userId } }
+      where: {
+        eventId_userId: { eventId, userId }
+      }
     });
     res.json({ success: true, message: 'Контролер успешно удален' });
   } catch (err: any) {
