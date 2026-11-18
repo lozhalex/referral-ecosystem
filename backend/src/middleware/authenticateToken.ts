@@ -21,7 +21,7 @@ export const authenticateToken = async (req: any, res: Response, next: NextFunct
     try {
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
-        select: { tokenVersion: true, roles: true } // 🆕 Было: role: true
+        select: { tokenVersion: true, role: true, roles: true }
       });
 
       if (!user) {
@@ -35,8 +35,8 @@ export const authenticateToken = async (req: any, res: Response, next: NextFunct
         });
       }
 
-      // 🆕 Добавляем массив ролей из БД в запрос
-      req.user = { ...decoded, roles: user.roles };
+      // 🆕 Возвращаем ОБА поля: актуальный legacy role и JSON-строку roles
+      req.user = { ...decoded, role: user.role, roles: user.roles };
       next();
     } catch (error) {
       console.error('Ошибка аутентификации (Token Version check):', error);

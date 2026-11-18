@@ -11,33 +11,35 @@ model User {
   id             Int       @id @default(autoincrement())
   phone          String    @unique
   passwordHash   String
-  
-  // 🆕 SQLite не поддерживает String[], используем Json для хранения массива
-  roles          Json      @default("[\"user\"]") 
-  
-  isRcbPaid            Boolean   @default(false) 
-  rcbId                String?   
-  rcbReferralLink      String?   
-  isRcbRegisteredFree  Boolean   @default(false) 
-  rcbPaymentRequested  Boolean   @default(false) 
+
+  // 🆕 Массив ролей хранится как JSON-строка (SQLite не умеет ни String[], ни Json)
+  roles          String    @default("[\"user\"]")
+  // ⚠️ legacy-поле: дубликат первой роли для совместимости со старым кодом (вход/сканер/контролёры)
+  role           String    @default("user")
+
+  isRcbPaid            Boolean   @default(false)
+  rcbId                String?
+  rcbReferralLink      String?
+  isRcbRegisteredFree  Boolean   @default(false)
+  rcbPaymentRequested  Boolean   @default(false)
   isPaidMember         Boolean   @default(false)
   referralCount        Int       @default(0)
-  
-  isFounder          Boolean   @default(false) 
+
+  isFounder          Boolean   @default(false)
   tokenVersion       Int       @default(1)
   isSuspicious       Boolean   @default(false)
-  preferredContact   String?   
+  preferredContact   String?
 
   referredById   Int?
   referredBy     User?     @relation("UserReferrals", fields: [referredById], references: [id])
   referrals      User[]    @relation("UserReferrals")
-  
+
   pushSubscriptions PushSubscription[]
-  
+
   wallet         Wallet?
   auditLogsAsAdmin   TreeAuditLog[] @relation("AuditAdmin")
   auditLogsAsTarget  TreeAuditLog[] @relation("AuditTarget")
-  
+
   tickets            Ticket[]            @relation("TicketOwner")
   scannedTickets     Ticket[]            @relation("ScannerUser")
   eventsAsController EventController[]
@@ -52,7 +54,7 @@ model User {
   masters                Master[]
   mileageChecks          MileageCheck[]
   autoSettings           UserAutoSettings?
-  
+
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   serviceAccessQrsClient ServiceAccessQR[] @relation("ServiceAccessQRClient")
@@ -70,17 +72,17 @@ model Transaction {
   id               String   @id @default(uuid())
   walletId         Int
   amount           Int
-  totalAmount      Int      @default(0) 
-  paidWithBonuses  Int      @default(0) 
-  realMoneyAmount  Int      @default(0) 
-  type             String   
+  totalAmount      Int      @default(0)
+  paidWithBonuses  Int      @default(0)
+  realMoneyAmount  Int      @default(0)
+  type             String
   description      String
   status           String   @default("AVAILABLE")
-  unlockDate       DateTime? 
+  unlockDate       DateTime?
   referenceId      String?
   createdAt        DateTime @default(now())
   wallet           Wallet   @relation(fields: [walletId], references: [id])
-  
+
   @@index([status])
   @@index([unlockDate])
 }
@@ -112,7 +114,7 @@ model Event {
   maxTickets     Int?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
-  
+
   tickets        Ticket[]
   controllers    EventController[]
 }
@@ -127,11 +129,11 @@ model Ticket {
   scannedById Int?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  
+
   user        User      @relation("TicketOwner", fields: [userId], references: [id])
   event       Event     @relation(fields: [eventId], references: [id])
   scannedBy   User?     @relation("ScannerUser", fields: [scannedById], references: [id])
-  
+
   @@unique([userId, eventId])
   @@index([qrCode])
   @@index([eventId, status])
@@ -142,17 +144,17 @@ model EventController {
   eventId   Int
   userId    Int
   createdAt DateTime  @default(now())
-  
+
   event     Event     @relation(fields: [eventId], references: [id])
   user      User      @relation(fields: [userId], references: [id])
-  
+
   @@unique([eventId, userId])
 }
 
 model RcbRequest {
   id              String   @id @default(uuid())
-  userId          Int      
-  referredById    Int?     
+  userId          Int
+  referredById    Int?
   status          String   @default("PENDING")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -175,7 +177,7 @@ model Car {
   vin         String    @default("")
   mileage     Int       @default(0)
   isDeleted   Boolean   @default(false)
-  
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -198,7 +200,7 @@ model ServiceRecord {
   work        String    @default("")
   cost        Int       @default(0)
   comment     String    @default("")
-  
+
   createdAt   DateTime  @default(now())
 
   car         Car       @relation(fields: [carId], references: [id])
@@ -207,7 +209,7 @@ model ServiceRecord {
 
   @@index([carId, date])
   @@index([userId])
-  
+
   source      String    @default("owner")
   authorId    Int?
 }
@@ -262,9 +264,9 @@ model PushSubscription {
   p256dh    String
   auth      String
   createdAt DateTime @default(now())
-  
+
   user      User     @relation(fields: [userId], references: [id])
-  
+
   @@index([userId])
 }
 
@@ -276,7 +278,7 @@ model ServiceAccessQR {
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime @default(now())
-  
+
   car       Car      @relation(fields: [carId], references: [id])
   client    User     @relation("ServiceAccessQRClient", fields: [clientId], references: [id])
 }
