@@ -65,11 +65,8 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
     work: '',
     comment: ''
   });
-
-  // 🆕 Состояние для модалки "Поделиться"
   const [showShareModal, setShowShareModal] = useState(false);
 
-  // 🆕 Получаем номер телефона текущего пользователя из localStorage
   const userPhone = (() => {
     try {
       const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -402,7 +399,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
     return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
   };
 
-  // 🆕 Кнопка "Пригласить друга" — вынесем в отдельный блок, чтобы использовать в нескольких местах
   const inviteButton = (
     <button
       onClick={() => setShowShareModal(true)}
@@ -413,13 +409,42 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
     </button>
   );
 
-  // 🆕 Модалка "Поделиться" — тоже вынесем, чтобы не дублировать
   const shareModal = showShareModal && (
     <ShareModal
       moduleId="auto"
       userPhone={userPhone}
       onClose={() => setShowShareModal(false)}
     />
+  );
+
+  const mileageModal = showMileageModal && (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm">
+        <div className="p-4 border-b border-white/10 flex justify-between items-center">
+          <h3 className="font-bold text-gray-100">Введите пробег</h3>
+          <button onClick={() => setShowMileageModal(false)} className="text-gray-400 hover:text-white text-xl transition-colors">×</button>
+        </div>
+        <form onSubmit={handleMileageSubmit} className="p-4 space-y-4">
+          <p className="text-sm text-gray-400">
+            Текущий пробег: <strong className="text-cyan-400">{cars.find(c => c.id === selectedCarId)?.mileage} км</strong>
+          </p>
+          <input
+            type="number"
+            required
+            value={mileageInput}
+            onChange={(e) => setMileageInput(e.target.value)}
+            placeholder="Введите текущий пробег"
+            className="w-full px-3 py-2.5 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all placeholder-gray-500"
+          />
+          <button
+            type="submit"
+            className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
+          >
+            Сохранить
+          </button>
+        </form>
+      </div>
+    </div>
   );
 
   if (loading) {
@@ -487,12 +512,9 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
             Ввести пробег
           </button>
         </div>
-
-        {/* 🆕 Кнопка "Пригласить друга" в состоянии "пробег не введён" */}
         {inviteButton}
-
-        {/* 🆕 Модалка */}
         {shareModal}
+        {mileageModal}
       </div>
     );
   }
@@ -569,7 +591,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         </div>
       )}
 
-      {/* 🆕 Кнопка "Пригласить друга" в основном состоянии Dashboard */}
       {inviteButton}
 
       <div>
@@ -635,35 +656,7 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         )}
       </div>
 
-      {showMileageModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm">
-            <div className="p-4 border-b border-white/10 flex justify-between items-center">
-              <h3 className="font-bold text-gray-100">Введите пробег</h3>
-              <button onClick={() => setShowMileageModal(false)} className="text-gray-400 hover:text-white text-xl transition-colors">×</button>
-            </div>
-            <form onSubmit={handleMileageSubmit} className="p-4 space-y-4">
-              <p className="text-sm text-gray-400">
-                Текущий пробег: <strong className="text-cyan-400">{cars.find(c => c.id === selectedCarId)?.mileage} км</strong>
-              </p>
-              <input
-                type="number"
-                required
-                value={mileageInput}
-                onChange={(e) => setMileageInput(e.target.value)}
-                placeholder="Введите текущий пробег"
-                className="w-full px-3 py-2.5 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all placeholder-gray-500"
-              />
-              <button
-                type="submit"
-                className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
-              >
-                Сохранить
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      {mileageModal}
 
       {showOsagoModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -770,7 +763,6 @@ const Dashboard: React.FC<DashboardProps> = ({ selectedCarId, onCarChange, onTab
         </div>
       )}
 
-      {/* 🆕 Модалка "Поделиться" в основном состоянии */}
       {shareModal}
     </div>
   );

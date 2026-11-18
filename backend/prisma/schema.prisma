@@ -12,14 +12,7 @@ model User {
   phone          String    @unique
   passwordHash   String
   
-  // ==========================================
-  // 1. СИСТЕМНЫЕ РОЛИ И ПРАВА ДОСТУПА
-  // ==========================================
-  role           String    @default("user") // "user", "cashier", "controller", "admin", "SUPER_ADMIN", "service_master"
-  
-  // ==========================================
-  // 2. БИЗНЕС-СТАТУС (Платный / Бесплатный)
-  // ==========================================
+  role           String    @default("user")
   isRcbPaid            Boolean   @default(false) 
   rcbId                String?   
   rcbReferralLink      String?   
@@ -28,17 +21,11 @@ model User {
   isPaidMember         Boolean   @default(false)
   referralCount        Int       @default(0)
   
-  // ==========================================
-  // 3. ЗАЩИТА И БЕЗОПАСНОСТЬ
-  // ==========================================
   isFounder          Boolean   @default(false) 
   tokenVersion       Int       @default(1)
   isSuspicious       Boolean   @default(false)
   preferredContact   String?   
 
-  // ==========================================
-  // 4. СВЯЗИ И ОТНОШЕНИЯ
-  // ==========================================
   referredById   Int?
   referredBy     User?     @relation("UserReferrals", fields: [referredById], references: [id])
   referrals      User[]    @relation("UserReferrals")
@@ -56,10 +43,9 @@ model User {
   rcbRequestsSent     RcbRequest[] @relation("RcbRequestSender")
   rcbRequestsReceived RcbRequest[] @relation("RcbRequestReceiver")
 
-  // --- ПОМОЩНИК АВТОМОБИЛИСТА ---
   cars                   Car[]
   serviceRecords         ServiceRecord[]
-  serviceRecordsAsAuthor ServiceRecord[] @relation("ServiceRecordAuthor") // 🆕 ДОБАВЛЕНО
+  serviceRecordsAsAuthor ServiceRecord[] @relation("ServiceRecordAuthor")
   serviceInterval        ServiceInterval?
   masters                Master[]
   mileageChecks          MileageCheck[]
@@ -119,6 +105,9 @@ model Event {
   cashbackAmount Int       @default(50)
   referrerBonus  Int       @default(100)
   isActive       Boolean   @default(true)
+  posterUrl      String?   // 🆕 URL афиши мероприятия
+  isFree         Boolean   @default(false)   // 🆕 Бесплатное мероприятие
+  maxTickets     Int?      // 🆕 Лимит мест (null = безлимит)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   
@@ -212,12 +201,12 @@ model ServiceRecord {
 
   car         Car       @relation(fields: [carId], references: [id])
   user        User      @relation(fields: [userId], references: [id])
-  author      User?     @relation("ServiceRecordAuthor", fields: [authorId], references: [id]) // 🆕 ДОБАВЛЕНО
+  author      User?     @relation("ServiceRecordAuthor", fields: [authorId], references: [id])
 
   @@index([carId, date])
   @@index([userId])
   
-  source      String    @default("owner") // "owner" | "service_master"
+  source      String    @default("owner")
   authorId    Int?
 }
 

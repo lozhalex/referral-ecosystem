@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { getAdminRcbRequests, approveAdminRcbRequest } from '../api/rcb';
 import ReferralTree from '../components/ReferralTree';
+import ExportImport from '../components/ExportImport';
 
 interface User {
   id: number;
@@ -58,7 +59,8 @@ const ROLE_BADGE_CLASS: { [key: string]: string } = {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'tree' | 'logs' | 'rcb'>('users');
+  // 🆕 ИСПРАВЛЕНО: удален дублирующийся useState
+  const [activeTab, setActiveTab] = useState<'users' | 'tree' | 'logs' | 'rcb' | 'export'>('users');
   const [users, setUsers] = useState<User[]>([]);
   const [searchPhone, setSearchPhone] = useState('');
   const [selectedUser, setSelectedUser] = useState<UserDetail | null>(null);
@@ -300,6 +302,7 @@ export default function AdminDashboard() {
               <div className="flex items-start gap-3 flex-1">
                 <div className="flex-shrink-0">
                   <svg className="h-6 w-6 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    {/* 🆕 ИСПРАВЛЕНО: удален дублирующийся тег <path> */}
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                   </svg>
                 </div>
@@ -336,6 +339,7 @@ export default function AdminDashboard() {
           <button onClick={() => setActiveTab('tree')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition whitespace-nowrap ${activeTab === 'tree' ? 'bg-slate-800 text-cyan-400 border-t border-l border-r border-white/10' : 'text-gray-400 hover:text-gray-200 hover:bg-slate-800/50'}`}>🌳 Визуальное дерево</button>
           <button onClick={() => setActiveTab('logs')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition whitespace-nowrap ${activeTab === 'logs' ? 'bg-slate-800 text-cyan-400 border-t border-l border-r border-white/10' : 'text-gray-400 hover:text-gray-200 hover:bg-slate-800/50'}`}>📋 Аудит</button>
           <button onClick={() => setActiveTab('rcb')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition whitespace-nowrap ${activeTab === 'rcb' ? 'bg-slate-800 text-cyan-400 border-t border-l border-r border-white/10' : 'text-gray-400 hover:text-gray-200 hover:bg-slate-800/50'}`}>🌉 Заявки РЦБ</button>
+          <button onClick={() => setActiveTab('export')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition whitespace-nowrap ${activeTab === 'export' ? 'bg-slate-800 text-cyan-400 border-t border-l border-r border-white/10' : 'text-gray-400 hover:text-gray-200 hover:bg-slate-800/50'}`}>💾 Экспорт/Импорт</button>
         </div>
 
         {error && <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg mb-6">{error}</div>}
@@ -475,6 +479,8 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+
+        {activeTab === 'export' && <ExportImport />}
 
         {selectedUser && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">

@@ -6,6 +6,7 @@ import { hasRole, isPartner } from '../utils/roles';
 import { CATEGORIES, getCategoryName } from './AutoHelper/categories';
 import { Html5Qrcode } from 'html5-qrcode';
 import Skeleton from '../components/Skeleton';
+import ShareModal from '../components/ShareModal';
 
 const Profile: React.FC = () => {
   const navigate = useNavigate();
@@ -37,6 +38,8 @@ const Profile: React.FC = () => {
     cost: '',
     comment: ''
   });
+  const [showInfoModal, setShowInfoModal] = useState<'rcb' | 'smart' | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerId = 'qr-scanner-container';
 
@@ -121,8 +124,11 @@ const Profile: React.FC = () => {
     }
   };
 
-  const handleMarkRegistered = async () => {
+  const handleGoToRcb = () => {
     window.open('https://rcpay.ru', '_blank');
+  };
+
+  const handleMarkRegistered = async () => {
     setRcbActionLoading(true);
     try {
       const res = await markRcbRegistered();
@@ -318,12 +324,19 @@ const Profile: React.FC = () => {
   if (!user) return null;
 
   const isServiceMaster = user.role === 'service_master';
+  const userPhoneForShare = user?.phone || '';
 
   return (
     <div className="min-h-screen p-4 pb-24 max-w-md mx-auto">
-      <div className="flex items-center justify-between mb-8 mt-2">
+      <div className="flex items-center justify-between mb-8 mt-2 flex-wrap gap-2">
         <button onClick={() => navigate('/')} className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition">
           <span>←</span> На главную
+        </button>
+        <button
+          onClick={() => setShowShareModal(true)}
+          className="text-sm text-gray-300 hover:text-white transition px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5"
+        >
+          Пригласить друга
         </button>
         <span className={`text-xs font-bold px-3 py-1.5 rounded-full border ${isPartner(user) ? 'text-neon-green border-neon-green/30 bg-neon-green/10' : 'text-slate-400 border-white/10 bg-white/5'}`}>
           {isPartner(user) ? 'ПАРТНЕР СМАРТ' : 'БЕСПЛАТНЫЙ УЧАСТНИК'}
@@ -356,7 +369,7 @@ const Profile: React.FC = () => {
         </div>
       </div>
 
-      {hasRole(user.role, ['admin', 'SUPER_ADMIN', 'cashier', 'controller', 'service_master' as any]) && (
+       {hasRole(user.roles, ['admin', 'SUPER_ADMIN', 'cashier', 'controller', 'service_master', 'event_organizer']) && (
         <div className="glass p-4 mb-6 border border-neon-purple/20">
           <p className="text-xs text-slate-400 mb-1 uppercase tracking-wider">Системная роль</p>
           <p className="text-lg font-semibold text-neon-purple font-display capitalize">{user.role}</p>
@@ -596,7 +609,7 @@ const Profile: React.FC = () => {
           <div className="space-y-5">
             <div className="flex items-center gap-3">
               <span className="text-neon-green text-xl">✅</span>
-              <span className="text-sm text-slate-300">Регистрация в RefPro — <span className="font-semibold text-white">Выполнено</span></span>
+              <span className="text-sm text-slate-300">Регистрация в «Бумеранг» — <span className="font-semibold text-white">Выполнено</span></span>
             </div>
             <div className="flex items-start gap-3">
               {user.isRcbRegisteredFree ? (
@@ -605,15 +618,31 @@ const Profile: React.FC = () => {
                 <span className="text-slate-500 text-xl mt-0.5">⏳</span>
               )}
               <div className="flex-1">
-                <p className="text-sm text-slate-300 mb-2">Регистрация в РЦБ (бесплатно)</p>
-                {!user.isRcbRegisteredFree ? (
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-sm text-slate-300">Регистрация в РЦБ (бесплатно)</p>
                   <button
-                    onClick={handleMarkRegistered}
-                    disabled={rcbActionLoading}
-                    className="text-xs bg-white/10 text-white px-4 py-2 rounded-lg hover:bg-white/20 transition disabled:opacity-50 border border-white/10"
+                    onClick={() => setShowInfoModal('rcb')}
+                    className="text-xs text-neon-cyan underline underline-offset-2 hover:text-white transition whitespace-nowrap"
                   >
-                    {rcbActionLoading ? 'Обработка...' : 'Перейти к регистрации ↗'}
+                    Для чего?
                   </button>
+                </div>
+                {!user.isRcbRegisteredFree ? (
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={handleMarkRegistered}
+                      disabled={rcbActionLoading}
+                      className="text-sm bg-gradient-to-r from-purple-600 to-cyan-600 text-white px-4 py-2.5 rounded-lg hover:shadow-lg hover:shadow-cyan-500/25 transition disabled:opacity-50 font-medium"
+                    >
+                      {rcbActionLoading ? 'Обработка...' : '✅ Я зарегистрирован в РЦБ'}
+                    </button>
+                    <button
+                      onClick={handleGoToRcb}
+                      className="text-xs text-slate-400 hover:text-slate-300 transition flex items-center gap-1"
+                    >
+                      Перейти к регистрации ↗
+                    </button>
+                  </div>
                 ) : (
                   <span className="text-xs text-neon-green font-medium">Аккаунт в РЦБ создан</span>
                 )}
@@ -626,7 +655,15 @@ const Profile: React.FC = () => {
                 <span className="text-slate-500 text-xl mt-0.5">🔒</span>
               )}
               <div className="flex-1">
-                <p className="text-sm text-slate-300 mb-2">Активация тарифа СМАРТ (1990 ₽)</p>
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-sm text-slate-300">Активация тарифа СМАРТ (1990 ₽)</p>
+                  <button
+                    onClick={() => setShowInfoModal('smart')}
+                    className="text-xs text-neon-cyan underline underline-offset-2 hover:text-white transition whitespace-nowrap"
+                  >
+                    Для чего?
+                  </button>
+                </div>
                 {!user.rcbPaymentRequested && user.isRcbRegisteredFree && (
                   <>
                     <p className="text-xs text-slate-400 mb-3 leading-relaxed">
@@ -673,13 +710,14 @@ const Profile: React.FC = () => {
       </div>
 
       <div className="space-y-3">
+        {/* 🔧 ИСПРАВЛЕНО: убран эмодзи 🔗 */}
         <button onClick={() => setShowInviteModal(true)} className="w-full py-3.5 btn-neon flex items-center justify-center gap-2 text-sm">
-          <span>🔗</span> Пригласить друга
+          Пригласить друга
         </button>
         <button onClick={() => navigate('/change-password')} className="w-full py-3 bg-white/5 text-slate-300 rounded-xl font-medium hover:bg-white/10 transition border border-white/5 text-sm">
           Сменить пароль
         </button>
-        {hasRole(user.role, ['admin', 'SUPER_ADMIN']) && (
+        {hasRole(user.roles, ['admin', 'SUPER_ADMIN']) && (
           <button
             onClick={() => navigate('/admin')}
             className="w-full py-3 bg-neon-purple/10 text-neon-purple rounded-xl font-medium hover:bg-neon-purple/20 transition border border-neon-purple/20 text-sm"
@@ -695,6 +733,52 @@ const Profile: React.FC = () => {
       {copied && (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-neon-green text-dark-900 px-5 py-2.5 rounded-xl shadow-neon-green text-sm font-bold z-50">
           ✅ Ссылка скопирована!
+        </div>
+      )}
+
+      {showInfoModal && (
+        <div className="fixed inset-0 bg-dark-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowInfoModal(null)}>
+          <div className="glass p-6 w-full max-w-sm border border-white/10 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xl font-bold text-white mb-3 font-display">
+              {showInfoModal === 'rcb' ? 'Зачем нужна регистрация в РЦБ?' : 'Зачем нужен тариф СМАРТ?'}
+            </h3>
+            <div className="text-sm text-slate-300 leading-relaxed space-y-3 mb-5">
+              {showInfoModal === 'rcb' ? (
+                <>
+                  <p>
+                    РЦБ — это внешняя партнёрская система, через которую в Бумеранге проходят оплаты и реферальные начисления.
+                  </p>
+                  <p>
+                    Бесплатная регистрация создаёт ваш личный аккаунт в РЦБ. Это <strong className="text-white">обязательный шаг</strong> перед активацией партнёрского статуса.
+                  </p>
+                  <p className="text-slate-400 text-xs">
+                    Без аккаунта в РЦБ вы не сможете оплатить тариф СМАРТ и получать бонусы за приглашённых.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p>
+                    Тариф <strong className="text-white">СМАРТ</strong> — это партнёрский статус участника закрытого клуба Бумеранг.
+                  </p>
+                  <p className="text-slate-400 text-xs">Что он даёт:</p>
+                  <ul className="space-y-1.5 text-sm">
+                    <li className="flex gap-2"><span className="text-neon-green">✓</span> Доступ ко всем модулям экосистемы</li>
+                    <li className="flex gap-2"><span className="text-neon-green">✓</span> Личную реферальную ссылку</li>
+                    <li className="flex gap-2"><span className="text-neon-green">✓</span> Бонусы за каждого приглашённого участника</li>
+                  </ul>
+                  <p className="text-slate-400 text-xs">
+                    Оплата 1990 ₽ проходит внутри РЦБ. После подтверждения оплаты администратором статус активируется автоматически.
+                  </p>
+                </>
+              )}
+            </div>
+            <button
+              onClick={() => setShowInfoModal(null)}
+              className="w-full py-3 btn-neon font-medium text-sm"
+            >
+              Понятно
+            </button>
+          </div>
         </div>
       )}
 
@@ -739,6 +823,14 @@ const Profile: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {showShareModal && (
+        <ShareModal
+          moduleId="profile"
+          userPhone={userPhoneForShare}
+          onClose={() => setShowShareModal(false)}
+        />
       )}
     </div>
   );

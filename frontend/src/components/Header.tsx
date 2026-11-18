@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import ShareModal from './ShareModal';
 
 interface HeaderProps {
   user: { phone: string; role: string } | null;
@@ -7,6 +9,9 @@ interface HeaderProps {
 
 export default function Header({ user, onLogout }: HeaderProps) {
   const navigate = useNavigate();
+  const [showShareModal, setShowShareModal] = useState(false);
+
+  const isAdmin = user?.role === 'admin' || user?.role === 'SUPER_ADMIN';
 
   return (
     <header className="glass border-b border-white/10 sticky top-0 z-40 backdrop-blur-xl bg-dark-800/80">
@@ -19,18 +24,37 @@ export default function Header({ user, onLogout }: HeaderProps) {
             <img src="/logo-mark.svg" alt="Бумеранг" className="h-8 w-auto" />
             <span className="text-xl font-bold text-white font-display">Бумеранг</span>
           </div>
+
           <div className="flex items-center gap-3">
             {user ? (
               <>
                 <span className="hidden sm:block text-sm text-slate-300">
                   Привет, {user.phone}
                 </span>
+
+                {isAdmin && (
+                  <button
+                    onClick={() => navigate('/admin')}
+                    className="px-3 py-2 text-sm font-medium text-cyan-300 glass hover:bg-white/10 rounded-xl transition border border-cyan-500/30"
+                  >
+                    Админ-панель
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setShowShareModal(true)}
+                  className="px-3 py-2 text-sm font-medium text-slate-300 glass hover:bg-white/10 rounded-xl transition border border-white/10"
+                >
+                  Пригласить друга
+                </button>
+
                 <button
                   onClick={() => navigate('/profile')}
                   className="px-4 py-2 text-sm font-medium text-slate-300 glass hover:bg-white/10 rounded-xl transition border border-white/10"
                 >
                   Профиль
                 </button>
+
                 <button
                   onClick={onLogout}
                   className="px-4 py-2 text-sm font-medium text-white bg-red-500/10 hover:bg-red-500/20 rounded-xl transition border border-red-500/20"
@@ -56,12 +80,21 @@ export default function Header({ user, onLogout }: HeaderProps) {
             )}
           </div>
         </div>
+
         <div className="pb-3 text-center">
           <p className="text-sm text-slate-400 italic">
             Всё возвращается. Одна экосистема жизни.
           </p>
         </div>
       </div>
+
+      {showShareModal && user && (
+        <ShareModal
+          moduleId="home"
+          userPhone={user.phone}
+          onClose={() => setShowShareModal(false)}
+        />
+      )}
     </header>
   );
 }

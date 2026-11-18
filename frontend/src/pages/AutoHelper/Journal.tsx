@@ -59,15 +59,13 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
   const [qrToken, setQrToken] = useState('');
   const [qrCarInfo, setQrCarInfo] = useState<any>(null);
   const [qrGenerating, setQrGenerating] = useState(false);
-
-  // 🆕 Состояния для блока ввода пробега
+  
   const [lastMileageCheck, setLastMileageCheck] = useState<LastMileageCheck | null>(null);
   const [mileageInput, setMileageInput] = useState('');
   const [mileageSaving, setMileageSaving] = useState(false);
   const [showMileageError, setShowMileageError] = useState(false);
   const [lastRecordedMileage, setLastRecordedMileage] = useState(0);
-
-  // 🆕 Состояния для редактирования записи
+  
   const [editingRecord, setEditingRecord] = useState<JournalRecord | null>(null);
   const [editForm, setEditForm] = useState({
     date: '',
@@ -77,7 +75,7 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
     cost: '',
     comment: ''
   });
-
+  
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     mileage: '',
@@ -100,8 +98,7 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
       ]);
       setCars(carsRes.cars || []);
       setRecords(journalRes.records || []);
-
-      // 🆕 Загружаем последний введённый пробег
+      
       if (selectedCarId) {
         const mileageData = await (await import('../../api/auto')).getMileageChecks(selectedCarId);
         const checks = mileageData.checks || [];
@@ -115,7 +112,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
           setLastMileageCheck(null);
         }
       }
-
       if (!selectedCarId && carsRes.cars?.length > 0) {
         onCarChange(carsRes.cars[0].id);
       }
@@ -156,7 +152,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
     }
   };
 
-  // 🆕 Обработчик сохранения пробега
   const handleMileageSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCarId || !mileageInput) return;
@@ -186,7 +181,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
     }
   };
 
-  // 🆕 Обработчики редактирования
   const handleEditClick = (record: JournalRecord) => {
     setEditingRecord(record);
     setEditForm({
@@ -287,7 +281,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
 
   return (
     <div className="space-y-4">
-      {/* 🆕 ЗАКРЕПЛЁННЫЙ БЛОК ВВОДА ПРОБЕГА */}
       <div className="bg-gradient-to-br from-cyan-500/10 to-purple-500/10 border border-cyan-500/30 rounded-2xl p-5 sticky top-2 z-10 backdrop-blur-md">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-bold text-gray-100 flex items-center gap-2">
@@ -409,7 +402,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         </div>
       )}
 
-      {/* Модалка создания записи */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -455,7 +447,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         </div>
       )}
 
-      {/* 🆕 Модалка редактирования записи */}
       {editingRecord && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -536,7 +527,6 @@ const Journal: React.FC<JournalProps> = ({ selectedCarId, onCarChange }) => {
         </div>
       )}
 
-      {/* 🆕 Модалка ошибки уменьшения пробега */}
       {showMileageError && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { apiClient } from '../api/client';
+import ShareModal from '../components/ShareModal';
 
 interface Ticket {
   id: number;
@@ -18,9 +19,23 @@ interface Ticket {
 
 export default function Tickets() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+
+  const userPhone = (() => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      return user.phone || '';
+    } catch {
+      return '';
+    }
+  })();
+
+  // Определяем активную вкладку по текущему пути
+  const isEventsPage = location.pathname === '/events';
 
   useEffect(() => {
     loadTickets();
@@ -82,13 +97,42 @@ export default function Tickets() {
           >
             ← На главную
           </button>
-          <h1 className="text-xl font-bold text-gray-100">🎫 Мои билеты</h1>
-          <button
-            onClick={() => navigate('/events')}
-            className="text-sm text-cyan-400 hover:text-cyan-300 transition"
-          >
-            Мероприятия
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/events')}
+              className={`px-3 py-1.5 text-sm rounded-lg transition border ${
+                isEventsPage
+                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+                  : 'text-gray-400 hover:text-white border-white/10 hover:bg-white/5'
+              }`}
+            >
+              🎟️ Мероприятия
+            </button>
+            <button
+              onClick={() => navigate('/tickets')}
+              className={`px-3 py-1.5 text-sm rounded-lg transition border ${
+                !isEventsPage
+                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+                  : 'text-gray-400 hover:text-white border-white/10 hover:bg-white/5'
+              }`}
+            >
+              🎫 Мои билеты
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="text-xs text-gray-300 hover:text-white transition px-2 py-1 rounded-lg border border-white/10 hover:bg-white/5"
+            >
+              Пригласить друга
+            </button>
+            <button
+              onClick={() => navigate('/profile')}
+              className="text-xs text-gray-300 hover:text-white transition px-2 py-1 rounded-lg border border-white/10 hover:bg-white/5"
+            >
+              Профиль
+            </button>
+          </div>
         </div>
       </div>
 
@@ -144,7 +188,6 @@ export default function Tickets() {
             <p className="text-sm text-gray-400 mb-6">
               {formatDate(selectedTicket.event.eventDate)}
             </p>
-            {/* QR-код остаётся на белом фоне — иначе сканер не прочитает */}
             <div className="bg-white p-4 rounded-lg mb-4 inline-block">
               <QRCodeSVG
                 value={selectedTicket.qrCode}
@@ -172,6 +215,14 @@ export default function Tickets() {
             </button>
           </div>
         </div>
+      )}
+
+      {showShareModal && (
+        <ShareModal
+          moduleId="tickets"
+          userPhone={userPhone}
+          onClose={() => setShowShareModal(false)}
+        />
       )}
     </div>
   );

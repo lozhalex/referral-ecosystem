@@ -164,10 +164,9 @@ router.put('/users/:id/role', requireAdmin, protectFounder, async (req: Request,
     const userId = Number(req.params.id);
     const { role } = req.body;
     const adminId = (req as any).user!.userId;
-    const currentAdminRole = (req as any).user!.role;
     const validRoles = ['user', 'admin', 'controller', 'SUPER_ADMIN', 'partner', 'service_master'];
     if (!validRoles.includes(role)) {
-      return res.status(400).json({ success: false, message: `Недопустимая роль.` });
+      return res.status(400).json({ success: false, message: 'Недопустимая роль.' });
     }
     const targetUser = await prisma.user.findUnique({ where: { id: userId } });
     if (!targetUser) return res.status(404).json({ success: false, message: 'Пользователь не найден' });
@@ -690,5 +689,301 @@ const countDescendants = async (tx: any, userId: number): Promise<number> => {
   }
   return count;
 };
+
+// ==========================================
+// 🆕 ЭКСПОРТ/ИМПОРТ ДАННЫХ
+// ==========================================
+
+// Экспорт пользователей с балансами и транзакциями
+router.get('/export/users', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const users = await prisma.user.findMany({
+      include: {
+        wallet: {
+          include: {
+            transactions: {
+              orderBy: { createdAt: 'desc' }
+            }
+          }
+        },
+        referredBy: { select: { id: true, phone: true } },
+        referrals: { select: { id: true, phone: true } }
+      }
+    });
+    const exportData = users.map(u => ({
+      id: u.id,
+      phone: u.phone,
+      role: u.role,
+      isPaidMember: u.isPaidMember,
+      isFounder: u.isFounder,
+      balance: u.wallet?.balance || 0,
+      transactions: u.wallet?.transactions || [],
+      referredById: u.referredById,
+      referredByPhone: u.referredBy?.phone || null,
+      referralCount: u.referrals.length
+    }));
+    res.json({ success: true, users: exportData });
+  } catch (err) {
+    console.error('Export users error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
+// Экспорт автомобилей с журналом
+router.get('/export/cars', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const cars = await prisma.car.findMany({
+      where: { isDeleted: false },
+      include: {
+        user: { select: { id: true, phone: true } },
+        records: {
+          orderBy: { date: 'desc' },
+          include: {
+            author: { select: { phone: true } }
+          }
+        }
+      }
+    });
+    const exportData = cars.map(c => ({
+      id: c.id,
+      userId: c.userId,
+      userPhone: c.user.phone,
+      marka: c.marka,
+      model: c.model,
+      year: c.year,
+      gosnomer: c.gosnomer,
+      vin: c.vin,
+      mileage: c.mileage,
+      records: c.records
+    }));
+    res.json({ success: true, cars: exportData });
+  } catch (err) {
+    console.error('Export cars error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
+// Экспорт мероприятий с билетами и контролёрами
+router.get('/export/events', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const events = await prisma.event.findMany({
+      include: {
+        tickets: {
+          include: {
+            user: { select: { id: true, phone: true } },
+            scannedBy: { select: { id: true, phone: true } }
+          }
+        },
+        controllers: {
+          include: {
+            user: { select: { id: true, phone: true, role: true } }
+          }
+        }
+      },
+      orderBy: { eventDate: 'desc' }
+    });
+    res.json({ success: true, events });
+  } catch (err) {
+    console.error('Export events error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
+// Импорт пользователей (умное слияние)
+router.post('/import/users', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const adminRole = (req as any).user!.role;
+    if (adminRole !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, message: 'Импорт доступен только SUPER_ADMIN' });
+    }
+    const { users } = req.body;
+    if (!Array.isArray(users)) {
+      return res.status(400).json({ success: false, message: 'Неверный формат данных' });
+    }
+    let created = 0;
+    let updated = 0;
+    await prisma.$transaction(async (tx) => {
+      for (const userData of users) {
+        const existingUser = await tx.user.findUnique({
+          where: { phone: userData.phone }
+        });
+        if (existingUser) {
+          // Обновляем существующего пользователя
+          await tx.user.update({
+            where: { id: existingUser.id },
+            data: {
+              role: userData.role || existingUser.role,
+              isPaidMember: userData.isPaidMember ?? existingUser.isPaidMember,
+              isFounder: userData.isFounder ?? existingUser.isFounder
+            }
+          });
+          // Обновляем баланс если есть wallet
+          if (userData.balance !== undefined) {
+            const wallet = await tx.wallet.findUnique({
+              where: { userId: existingUser.id }
+            });
+            if (wallet) {
+              await tx.wallet.update({
+                where: { id: wallet.id },
+                data: { balance: userData.balance }
+              });
+            } else {
+              await tx.wallet.create({
+                data: {
+                  userId: existingUser.id,
+                  balance: userData.balance
+                }
+              });
+            }
+          }
+          updated++;
+        } else {
+          // Создаём нового пользователя
+          const newUser = await tx.user.create({
+            data: {
+              phone: userData.phone,
+              passwordHash: await bcrypt.hash('123456', 10),
+              role: userData.role || 'user',
+              isPaidMember: userData.isPaidMember || false,
+              isFounder: userData.isFounder || false
+            }
+          });
+          // Создаём wallet
+          if (userData.balance !== undefined) {
+            await tx.wallet.create({
+              data: {
+                userId: newUser.id,
+                balance: userData.balance
+              }
+            });
+          }
+          created++;
+        }
+      }
+    });
+    res.json({ success: true, message: `Импорт завершён: создано ${created}, обновлено ${updated}` });
+  } catch (err) {
+    console.error('Import users error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
+// Импорт автомобилей (умное слияние)
+router.post('/import/cars', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const adminRole = (req as any).user!.role;
+    if (adminRole !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, message: 'Импорт доступен только SUPER_ADMIN' });
+    }
+    const { cars } = req.body;
+    if (!Array.isArray(cars)) {
+      return res.status(400).json({ success: false, message: 'Неверный формат данных' });
+    }
+    let created = 0;
+    let updated = 0;
+    await prisma.$transaction(async (tx) => {
+      for (const carData of cars) {
+        const existingCar = await tx.car.findFirst({
+          where: {
+            userId: carData.userId,
+            gosnomer: carData.gosnomer
+          }
+        });
+        if (existingCar) {
+          // Обновляем существующее авто
+          await tx.car.update({
+            where: { id: existingCar.id },
+            data: {
+              marka: carData.marka,
+              model: carData.model,
+              year: carData.year,
+              vin: carData.vin,
+              mileage: carData.mileage
+            }
+          });
+          updated++;
+        } else {
+          // Создаём новое авто
+          await tx.car.create({
+            data: {
+              userId: carData.userId,
+              marka: carData.marka,
+              model: carData.model,
+              year: carData.year,
+              gosnomer: carData.gosnomer,
+              vin: carData.vin,
+              mileage: carData.mileage
+            }
+          });
+          created++;
+        }
+      }
+    });
+    res.json({ success: true, message: `Импорт завершён: создано ${created}, обновлено ${updated}` });
+  } catch (err) {
+    console.error('Import cars error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
+// Импорт мероприятий (умное слияние)
+router.post('/import/events', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const adminRole = (req as any).user!.role;
+    if (adminRole !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, message: 'Импорт доступен только SUPER_ADMIN' });
+    }
+    const { events } = req.body;
+    if (!Array.isArray(events)) {
+      return res.status(400).json({ success: false, message: 'Неверный формат данных' });
+    }
+    let created = 0;
+    let updated = 0;
+    await prisma.$transaction(async (tx) => {
+      for (const eventData of events) {
+        const existingEvent = await tx.event.findUnique({
+          where: { id: eventData.id }
+        });
+        if (existingEvent) {
+          // Обновляем существующее мероприятие
+          await tx.event.update({
+            where: { id: eventData.id },
+            data: {
+              title: eventData.title,
+              description: eventData.description,
+              location: eventData.location,
+              eventDate: new Date(eventData.eventDate),
+              cashbackAmount: eventData.cashbackAmount,
+              referrerBonus: eventData.referrerBonus,
+              isActive: eventData.isActive,
+              posterUrl: eventData.posterUrl
+            }
+          });
+          updated++;
+        } else {
+          // Создаём новое мероприятие
+          await tx.event.create({
+            data: {
+              id: eventData.id,
+              title: eventData.title,
+              description: eventData.description,
+              location: eventData.location,
+              eventDate: new Date(eventData.eventDate),
+              cashbackAmount: eventData.cashbackAmount,
+              referrerBonus: eventData.referrerBonus,
+              isActive: eventData.isActive,
+              posterUrl: eventData.posterUrl
+            }
+          });
+          created++;
+        }
+      }
+    });
+    res.json({ success: true, message: `Импорт завершён: создано ${created}, обновлено ${updated}` });
+  } catch (err) {
+    console.error('Import events error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
 
 export default router;

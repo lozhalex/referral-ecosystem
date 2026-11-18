@@ -143,18 +143,15 @@ router.put('/journal/:id', async (req: any, res: Response) => {
   try {
     const recordId = Number(req.params.id);
     const { date, mileage, category, subcat, work, cost, comment } = req.body;
-
     const originalRecord = await prisma.serviceRecord.findUnique({
       where: { id: recordId }
     });
-
     if (!originalRecord) {
       return res.status(404).json({ success: false, message: 'Запись не найдена' });
     }
     if (originalRecord.userId !== req.user.userId) {
       return res.status(403).json({ success: false, message: 'Нет доступа к этой записи' });
     }
-
     const updatedRecord = await prisma.serviceRecord.update({
       where: { id: recordId },
       data: {
@@ -167,7 +164,6 @@ router.put('/journal/:id', async (req: any, res: Response) => {
         comment: comment || originalRecord.comment
       }
     });
-
     // Если пробег увеличился — обновляем пробег авто
     if (originalRecord.carId && Number(mileage) > originalRecord.mileage) {
       await prisma.car.updateMany({
@@ -179,7 +175,6 @@ router.put('/journal/:id', async (req: any, res: Response) => {
         data: { mileage: Number(mileage) }
       });
     }
-
     res.json({ success: true, record: updatedRecord });
   } catch (err) {
     console.error('Auto journal update error:', err);
@@ -191,18 +186,15 @@ router.put('/journal/:id', async (req: any, res: Response) => {
 router.delete('/journal/:id', async (req: any, res: Response) => {
   try {
     const recordId = Number(req.params.id);
-
     const record = await prisma.serviceRecord.findUnique({
       where: { id: recordId }
     });
-
     if (!record) {
       return res.status(404).json({ success: false, message: 'Запись не найдена' });
     }
     if (record.userId !== req.user.userId) {
       return res.status(403).json({ success: false, message: 'Нет доступа к этой записи' });
     }
-
     await prisma.serviceRecord.delete({ where: { id: recordId } });
     res.json({ success: true, message: 'Запись удалена' });
   } catch (err) {

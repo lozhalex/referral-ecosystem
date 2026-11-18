@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 
 export default function ExportImport() {
@@ -7,8 +7,8 @@ export default function ExportImport() {
   const [error, setError] = useState('');
   const [userRole, setUserRole] = useState<string>('');
 
-  // Получаем роль пользователя при монтировании
-  useState(() => {
+  // 🆕 ИСПРАВЛЕНО: useState заменен на useEffect для сайд-эффектов
+  useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
       try {
@@ -18,7 +18,7 @@ export default function ExportImport() {
         console.error('Error parsing token:', e);
       }
     }
-  });
+  }, []);
 
   const isSuperAdmin = userRole === 'SUPER_ADMIN';
 
