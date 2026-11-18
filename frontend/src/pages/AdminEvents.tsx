@@ -450,9 +450,10 @@ export default function AdminEvents() {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {filteredEvents.map(event => {
-              const isSoldOut = event.maxTickets !== null && event.maxTickets !== undefined && event.maxTickets <= 0;
-              const remaining = event.maxTickets !== null && event.maxTickets !== undefined
-                ? event.maxTickets
+              // 🔧 ИСПРАВЛЕНО: maxTickets = 0 означает безлимит, SOLD OUT только когда ticketsCount >= maxTickets
+              const isSoldOut = event.maxTickets !== null && event.maxTickets !== undefined && event.maxTickets > 0 && event.ticketsCount >= event.maxTickets;
+              const remaining = event.maxTickets !== null && event.maxTickets !== undefined && event.maxTickets > 0
+                ? event.maxTickets - event.ticketsCount
                 : null;
               return (
                 <div
@@ -464,7 +465,6 @@ export default function AdminEvents() {
                       SOLD OUT
                     </div>
                   )}
-                  {/* 🔧 ИСПРАВЛЕНО: object-contain вместо object-cover */}
                   <div className="aspect-[2/3] w-full relative bg-gradient-to-br from-slate-800 to-slate-900">
                     {event.posterUrl ? (
                       <img
@@ -496,6 +496,7 @@ export default function AdminEvents() {
                     <h3 className="font-bold text-gray-100 text-sm mb-1 line-clamp-2">{event.title}</h3>
                     <p className="text-xs text-gray-400 mb-1">📍 {event.location || 'Не указано'}</p>
                     <p className="text-xs text-cyan-400 mb-2">📅 {formatDate(event.eventDate)}</p>
+                    {/* 🔧 ИСПРАВЛЕНО: показываем счётчик только если maxTickets > 0 */}
                     {remaining !== null && (
                       <p className={`text-xs mb-2 font-medium ${isSoldOut ? 'text-red-400' : 'text-green-400'}`}>
                         {isSoldOut ? '❌ Мест нет' : `🎫 Осталось: ${remaining}`}
@@ -645,7 +646,7 @@ export default function AdminEvents() {
               <div>
                 <h3 className="text-lg font-bold text-gray-100">🎫 Билеты: {ticketsEvent.title}</h3>
                 <p className="text-sm text-gray-400 mt-1">
-                  {ticketsEvent.maxTickets !== null && ticketsEvent.maxTickets !== undefined
+                  {ticketsEvent.maxTickets !== null && ticketsEvent.maxTickets !== undefined && ticketsEvent.maxTickets > 0
                     ? `Мест: ${ticketsEvent.maxTickets} / Всего билетов: ${ticketsList.length}`
                     : `Безлимит. Всего билетов: ${ticketsList.length}`}
                 </p>

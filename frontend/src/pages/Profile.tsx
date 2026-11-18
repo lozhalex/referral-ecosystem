@@ -328,7 +328,6 @@ const Profile: React.FC = () => {
 
   return (
     <div className="min-h-screen p-4 pb-24 max-w-md mx-auto">
-      {/* 🔧 ИЗМЕНЕНО: добавлена кнопка "Пригласить друга" в шапку */}
       <div className="flex items-center justify-between mb-8 mt-2 flex-wrap gap-2">
         <button onClick={() => navigate('/')} className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition">
           <span>←</span> На главную
@@ -337,7 +336,7 @@ const Profile: React.FC = () => {
           onClick={() => setShowShareModal(true)}
           className="text-sm text-gray-300 hover:text-white transition px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5"
         >
-          🎁 Пригласить друга
+          Пригласить друга
         </button>
         <span className={`text-xs font-bold px-3 py-1.5 rounded-full border ${isPartner(user) ? 'text-neon-green border-neon-green/30 bg-neon-green/10' : 'text-slate-400 border-white/10 bg-white/5'}`}>
           {isPartner(user) ? 'ПАРТНЕР СМАРТ' : 'БЕСПЛАТНЫЙ УЧАСТНИК'}
@@ -711,8 +710,9 @@ const Profile: React.FC = () => {
       </div>
 
       <div className="space-y-3">
+        {/* 🔧 ИСПРАВЛЕНО: убран эмодзи 🔗 */}
         <button onClick={() => setShowInviteModal(true)} className="w-full py-3.5 btn-neon flex items-center justify-center gap-2 text-sm">
-          <span>🔗</span> Пригласить друга
+          Пригласить друга
         </button>
         <button onClick={() => navigate('/change-password')} className="w-full py-3 bg-white/5 text-slate-300 rounded-xl font-medium hover:bg-white/10 transition border border-white/5 text-sm">
           Сменить пароль
@@ -825,7 +825,6 @@ const Profile: React.FC = () => {
         </div>
       )}
 
-      {/* 🆕 Модалка "Поделиться" */}
       {showShareModal && (
         <ShareModal
           moduleId="profile"
