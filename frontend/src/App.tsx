@@ -13,12 +13,10 @@ import Tickets from './pages/Tickets';
 import Scanner from './pages/Scanner';
 import AdminEvents from './pages/AdminEvents';
 import AutoHelper from './pages/AutoHelper';
+import SmartBenefits from './pages/SmartBenefits';
 import ProtectedRoute from './components/ProtectedRoute';
 import ReferralCapture from './components/ReferralCapture';
 
-// 🆕 Компонент-обёртка для главной страницы:
-// - Гость (без токена) → видит лендинг HomeGuest
-// - Авторизованный (с токеном) → видит Home со всеми проектами
 const HomeRouter = () => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -59,6 +57,7 @@ function App() {
           <Route path="/events" element={<Events />} />
           <Route path="/tickets" element={<Tickets />} />
           <Route path="/scanner" element={<Scanner />} />
+          <Route path="/smart-benefits" element={<SmartBenefits />} />
         </Route>
       </Routes>
     </BrowserRouter>

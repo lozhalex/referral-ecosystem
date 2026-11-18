@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { apiClient } from '../api/client';
+import ShareModal from '../components/ShareModal';
 
 interface Ticket {
   id: number;
@@ -21,6 +22,11 @@ export default function Tickets() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+
+  const token = localStorage.getItem('token');
+  const user = token ? JSON.parse(atob(token.split('.')[1])) : null;
+  const userPhone = user?.phone || '';
 
   useEffect(() => {
     loadTickets();
@@ -36,21 +42,6 @@ export default function Tickets() {
       console.error('Error loading tickets:', err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  // 🆕 Отмена билета
-  const handleCancelTicket = async (ticketId: number) => {
-    if (!confirm('Отменить билет? Место освободится для других.')) return;
-    try {
-      const response = await apiClient.delete(`/api/tickets/${ticketId}`);
-      if (response.data.success) {
-        alert('✅ Билет отменен');
-        setSelectedTicket(null);
-        loadTickets();
-      }
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Ошибка отмены билета');
     }
   };
 
@@ -90,7 +81,7 @@ export default function Tickets() {
   return (
     <div className="min-h-screen bg-slate-950">
       <div className="bg-slate-900/60 border-b border-white/10">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between flex-wrap gap-2">
           <button
             onClick={() => navigate('/')}
             className="text-sm text-gray-400 hover:text-white transition"
@@ -98,12 +89,20 @@ export default function Tickets() {
             ← На главную
           </button>
           <h1 className="text-xl font-bold text-gray-100">🎫 Мои билеты</h1>
-          <button
-            onClick={() => navigate('/events')}
-            className="text-sm text-cyan-400 hover:text-cyan-300 transition"
-          >
-            Мероприятия
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="text-sm text-gray-300 hover:text-white transition px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5"
+            >
+              🎁 Пригласить друга
+            </button>
+            <button
+              onClick={() => navigate('/events')}
+              className="text-sm text-cyan-400 hover:text-cyan-300 transition"
+            >
+              Мероприятия
+            </button>
+          </div>
         </div>
       </div>
 
@@ -170,18 +169,9 @@ export default function Tickets() {
               {selectedTicket.qrCode}
             </p>
             {selectedTicket.status === 'ACTIVE' ? (
-              <>
-                <p className="text-sm text-green-400 font-medium mb-4">
-                  ✅ Билет активен. Покажите QR на входе.
-                </p>
-                {/* 🆕 Кнопка отмены */}
-                <button
-                  onClick={() => handleCancelTicket(selectedTicket.id)}
-                  className="w-full py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition border border-red-500/30 text-sm font-medium mb-2"
-                >
-                  🗑 Отменить билет
-                </button>
-              </>
+              <p className="text-sm text-green-400 font-medium mb-4">
+                ✅ Билет активен. Покажите QR на входе.
+              </p>
             ) : (
               <p className="text-sm text-gray-500 mb-4">
                 Билет уже использован
@@ -195,6 +185,14 @@ export default function Tickets() {
             </button>
           </div>
         </div>
+      )}
+
+      {showShareModal && (
+        <ShareModal
+          moduleId="tickets"
+          userPhone={userPhone}
+          onClose={() => setShowShareModal(false)}
+        />
       )}
     </div>
   );

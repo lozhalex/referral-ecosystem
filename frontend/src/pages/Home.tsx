@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import ProjectCard from '../components/ProjectCard';
 import Skeleton from '../components/Skeleton';
+import OnboardingModal from '../components/OnboardingModal';
 import { projects } from '../data/projects';
 import { apiClient } from '../api/client';
 
@@ -29,6 +30,7 @@ export default function Home() {
   const [showAll, setShowAll] = useState(false);
   const [userCount, setUserCount] = useState<number | null>(null);
   const [autoNotifications, setAutoNotifications] = useState<number>(0);
+  const [showSystemOnboarding, setShowSystemOnboarding] = useState(false);
   const token = localStorage.getItem('token');
   const user = token ? JSON.parse(atob(token.split('.')[1])) : null;
 
@@ -36,6 +38,13 @@ export default function Home() {
     localStorage.removeItem('token');
     window.location.reload();
   };
+
+  useEffect(() => {
+    const hasSeenOnboarding = localStorage.getItem('onboarding_system_shown');
+    if (!hasSeenOnboarding && token) {
+      setTimeout(() => setShowSystemOnboarding(true), 500);
+    }
+  }, [token]);
 
   useEffect(() => {
     apiClient.get('/api/stats/total-users')
@@ -121,13 +130,38 @@ export default function Home() {
     );
   };
 
+  const systemOnboardingSteps = [
+    {
+      title: 'Всё возвращается. Одна экосистема.',
+      text: 'Бумеранг — это несколько модулей-проектов, где каждое действие приносит пользу Вам и тем, кого Вы пригласили.',
+      iconType: 'logo' as const
+    },
+    {
+      title: '🎉 Добро пожаловать!',
+      text: 'Поздравляю с регистрацией в системе. Теперь Вы сможете участвовать в уже готовых модулях-проектах экосистемы, а также сможете изучить каждый проект, который будет внедряться в дальнейшем.'
+    },
+    {
+      title: '👥 С друзьями веселей',
+      text: 'После того, как Вы изучите возможности работающих модулей и информацию о готовящихся проектах, расскажите об экосистеме своим друзьям. Каждый Ваш друг принесет Вам пользу, где-то Вы получите растущую скидку, а где-то бонус с покупок Ваших друзей.'
+    },
+    {
+      title: '💎 Станьте партнёром',
+      text: 'Для того, чтобы пользоваться системой с максимальной выгодой, станьте партнером проекта (оформите разово тариф СМАРТ за 1990р).',
+      actionLabel: 'Перейти к проектам',
+      secondaryActionLabel: 'Узнать подробнее о максимальной выгоде',
+      onSecondaryAction: () => {
+        window.location.href = '/smart-benefits';
+      }
+    }
+  ];
+
   return (
     <div className="min-h-screen bg-dark-900 relative">
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-neon-purple/10 rounded-full mix-blend-screen filter blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-neon-cyan/10 rounded-full mix-blend-screen filter blur-3xl pointer-events-none"></div>
-      
+
       <Header user={user} onLogout={handleLogout} />
-      
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
         <section className="text-center mb-10">
           <h1 className="text-4xl sm:text-5xl font-bold text-white mb-4 font-display tracking-tight">
@@ -138,7 +172,6 @@ export default function Home() {
           </p>
         </section>
 
-        {/* 🆕 Скелетон счётчика пользователей */}
         <section className="text-center mb-12">
           <div className="inline-flex items-center gap-2 glass px-6 py-3 border border-neon-cyan/20">
             {userCount !== null ? (
@@ -237,6 +270,14 @@ export default function Home() {
           <p>© 2026 Бумеранг · Один аккаунт — все сервисы</p>
         </footer>
       </main>
+
+      {showSystemOnboarding && (
+        <OnboardingModal
+          steps={systemOnboardingSteps}
+          storageKey="onboarding_system_shown"
+          onComplete={() => setShowSystemOnboarding(false)}
+        />
+      )}
     </div>
   );
 }

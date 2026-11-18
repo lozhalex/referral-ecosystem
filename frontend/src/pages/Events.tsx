@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
+import ShareModal from '../components/ShareModal';
 
 interface Event {
   id: number;
@@ -11,8 +12,6 @@ interface Event {
   cashbackAmount: number;
   referrerBonus: number;
   posterUrl: string | null;
-  isFree: boolean;
-  maxTickets: number | null;
   ticketsCount: number;
 }
 
@@ -23,6 +22,11 @@ export default function Events() {
   const [error, setError] = useState('');
   const [gettingTicket, setGettingTicket] = useState<number | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+
+  const token = localStorage.getItem('token');
+  const user = token ? JSON.parse(atob(token.split('.')[1])) : null;
+  const userPhone = user?.phone || '';
 
   useEffect(() => {
     loadEvents();
@@ -84,14 +88,22 @@ export default function Events() {
   return (
     <div className="min-h-screen bg-slate-950">
       <div className="bg-slate-900/60 border-b border-white/10">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between flex-wrap gap-2">
           <button onClick={() => navigate('/')} className="text-sm text-gray-400 hover:text-white transition">
             ← На главную
           </button>
           <h1 className="text-xl font-bold text-gray-100">🎟️ Мероприятия</h1>
-          <button onClick={() => navigate('/tickets')} className="text-sm text-cyan-400 hover:text-cyan-300 transition">
-            Мои билеты
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="text-sm text-gray-300 hover:text-white transition px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5"
+            >
+              🎁 Пригласить друга
+            </button>
+            <button onClick={() => navigate('/tickets')} className="text-sm text-cyan-400 hover:text-cyan-300 transition">
+              Мои билеты
+            </button>
+          </div>
         </div>
       </div>
 
@@ -115,59 +127,39 @@ export default function Events() {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {events.map(event => {
-              const isSoldOut = event.maxTickets !== null && event.maxTickets !== undefined && event.maxTickets <= 0;
-              const remaining = event.maxTickets !== null && event.maxTickets !== undefined ? event.maxTickets : null;
-              return (
-                <div
-                  key={event.id}
-                  onClick={() => !isSoldOut && setSelectedEvent(event)}
-                  className={`bg-slate-900 border border-white/10 rounded-xl overflow-hidden transition-all group flex flex-col relative ${
-                    isSoldOut ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:border-cyan-500/30'
-                  }`}
-                >
-                  {isSoldOut && (
-                    <div className="absolute top-2 left-2 z-10 px-2 py-1 bg-red-500/80 text-white text-xs font-bold rounded-lg border border-red-400/50">
-                      SOLD OUT
-                    </div>
-                  )}
-                  {/* 🔧 ИСПРАВЛЕНО: object-contain вместо object-cover — афиша видна полностью */}
-                  <div className="aspect-[2/3] w-full relative bg-gradient-to-br from-slate-800 to-slate-900">
-                    {event.posterUrl ? (
-                      <img
-                        src={event.posterUrl}
-                        alt={event.title}
-                        className="w-full h-full object-contain"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                        }}
-                      />
-                    ) : null}
-                    <div
-                      className={`absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-600 to-cyan-600 ${
-                        event.posterUrl ? 'hidden' : ''
-                      }`}
-                    >
-                      <span className="text-white font-bold text-center px-2 text-sm">{event.title}</span>
-                    </div>
-                  </div>
-                  <div className="p-3 flex-1 flex flex-col">
-                    <h3 className="font-bold text-gray-100 text-sm mb-1 line-clamp-2">{event.title}</h3>
-                    <p className="text-xs text-gray-400 mb-1">📍 {event.location || 'Не указано'}</p>
-                    <p className="text-xs text-cyan-400 mb-2">📅 {formatDate(event.eventDate)}</p>
-                    {remaining !== null && (
-                      <p className={`text-xs font-medium ${isSoldOut ? 'text-red-400' : 'text-green-400'}`}>
-                        {isSoldOut ? '❌ Мест нет' : `🎫 Осталось: ${remaining}`}
-                      </p>
-                    )}
-                    {event.isFree && (
-                      <p className="text-xs text-green-400">🆓 Бесплатно</p>
-                    )}
+            {events.map(event => (
+              <div
+                key={event.id}
+                onClick={() => setSelectedEvent(event)}
+                className="bg-slate-900 border border-white/10 rounded-xl overflow-hidden cursor-pointer hover:border-cyan-500/30 transition-all group flex flex-col"
+              >
+                <div className="aspect-[2/3] w-full relative bg-slate-800">
+                  {event.posterUrl ? (
+                    <img
+                      src={event.posterUrl}
+                      alt={event.title}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                      }}
+                    />
+                  ) : null}
+                  <div
+                    className={`absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-600 to-cyan-600 ${
+                      event.posterUrl ? 'hidden' : ''
+                    }`}
+                  >
+                    <span className="text-white font-bold text-center px-2 text-sm">{event.title}</span>
                   </div>
                 </div>
-              );
-            })}
+                <div className="p-3 flex-1 flex flex-col">
+                  <h3 className="font-bold text-gray-100 text-sm mb-1 line-clamp-2">{event.title}</h3>
+                  <p className="text-xs text-gray-400 mb-1">📍 {event.location || 'Не указано'}</p>
+                  <p className="text-xs text-cyan-400 mt-auto">📅 {formatDate(event.eventDate)}</p>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -207,37 +199,12 @@ export default function Events() {
                 ✕
               </button>
             </div>
-
             <div className="p-6 space-y-4">
               <h2 className="text-2xl font-bold text-gray-100">{selectedEvent.title}</h2>
-
               <div className="space-y-2 text-sm">
                 {selectedEvent.location && <p className="text-gray-300">📍 {selectedEvent.location}</p>}
                 <p className="text-gray-300">📅 {formatDate(selectedEvent.eventDate)}</p>
               </div>
-
-              {selectedEvent.maxTickets !== null && selectedEvent.maxTickets !== undefined && (
-                <div className={`p-3 rounded-lg border ${
-                  selectedEvent.maxTickets <= 0
-                    ? 'bg-red-500/10 border-red-500/30'
-                    : 'bg-cyan-500/10 border-cyan-500/30'
-                }`}>
-                  <p className={`text-sm font-medium ${
-                    selectedEvent.maxTickets <= 0 ? 'text-red-400' : 'text-cyan-400'
-                  }`}>
-                    {selectedEvent.maxTickets <= 0
-                      ? '❌ Места закончились'
-                      : `🎫 Осталось мест: ${selectedEvent.maxTickets}`}
-                  </p>
-                </div>
-              )}
-
-              {selectedEvent.isFree && (
-                <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/30">
-                  <p className="text-sm font-medium text-green-400">🆓 Бесплатное мероприятие</p>
-                </div>
-              )}
-
               {selectedEvent.description && (
                 <div className="bg-slate-800/50 border border-white/10 rounded-lg p-4">
                   <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">
@@ -245,7 +212,6 @@ export default function Events() {
                   </p>
                 </div>
               )}
-
               <div className="bg-slate-800/50 border border-white/10 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">💰 Кэшбек участнику:</span>
@@ -256,30 +222,28 @@ export default function Events() {
                   <span className="font-bold text-cyan-400">{selectedEvent.referrerBonus} ₽</span>
                 </div>
               </div>
-
-              {selectedEvent.maxTickets !== null && selectedEvent.maxTickets !== undefined && selectedEvent.maxTickets <= 0 ? (
-                <button
-                  disabled
-                  className="w-full py-3 bg-slate-700 text-gray-500 rounded-lg font-semibold cursor-not-allowed border border-white/10"
-                >
-                  ❌ Места закончились
-                </button>
-              ) : (
-                <button
-                  onClick={() => handleGetTicket(selectedEvent.id)}
-                  disabled={gettingTicket === selectedEvent.id}
-                  className={`w-full py-3 rounded-lg font-semibold transition ${
-                    gettingTicket === selectedEvent.id
-                      ? 'bg-slate-700 text-gray-500 cursor-not-allowed border border-white/10'
-                      : 'bg-gradient-to-r from-purple-600 to-cyan-600 text-white hover:shadow-lg hover:shadow-purple-500/25'
-                  }`}
-                >
-                  {gettingTicket === selectedEvent.id ? 'Получение...' : 'Получить билет'}
-                </button>
-              )}
+              <button
+                onClick={() => handleGetTicket(selectedEvent.id)}
+                disabled={gettingTicket === selectedEvent.id}
+                className={`w-full py-3 rounded-lg font-semibold transition ${
+                  gettingTicket === selectedEvent.id
+                    ? 'bg-slate-700 text-gray-500 cursor-not-allowed border border-white/10'
+                    : 'bg-gradient-to-r from-purple-600 to-cyan-600 text-white hover:shadow-lg hover:shadow-purple-500/25'
+                }`}
+              >
+                {gettingTicket === selectedEvent.id ? 'Получение...' : 'Получить билет'}
+              </button>
             </div>
           </div>
         </div>
+      )}
+
+      {showShareModal && (
+        <ShareModal
+          moduleId="events"
+          userPhone={userPhone}
+          onClose={() => setShowShareModal(false)}
+        />
       )}
     </div>
   );

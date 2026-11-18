@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import ShareModal from './ShareModal';
 
 interface HeaderProps {
   user: { phone: string; role: string } | null;
@@ -7,6 +9,7 @@ interface HeaderProps {
 
 export default function Header({ user, onLogout }: HeaderProps) {
   const navigate = useNavigate();
+  const [showShareModal, setShowShareModal] = useState(false);
 
   return (
     <header className="glass border-b border-white/10 sticky top-0 z-40 backdrop-blur-xl bg-dark-800/80">
@@ -25,6 +28,12 @@ export default function Header({ user, onLogout }: HeaderProps) {
                 <span className="hidden sm:block text-sm text-slate-300">
                   Привет, {user.phone}
                 </span>
+                <button
+                  onClick={() => setShowShareModal(true)}
+                  className="px-3 py-2 text-sm font-medium text-slate-300 glass hover:bg-white/10 rounded-xl transition border border-white/10"
+                >
+                  🎁 Пригласить друга
+                </button>
                 <button
                   onClick={() => navigate('/profile')}
                   className="px-4 py-2 text-sm font-medium text-slate-300 glass hover:bg-white/10 rounded-xl transition border border-white/10"
@@ -62,6 +71,15 @@ export default function Header({ user, onLogout }: HeaderProps) {
           </p>
         </div>
       </div>
+
+      {/* 🆕 Модалка "Поделиться" */}
+      {showShareModal && user && (
+        <ShareModal
+          moduleId="home"
+          userPhone={user.phone}
+          onClose={() => setShowShareModal(false)}
+        />
+      )}
     </header>
   );
 }

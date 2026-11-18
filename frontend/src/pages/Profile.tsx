@@ -6,6 +6,7 @@ import { hasRole, isPartner } from '../utils/roles';
 import { CATEGORIES, getCategoryName } from './AutoHelper/categories';
 import { Html5Qrcode } from 'html5-qrcode';
 import Skeleton from '../components/Skeleton';
+import ShareModal from '../components/ShareModal';
 
 const Profile: React.FC = () => {
   const navigate = useNavigate();
@@ -38,6 +39,7 @@ const Profile: React.FC = () => {
     comment: ''
   });
   const [showInfoModal, setShowInfoModal] = useState<'rcb' | 'smart' | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerId = 'qr-scanner-container';
 
@@ -122,12 +124,10 @@ const Profile: React.FC = () => {
     }
   };
 
-  // 🔧 ИСПРАВЛЕНО: теперь только открывает сайт РЦБ, не меняет статус
   const handleGoToRcb = () => {
     window.open('https://rcpay.ru', '_blank');
   };
 
-  // 🔧 ИСПРАВЛЕНО: подтверждает регистрацию в РЦБ через API
   const handleMarkRegistered = async () => {
     setRcbActionLoading(true);
     try {
@@ -324,12 +324,20 @@ const Profile: React.FC = () => {
   if (!user) return null;
 
   const isServiceMaster = user.role === 'service_master';
+  const userPhoneForShare = user?.phone || '';
 
   return (
     <div className="min-h-screen p-4 pb-24 max-w-md mx-auto">
-      <div className="flex items-center justify-between mb-8 mt-2">
+      {/* 🔧 ИЗМЕНЕНО: добавлена кнопка "Пригласить друга" в шапку */}
+      <div className="flex items-center justify-between mb-8 mt-2 flex-wrap gap-2">
         <button onClick={() => navigate('/')} className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition">
           <span>←</span> На главную
+        </button>
+        <button
+          onClick={() => setShowShareModal(true)}
+          className="text-sm text-gray-300 hover:text-white transition px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5"
+        >
+          🎁 Пригласить друга
         </button>
         <span className={`text-xs font-bold px-3 py-1.5 rounded-full border ${isPartner(user) ? 'text-neon-green border-neon-green/30 bg-neon-green/10' : 'text-slate-400 border-white/10 bg-white/5'}`}>
           {isPartner(user) ? 'ПАРТНЕР СМАРТ' : 'БЕСПЛАТНЫЙ УЧАСТНИК'}
@@ -600,13 +608,10 @@ const Profile: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-5">
-            {/* Шаг 1: Регистрация в «Бумеранг» */}
             <div className="flex items-center gap-3">
               <span className="text-neon-green text-xl">✅</span>
               <span className="text-sm text-slate-300">Регистрация в «Бумеранг» — <span className="font-semibold text-white">Выполнено</span></span>
             </div>
-
-            {/* Шаг 2: Регистрация в РЦБ */}
             <div className="flex items-start gap-3">
               {user.isRcbRegisteredFree ? (
                 <span className="text-neon-green text-xl mt-0.5">✅</span>
@@ -625,7 +630,6 @@ const Profile: React.FC = () => {
                 </div>
                 {!user.isRcbRegisteredFree ? (
                   <div className="flex flex-col gap-2">
-                    {/* 🔧 Две кнопки: основная + второстепенная */}
                     <button
                       onClick={handleMarkRegistered}
                       disabled={rcbActionLoading}
@@ -645,8 +649,6 @@ const Profile: React.FC = () => {
                 )}
               </div>
             </div>
-
-            {/* Шаг 3: Активация тарифа СМАРТ */}
             <div className="flex items-start gap-3">
               {user.rcbPaymentRequested ? (
                 <span className="text-neon-cyan text-xl mt-0.5 animate-pulse">⏳</span>
@@ -821,6 +823,15 @@ const Profile: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 🆕 Модалка "Поделиться" */}
+      {showShareModal && (
+        <ShareModal
+          moduleId="profile"
+          userPhone={userPhoneForShare}
+          onClose={() => setShowShareModal(false)}
+        />
       )}
     </div>
   );
