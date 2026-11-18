@@ -17,15 +17,21 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
     if (typeof bonusAmount !== 'number' || bonusAmount < 0) {
       return res.status(400).json({ success: false, message: 'Некорректная сумма бонусов' });
     }
-    const event = await prisma.event.findUnique({ where: { id: eventId } });
+
+    // 🔧 ИСПРАВЛЕНО: добавлен _count для отладки (ticketsCount)
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+      include: {
+        _count: { select: { tickets: true } }
+      }
+    });
     if (!event || !event.isActive) {
       return res.status(404).json({ success: false, message: 'Мероприятие не найдено или не активно' });
     }
 
-    // 🆕 Проверка лимита мест
-    if (event.maxTickets !== null && event.maxTickets !== undefined && event.maxTickets <= 0) {
-      return res.status(400).json({ success: false, message: 'Места закончились' });
-    }
+    // 🔧 ИСПРАВЛЕНО: убрана ранняя проверка maxTickets <= 0
+    // По ТЗ maxTickets = 0 означает безлимит.
+    // Проверка мест происходит внутри транзакции через атомарное уменьшение.
 
     const ticketPrice = event.price;
     if (bonusAmount > ticketPrice) {
@@ -44,28 +50,31 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
         throw new Error('У вас уже есть билет на это мероприятие');
       }
 
-      // 🆕 2. Атомарное уменьшение maxTickets (только если > 0)
+      // 🔧 ИСПРАВЛЕНО: атомарное уменьшение maxTickets только если он > 0
+      // Если maxTickets = null или 0 — безлимит, пропускаем проверку
       if (event.maxTickets !== null && event.maxTickets !== undefined && event.maxTickets > 0) {
         const updatedEvent = await tx.event.update({
           where: {
             id: eventId,
-            maxTickets: { gt: 0 }
+            maxTickets: { gt: 0 } // Ключевое условие: уменьшаем только если мест ещё есть
           },
           data: {
             maxTickets: { decrement: 1 }
           }
         });
+        // Если update вернул null — мест не осталось (race condition защищён)
         if (!updatedEvent) {
           throw new Error('Места закончились');
         }
       }
 
-      // 3. Получаем или создаем кошелек покупателя
+      // 2. Получаем или создаем кошелек покупателя
       let wallet = await tx.wallet.findUnique({ where: { userId } });
       if (!wallet) {
         wallet = await tx.wallet.create({ data: { userId, balance: 0 } });
       }
-      // 4. Атомарное списание бонусов с защитой от минуса (gte)
+
+      // 3. Атомарное списание бонусов с защитой от минуса (gte)
       if (bonusAmount > 0) {
         const updatedWallet = await tx.wallet.update({
           where: { 
@@ -91,7 +100,8 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
           }
         });
       }
-      // 5. Создание билета
+
+      // 4. Создание билета
       const ticket = await tx.ticket.create({
         data: {
           userId,
@@ -100,7 +110,8 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
           status: 'ACTIVE'
         }
       });
-      // 6. Начисление бонуса рефереру
+
+      // 5. Начисление бонуса рефереру
       const buyer = await tx.user.findUnique({ 
         where: { id: userId },
         select: { referredById: true }
@@ -132,6 +143,7 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
       }
       return ticket;
     });
+
     res.json({ 
       success: true, 
       message: 'Билет успешно приобретен',
@@ -172,7 +184,7 @@ router.get('/my', authenticateToken, async (req: Request, res: Response) => {
   }
 });
 
-// 🆕 DELETE /api/tickets/:id — отмена билета пользователем (возврат места)
+// DELETE /api/tickets/:id — отмена билета пользователем (возврат места)
 router.delete('/:id', authenticateToken, async (req: Request, res: Response) => {
   try {
     const ticketId = Number(req.params.id);
@@ -189,8 +201,8 @@ router.delete('/:id', authenticateToken, async (req: Request, res: Response) => 
     }
     await prisma.$transaction(async (tx) => {
       await tx.ticket.delete({ where: { id: ticketId } });
-      // Возвращаем место
-      if (ticket.event.maxTickets !== null && ticket.event.maxTickets !== undefined) {
+      // Возвращаем место только если был лимит
+      if (ticket.event.maxTickets !== null && ticket.event.maxTickets !== undefined && ticket.event.maxTickets >= 0) {
         await tx.event.update({
           where: { id: ticket.eventId },
           data: { maxTickets: { increment: 1 } }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import ShareModal from '../components/ShareModal';
 
@@ -19,6 +19,7 @@ interface Event {
 
 export default function Events() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -34,6 +35,8 @@ export default function Events() {
       return '';
     }
   })();
+
+  const isEventsPage = location.pathname === '/events';
 
   useEffect(() => {
     loadEvents();
@@ -94,12 +97,34 @@ export default function Events() {
 
   return (
     <div className="min-h-screen bg-slate-950">
+      {/* 🔧 ИСПРАВЛЕНО: Header как в Tickets.tsx */}
       <div className="bg-slate-900/60 border-b border-white/10">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between flex-wrap gap-2">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <button onClick={() => navigate('/')} className="text-sm text-gray-400 hover:text-white transition">
             ← На главную
           </button>
-          <h1 className="text-xl font-bold text-gray-100">🎟️ Мероприятия</h1>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/events')}
+              className={`px-3 py-1.5 text-sm rounded-lg transition border ${
+                isEventsPage
+                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+                  : 'text-gray-400 hover:text-white border-white/10 hover:bg-white/5'
+              }`}
+            >
+              🎟️ Мероприятия
+            </button>
+            <button
+              onClick={() => navigate('/tickets')}
+              className={`px-3 py-1.5 text-sm rounded-lg transition border ${
+                !isEventsPage
+                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+                  : 'text-gray-400 hover:text-white border-white/10 hover:bg-white/5'
+              }`}
+            >
+              🎫 Мои билеты
+            </button>
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowShareModal(true)}
@@ -107,8 +132,11 @@ export default function Events() {
             >
               Пригласить друга
             </button>
-            <button onClick={() => navigate('/tickets')} className="text-sm text-cyan-400 hover:text-cyan-300 transition">
-              Мои билеты
+            <button
+              onClick={() => navigate('/profile')}
+              className="text-sm text-gray-300 hover:text-white transition px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5"
+            >
+              Профиль
             </button>
           </div>
         </div>
@@ -135,7 +163,6 @@ export default function Events() {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {events.map(event => {
-              // 🔧 ИСПРАВЛЕНО: maxTickets = 0 означает безлимит, SOLD OUT только когда ticketsCount >= maxTickets
               const isSoldOut = event.maxTickets !== null && event.maxTickets !== undefined && event.maxTickets > 0 && event.ticketsCount >= event.maxTickets;
               const remaining = event.maxTickets !== null && event.maxTickets !== undefined && event.maxTickets > 0
                 ? event.maxTickets - event.ticketsCount
@@ -237,7 +264,6 @@ export default function Events() {
                 <p className="text-gray-300">📅 {formatDate(selectedEvent.eventDate)}</p>
               </div>
 
-              {/* 🔧 ИСПРАВЛЕНО: показываем счётчик только если maxTickets > 0 */}
               {selectedEvent.maxTickets !== null && selectedEvent.maxTickets !== undefined && selectedEvent.maxTickets > 0 && (
                 <div className={`p-3 rounded-lg border ${
                   selectedEvent.ticketsCount >= selectedEvent.maxTickets
@@ -279,7 +305,6 @@ export default function Events() {
                 </div>
               </div>
 
-              {/* 🔧 ИСПРАВЛЕНО: блокировка кнопки только если maxTickets > 0 и места закончились */}
               {selectedEvent.maxTickets !== null && selectedEvent.maxTickets !== undefined && selectedEvent.maxTickets > 0 && selectedEvent.ticketsCount >= selectedEvent.maxTickets ? (
                 <button
                   disabled
