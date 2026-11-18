@@ -21,7 +21,7 @@ export const authenticateToken = async (req: any, res: Response, next: NextFunct
     try {
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
-        select: { tokenVersion: true, roles: true } // 🆕 было: role: true
+        select: { tokenVersion: true, roles: true } // 🆕 Было: role: true
       });
 
       if (!user) {
@@ -29,9 +29,9 @@ export const authenticateToken = async (req: any, res: Response, next: NextFunct
       }
 
       if (user.tokenVersion !== decoded.version) {
-        return res.status(401).json({ 
-          success: false, 
-          message: 'Сессия недействительна. Пожалуйста, войдите в систему заново.' 
+        return res.status(401).json({
+          success: false,
+          message: 'Сессия недействительна. Пожалуйста, войдите в систему заново.'
         });
       }
 

@@ -12,7 +12,9 @@ model User {
   phone          String    @unique
   passwordHash   String
   
-  roles          String[]  @default(["user"]) // 🆕 Было: role String @default("user")
+  // 🆕 SQLite не поддерживает String[], используем Json для хранения массива
+  roles          Json      @default("[\"user\"]") 
+  
   isRcbPaid            Boolean   @default(false) 
   rcbId                String?   
   rcbReferralLink      String?   
