@@ -1,10 +1,9 @@
 import axios from 'axios';
 
 export const apiClient = axios.create({
-  baseURL: 'https://booomerang.ru', // 👈 ТЕПЕРЬ HTTPS после настройки SSL
+  baseURL: '', // 🆕 Пустая строка означает относительный путь (тот же домен, где открыт сайт)
   headers: {
     'Content-Type': 'application/json',
-    'x-requested-with': 'XMLHttpRequest', // Для CSRF-защиты на бэкенде
   },
 });
 
@@ -25,7 +24,6 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      // window.location.href = '/'; // Раскомментируй, если нужен авто-редирект на логин
     }
     return Promise.reject(error);
   }
