@@ -1,9 +1,10 @@
 import axios from 'axios';
 
 export const apiClient = axios.create({
-  baseURL: '', // 🆕 Пустая строка означает относительный путь (тот же домен, где открыт сайт)
+  baseURL: '',
   headers: {
     'Content-Type': 'application/json',
+    'x-requested-with': 'XMLHttpRequest', // 🆕 вернуть: CSRF на бэкенде требует этот заголовок
   },
 });
 
