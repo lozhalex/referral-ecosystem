@@ -1,10 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
-import { hasRole, ROLES } from '../constants/roles';
 
 export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
-  const roles = (req as any).user?.roles;
+  const role = (req as any).user?.role;
 
-  if (!hasRole(roles, [ROLES.ADMIN, ROLES.SUPER_ADMIN])) {
+  if (role !== 'admin' && role !== 'SUPER_ADMIN') {
     return res.status(403).json({
       success: false,
       message: 'Доступ запрещён. Требуются права администратора.'
@@ -15,9 +14,9 @@ export const requireAdmin = (req: Request, res: Response, next: NextFunction) =>
 };
 
 export const requireSuperAdmin = (req: Request, res: Response, next: NextFunction) => {
-  const roles = (req as any).user?.roles;
+  const role = (req as any).user?.role;
 
-  if (!hasRole(roles, [ROLES.SUPER_ADMIN])) {
+  if (role !== 'SUPER_ADMIN') {
     return res.status(403).json({
       success: false,
       message: 'Доступ запрещён. Требуются права супер-администратора.'

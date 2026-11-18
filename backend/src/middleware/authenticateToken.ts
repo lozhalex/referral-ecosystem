@@ -21,7 +21,7 @@ export const authenticateToken = async (req: any, res: Response, next: NextFunct
     try {
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
-        select: { tokenVersion: true, role: true, roles: true }
+        select: { tokenVersion: true, role: true }
       });
 
       if (!user) {
@@ -29,17 +29,16 @@ export const authenticateToken = async (req: any, res: Response, next: NextFunct
       }
 
       if (user.tokenVersion !== decoded.version) {
-        return res.status(401).json({
-          success: false,
-          message: 'Сессия недействительна. Пожалуйста, войдите в систему заново.'
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Сессия недействительна. Пожалуйста, войдите в систему заново.' 
         });
       }
 
-      // 🆕 Возвращаем ОБА поля: актуальный legacy role и JSON-строку roles
-      req.user = { ...decoded, role: user.role, roles: user.roles };
+      req.user = { ...decoded, role: user.role };
       next();
     } catch (error) {
-      console.error('Ошибка аутентификации (Token Version check):', error);
+      console.error('Ошибка аутентификации:', error);
       return res.status(500).json({ success: false, message: 'Ошибка сервера при проверке токена' });
     }
   });
