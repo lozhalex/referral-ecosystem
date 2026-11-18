@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs';
 
 const router = Router();
 const prisma = new PrismaClient();
-const ROOT_PHONE = '+79503278027';
+const ROOT_PHONE = '+79274204313';
 
 // ==========================================
 // 🆕 БЕЗОПАСНЫЙ ПАРСЕР ролей (строка JSON / массив / legacy-строка)
