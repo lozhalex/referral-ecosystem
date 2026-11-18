@@ -7,6 +7,7 @@ interface Step {
   secondaryActionLabel?: string;
   onSecondaryAction?: () => void;
   iconType?: 'emoji' | 'logo';
+  bumiPose?: number; // 🆕 1-4, номер позы Буми
 }
 
 interface OnboardingModalProps {
@@ -46,14 +47,30 @@ export default function OnboardingModal({ steps, storageKey, onComplete }: Onboa
           ))}
         </div>
 
-        {/* Иконка/логотип */}
-        <div className="mb-4 flex justify-center">
-          {step.iconType === 'logo' ? (
-            <img src="/logo-mark.svg" alt="Бумеранг" className="w-16 h-16" />
-          ) : (
-            <div className="text-4xl">{step.title.split(' ')[0]}</div>
-          )}
-        </div>
+        {/* 🆕 Буми */}
+        {step.bumiPose && (
+          <div className="flex justify-center mb-4">
+            <img
+              src={`/bumi/pose-${step.bumiPose}.png`}
+              alt="Буми"
+              className="w-28 h-28 object-contain"
+              style={{
+                animation: 'bumi-bounce 2s ease-in-out infinite',
+              }}
+            />
+          </div>
+        )}
+
+        {/* Иконка/логотип (если нет Буми) */}
+        {!step.bumiPose && (
+          <div className="mb-4 flex justify-center">
+            {step.iconType === 'logo' ? (
+              <img src="/logo-mark.svg" alt="Бумеранг" className="w-16 h-16" />
+            ) : (
+              <div className="text-4xl">{step.title.split(' ')[0]}</div>
+            )}
+          </div>
+        )}
 
         <h2 className="text-2xl font-bold text-white mb-4 font-display tracking-tight text-center">
           {step.iconType === 'logo' ? step.title : step.title.replace(/^[^\s]+\s/, '')}
@@ -93,6 +110,14 @@ export default function OnboardingModal({ steps, storageKey, onComplete }: Onboa
           </button>
         )}
       </div>
+
+      {/* 🆕 Анимация Буми */}
+      <style>{`
+        @keyframes bumi-bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-8px); }
+        }
+      `}</style>
     </div>
   );
 }
