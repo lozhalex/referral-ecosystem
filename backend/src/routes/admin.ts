@@ -6,18 +6,22 @@ import bcrypt from 'bcryptjs';
 
 const router = Router();
 const prisma = new PrismaClient();
-const ROOT_PHONE = '+79503278027'; // Защита корневого пользователя
+const ROOT_PHONE = '+79503278027';
 
 // ==========================================
-// 🆕 БЕЗОПАСНЫЙ ПАРСЕР JSON (для старых битых записей в БД)
+// 🆕 БЕЗОПАСНЫЙ ПАРСЕР ролей (строка JSON / массив / legacy-строка)
 // ==========================================
-const safeParse = (str: string | null): any => {
-  if (!str) return null;
-  try {
-    return JSON.parse(str);
-  } catch {
-    return str; // возвращаем сырую строку как есть
+const safeParseRoles = (rolesData: any): string[] => {
+  if (Array.isArray(rolesData)) return rolesData;
+  if (typeof rolesData === 'string') {
+    try {
+      const parsed = JSON.parse(rolesData);
+      return Array.isArray(parsed) ? parsed : [parsed];
+    } catch {
+      return [rolesData];
+    }
   }
+  return ['user'];
 };
 
 // ==========================================
@@ -66,7 +70,7 @@ router.get('/users', requireAdmin, async (req: Request, res: Response) => {
     const result = users.map(u => ({
       id: u.id,
       phone: u.phone,
-      roles: Array.isArray(u.roles) ? u.roles : [u.role || 'user'], // 🆕 Поддержка массива
+      roles: safeParseRoles(u.roles), // 🆕 Возвращаем массив для фронтенда
       isPaidMember: u.isPaidMember,
       isFounder: u.isFounder,
       balance: u.wallet?.balance ?? 0,
@@ -100,7 +104,7 @@ router.get('/users/:id', requireAdmin, async (req: Request, res: Response) => {
       user: {
         id: user.id,
         phone: user.phone,
-        roles: Array.isArray(user.roles) ? user.roles : [user.role || 'user'], // 🆕 Поддержка массива
+        roles: safeParseRoles(user.roles), // 🆕 Возвращаем массив для фронтенда
         isPaidMember: user.isPaidMember,
         isFounder: user.isFounder,
         createdAt: user.createdAt,
@@ -173,10 +177,10 @@ router.post('/users/:id/wallet/adjust', requireAdmin, protectFounder, async (req
 // ==========================================
 // 🆕 УПРАВЛЕНИЕ РОЛЯМИ (МАССИВ) И ПАРОЛЯМИ
 // ==========================================
-router.put('/users/:id/role', requireAdmin, protectFounder, async (req: Request, res: Response) => {
+router.put('/users/:id/roles', requireAdmin, protectFounder, async (req: Request, res: Response) => {
   try {
     const userId = Number(req.params.id);
-    const { roles } = req.body; // 🆕 Теперь ожидаем массив
+    const { roles } = req.body; // Ожидаем массив string[]
     const adminId = (req as any).user!.userId;
 
     if (!Array.isArray(roles) || roles.length === 0) {
@@ -191,19 +195,19 @@ router.put('/users/:id/role', requireAdmin, protectFounder, async (req: Request,
 
     const targetUser = await prisma.user.findUnique({ where: { id: userId } });
     if (!targetUser) return res.status(404).json({ success: false, message: 'Пользователь не найден' });
-
     if (targetUser.phone === ROOT_PHONE) {
       return res.status(403).json({ success: false, message: 'Нельзя изменить роли корневого администратора' });
     }
 
-    const oldRoles = Array.isArray(targetUser.roles) ? targetUser.roles : [targetUser.role || 'user'];
+    const oldRoles = safeParseRoles(targetUser.roles);
 
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: userId },
         data: { 
-          roles, 
-          tokenVersion: { increment: 1 } // 🆕 Отзыв старых токенов при смене ролей
+          roles: JSON.stringify(roles),          // 🆕 Исправлено: сохраняем как JSON-строку
+          role: roles[0] ?? 'user',              // 🆕 Синхронизируем legacy-поле для совместимости
+          tokenVersion: { increment: 1 }
         }
       });
       await tx.treeAuditLog.create({
@@ -319,7 +323,6 @@ router.post('/tree/move', requireAdmin, protectFounder, async (req: Request, res
   }
 });
 
-// 🆕 ИСПРАВЛЕН: используем safeParse вместо JSON.parse
 router.get('/tree/logs', requireAdmin, async (req: Request, res: Response) => {
   try {
     const logs = await prisma.treeAuditLog.findMany({
@@ -336,8 +339,8 @@ router.get('/tree/logs', requireAdmin, async (req: Request, res: Response) => {
       adminPhone: log.admin.phone,
       targetPhone: log.targetUser?.phone || 'ВСЕ',
       action: log.action,
-      oldData: safeParse(log.oldData),
-      newData: safeParse(log.newData),
+      oldData: log.oldData,
+      newData: log.newData,
       createdAt: log.createdAt
     }));
 
@@ -366,8 +369,8 @@ router.get('/tree/logs/export', requireAdmin, async (req: Request, res: Response
         log.admin.phone,
         log.targetUser?.phone || 'ВСЕ',
         log.action,
-        log.oldData || '',
-        log.newData || ''
+        typeof log.oldData === 'object' ? JSON.stringify(log.oldData) : (log.oldData || ''),
+        typeof log.newData === 'object' ? JSON.stringify(log.newData) : (log.newData || '')
       ]);
     });
 
@@ -385,7 +388,7 @@ router.get('/tree/logs/export', requireAdmin, async (req: Request, res: Response
 router.get('/tree/export', requireAdmin, async (req: Request, res: Response) => {
   try {
     const treeData = await prisma.user.findMany({
-      select: { id: true, phone: true, referredById: true, roles: true } // 🆕 Добавили roles
+      select: { id: true, phone: true, referredById: true, roles: true }
     });
     
     res.setHeader('Content-Type', 'application/json');
@@ -439,12 +442,13 @@ router.post('/tree/import', requireAdmin, async (req: Request, res: Response) =>
       }
 
       for (const node of treeData) {
+        const rolesArr = safeParseRoles(node.roles);
         await tx.user.update({ 
           where: { id: node.id }, 
           data: { 
             referredById: node.referredById,
-            // 🆕 Если в импорте есть roles, используем их, иначе оставляем как есть
-            ...(node.roles && Array.isArray(node.roles) ? { roles: node.roles } : {})
+            roles: JSON.stringify(rolesArr),          // 🆕 Исправлено
+            role: rolesArr[0] ?? 'user'               // 🆕 Синхронизируем legacy
           } 
         });
         if (node.referredById !== null) {
@@ -494,8 +498,7 @@ router.post('/rcb-requests/:id/approve', requireAdmin, async (req: Request, res:
 
     await prisma.$transaction(async (tx) => {
       const user = await tx.user.findUnique({ where: { id: userId } });
-      // 🆕 Безопасно добавляем 'partner' в массив ролей, не затирая остальные
-      const currentRoles = Array.isArray(user?.roles) ? user.roles : [user?.role || 'user'];
+      const currentRoles = safeParseRoles(user?.roles);
       if (!currentRoles.includes('partner')) {
         currentRoles.push('partner');
       }
@@ -505,8 +508,9 @@ router.post('/rcb-requests/:id/approve', requireAdmin, async (req: Request, res:
         data: { 
           isRcbPaid: true, 
           rcbPaymentRequested: false, 
-          roles: currentRoles,
-          tokenVersion: { increment: 1 } // 🆕 Отзыв токена
+          roles: JSON.stringify(currentRoles), // 🆕 Исправлено: сохраняем как JSON-строку
+          role: currentRoles[0] ?? 'user',     // 🆕 Синхронизируем legacy
+          tokenVersion: { increment: 1 }
         }
       });
       
@@ -515,7 +519,7 @@ router.post('/rcb-requests/:id/approve', requireAdmin, async (req: Request, res:
           adminId,
           targetUserId: userId,
           action: 'RCB_APPROVE',
-          oldData: JSON.stringify({ isRcbPaid: false, roles: user?.roles }),
+          oldData: JSON.stringify({ isRcbPaid: false, roles: currentRoles }),
           newData: JSON.stringify({ isRcbPaid: true, roles: currentRoles })
         }
       });
@@ -645,7 +649,7 @@ router.delete('/auto/records/:id', requireAdmin, async (req: Request, res: Respo
 interface TreeNode {
   id: number;
   phone: string;
-  roles: string[]; // 🆕 Было: role: string
+  roles: string[];
   referralCount: number;
   totalDescendants: number;
   balance: number;
@@ -690,7 +694,7 @@ const buildTreeNode = async (
   return {
     id: user.id,
     phone: user.phone,
-    roles: Array.isArray(user.roles) ? user.roles : [user.role || 'user'], // 🆕
+    roles: safeParseRoles(user.roles), // 🆕 Возвращаем массив
     referralCount: children.length,
     totalDescendants,
     balance: user.wallet?.balance || 0,
@@ -810,7 +814,7 @@ router.get('/export/users', requireAdmin, async (req: Request, res: Response) =>
     const exportData = users.map(u => ({
       id: u.id,
       phone: u.phone,
-      roles: Array.isArray(u.roles) ? u.roles : [u.role || 'user'], // 🆕
+      roles: safeParseRoles(u.roles), // 🆕 Возвращаем массив
       isPaidMember: u.isPaidMember,
       isFounder: u.isFounder,
       balance: u.wallet?.balance || 0,
@@ -887,8 +891,8 @@ router.get('/export/events', requireAdmin, async (req: Request, res: Response) =
 
 router.post('/import/users', requireAdmin, async (req: Request, res: Response) => {
   try {
-    const adminRole = (req as any).user!.roles?.includes('SUPER_ADMIN') || (req as any).user!.role === 'SUPER_ADMIN';
-    if (!adminRole) {
+    const userRoles = (req as any).user!.roles;
+    if (!safeParseRoles(userRoles).includes('SUPER_ADMIN')) {
       return res.status(403).json({ success: false, message: 'Импорт доступен только SUPER_ADMIN' });
     }
 
@@ -902,14 +906,15 @@ router.post('/import/users', requireAdmin, async (req: Request, res: Response) =
 
     await prisma.$transaction(async (tx) => {
       for (const userData of users) {
+        const rolesArr = Array.isArray(userData.roles) ? userData.roles : safeParseRoles(userData.roles);
         const existingUser = await tx.user.findUnique({ where: { phone: userData.phone } });
 
         if (existingUser) {
           await tx.user.update({
             where: { id: existingUser.id },
             data: {
-              // 🆕 Поддержка массива roles при обновлении
-              roles: Array.isArray(userData.roles) ? userData.roles : (userData.role ? [userData.role] : existingUser.roles),
+              roles: JSON.stringify(rolesArr),          // 🆕 Исправлено
+              role: rolesArr[0] ?? existingUser.role,   // 🆕 Синхронизируем legacy
               isPaidMember: userData.isPaidMember ?? existingUser.isPaidMember,
               isFounder: userData.isFounder ?? existingUser.isFounder
             }
@@ -929,8 +934,8 @@ router.post('/import/users', requireAdmin, async (req: Request, res: Response) =
             data: {
               phone: userData.phone,
               passwordHash: await bcrypt.hash('123456', 10),
-              // 🆕 Поддержка массива roles при создании
-              roles: Array.isArray(userData.roles) ? userData.roles : (userData.role ? [userData.role] : ['user']),
+              roles: JSON.stringify(rolesArr.length ? rolesArr : ['user']), // 🆕 Исправлено
+              role: rolesArr[0] ?? 'user',                                  // 🆕 Синхронизируем legacy
               isPaidMember: userData.isPaidMember || false,
               isFounder: userData.isFounder || false
             }
@@ -953,8 +958,8 @@ router.post('/import/users', requireAdmin, async (req: Request, res: Response) =
 
 router.post('/import/cars', requireAdmin, async (req: Request, res: Response) => {
   try {
-    const adminRole = (req as any).user!.roles?.includes('SUPER_ADMIN') || (req as any).user!.role === 'SUPER_ADMIN';
-    if (!adminRole) {
+    const userRoles = (req as any).user!.roles;
+    if (!safeParseRoles(userRoles).includes('SUPER_ADMIN')) {
       return res.status(403).json({ success: false, message: 'Импорт доступен только SUPER_ADMIN' });
     }
 
@@ -1010,8 +1015,8 @@ router.post('/import/cars', requireAdmin, async (req: Request, res: Response) =>
 
 router.post('/import/events', requireAdmin, async (req: Request, res: Response) => {
   try {
-    const adminRole = (req as any).user!.roles?.includes('SUPER_ADMIN') || (req as any).user!.role === 'SUPER_ADMIN';
-    if (!adminRole) {
+    const userRoles = (req as any).user!.roles;
+    if (!safeParseRoles(userRoles).includes('SUPER_ADMIN')) {
       return res.status(403).json({ success: false, message: 'Импорт доступен только SUPER_ADMIN' });
     }
 
