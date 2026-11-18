@@ -7,13 +7,13 @@ export const ROLES = {
   CASHIER: 'cashier',
   SERVICE_MASTER: 'service_master',
   EVENT_ORGANIZER: 'event_organizer',
-  PARTNER: 'partner',
 } as const;
 
 export type Role = typeof ROLES[keyof typeof ROLES];
 
+// Иерархия: кто может менять роли кого
 export const ROLE_HIERARCHY: Record<Role, Role[]> = {
-  [ROLES.SUPER_ADMIN]: [ROLES.USER, ROLES.ADMIN, ROLES.CONTROLLER, ROLES.CASHIER, ROLES.SERVICE_MASTER, ROLES.EVENT_ORGANIZER, ROLES.PARTNER],
+  [ROLES.SUPER_ADMIN]: [ROLES.USER, ROLES.ADMIN, ROLES.CONTROLLER, ROLES.CASHIER, ROLES.SERVICE_MASTER, ROLES.EVENT_ORGANIZER],
   [ROLES.ADMIN]: [ROLES.USER, ROLES.EVENT_ORGANIZER],
   [ROLES.USER]: [],
   [ROLES.CONTROLLER]: [],
@@ -21,43 +21,16 @@ export const ROLE_HIERARCHY: Record<Role, Role[]> = {
   [ROLES.CASHIER]: [],
   [ROLES.SERVICE_MASTER]: [],
   [ROLES.EVENT_ORGANIZER]: [],
-  [ROLES.PARTNER]: [],
 };
 
-/**
- * 🆕 Безопасно превращает данные из БД (строка JSON или legacy-строка) в массив строк.
- */
-export const safeParseRoles = (rolesData: any): string[] => {
-  if (Array.isArray(rolesData)) return rolesData;
-  if (typeof rolesData === 'string') {
-    try {
-      const parsed = JSON.parse(rolesData);
-      return Array.isArray(parsed) ? parsed : [parsed];
-    } catch {
-      return [rolesData];
-    }
-  }
-  return ['user'];
+export const hasRole = (userRole: string | undefined, allowedRoles: Role[]): boolean => {
+  return userRole ? (allowedRoles as string[]).includes(userRole) : false;
 };
 
-/**
- * 🆕 Проверяет, есть ли у пользователя хотя бы одна из разрешённых ролей.
- */
-export const hasRole = (userRoles: any, allowedRoles: Role[]): boolean => {
-  const rolesArray = safeParseRoles(userRoles);
-  return allowedRoles.some(role => rolesArray.includes(role));
-};
-
-/**
- * Проверяет бизнес-статус партнёра.
- */
 export const isPartner = (user: any): boolean => {
-  return user?.isRcbPaid === true || hasRole(user?.roles, [ROLES.PARTNER]);
+  return user?.isRcbPaid === true || user?.role === 'partner';
 };
 
-/**
- * Проверяет, является ли пользователь основателем.
- */
 export const isFounder = (user: any): boolean => {
   return user?.isFounder === true;
 };
