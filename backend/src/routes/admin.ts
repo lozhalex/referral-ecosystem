@@ -27,11 +27,13 @@ const checkForCycle = async (tx: any, targetUserId: number, newReferredById: num
   if (newReferredById === null) return false;
   const queue: number[] = [newReferredById];
   const visited = new Set<number>();
+  
   while (queue.length > 0) {
     const currentId = queue.shift()!;
     if (currentId === targetUserId) return true;
     if (visited.has(currentId)) continue;
     visited.add(currentId);
+    
     const children = await tx.user.findMany({
       where: { referredById: currentId },
       select: { id: true }
@@ -50,6 +52,7 @@ router.get('/users', requireAdmin, async (req: Request, res: Response) => {
   try {
     const phoneFilter = req.query.phone as string | undefined;
     const where = phoneFilter ? { phone: { contains: phoneFilter.replace(/\D/g, '') } } : {};
+    
     const users = await prisma.user.findMany({
       where,
       include: {
@@ -59,16 +62,18 @@ router.get('/users', requireAdmin, async (req: Request, res: Response) => {
       orderBy: { createdAt: 'desc' },
       take: 100
     });
+
     const result = users.map(u => ({
       id: u.id,
       phone: u.phone,
-      role: u.role,
+      roles: Array.isArray(u.roles) ? u.roles : [u.role || 'user'], // 🆕 Поддержка массива
       isPaidMember: u.isPaidMember,
       isFounder: u.isFounder,
       balance: u.wallet?.balance ?? 0,
       referralCount: u._count.referrals,
       createdAt: u.createdAt
     }));
+
     res.json({ success: true, users: result });
   } catch (err) {
     console.error('Admin users error:', err);
@@ -87,13 +92,15 @@ router.get('/users/:id', requireAdmin, async (req: Request, res: Response) => {
         referrals: { select: { id: true, phone: true, createdAt: true }, orderBy: { createdAt: 'desc' } }
       }
     });
+
     if (!user) return res.status(404).json({ success: false, message: 'Пользователь не найден' });
+
     res.json({
       success: true,
       user: {
         id: user.id,
         phone: user.phone,
-        role: user.role,
+        roles: Array.isArray(user.roles) ? user.roles : [user.role || 'user'], // 🆕 Поддержка массива
         isPaidMember: user.isPaidMember,
         isFounder: user.isFounder,
         createdAt: user.createdAt,
@@ -113,27 +120,33 @@ router.post('/users/:id/wallet/adjust', requireAdmin, protectFounder, async (req
   try {
     const userId = Number(req.params.id);
     const { amount, type, description, referenceId } = req.body;
+
     if (typeof amount !== 'number' || amount === 0) {
       return res.status(400).json({ success: false, message: 'Сумма должна быть числом и не равна 0' });
     }
     if (typeof description !== 'string' || description.trim().length < 10) {
       return res.status(400).json({ success: false, message: 'Описание обязательно и минимум 10 символов' });
     }
+
     const user = await prisma.user.findUnique({ where: { id: userId }, include: { wallet: true } });
     if (!user) return res.status(404).json({ success: false, message: 'Пользователь не найден' });
+
     let walletId = user.wallet?.id;
     if (!walletId) {
       const newWallet = await prisma.wallet.create({ data: { userId: user.id, balance: 0 } });
       walletId = newWallet.id;
     }
+
     await prisma.$transaction(async (tx) => {
       const updatedWallet = await tx.wallet.update({
         where: { id: walletId, ...(amount < 0 ? { balance: { gte: Math.abs(amount) } } : {}) },
         data: { balance: { increment: amount } }
       });
+
       if (!updatedWallet && amount < 0) {
         throw new Error('Недостаточно средств на балансе для списания');
       }
+
       await tx.transaction.create({
         data: {
           walletId,
@@ -145,6 +158,7 @@ router.post('/users/:id/wallet/adjust', requireAdmin, protectFounder, async (req
         }
       });
     });
+
     console.log(`[ADMIN ACTION] Admin adjusted wallet of user ${userId} by ${amount}.`);
     res.json({ success: true, message: 'Баланс успешно обновлен' });
   } catch (err: any) {
@@ -157,46 +171,56 @@ router.post('/users/:id/wallet/adjust', requireAdmin, protectFounder, async (req
 });
 
 // ==========================================
-// УПРАВЛЕНИЕ РОЛЯМИ И ПАРОЛЯМИ
+// 🆕 УПРАВЛЕНИЕ РОЛЯМИ (МАССИВ) И ПАРОЛЯМИ
 // ==========================================
 router.put('/users/:id/role', requireAdmin, protectFounder, async (req: Request, res: Response) => {
   try {
     const userId = Number(req.params.id);
-    const { role } = req.body;
+    const { roles } = req.body; // 🆕 Теперь ожидаем массив
     const adminId = (req as any).user!.userId;
-    const currentAdminRole = (req as any).user!.role;
-    const validRoles = ['user', 'admin', 'controller', 'SUPER_ADMIN', 'partner', 'service_master'];
-    if (!validRoles.includes(role)) {
-      return res.status(400).json({ success: false, message: `Недопустимая роль.` });
+
+    if (!Array.isArray(roles) || roles.length === 0) {
+      return res.status(400).json({ success: false, message: 'Должна быть выбрана хотя бы одна роль' });
     }
+
+    const validRoles = ['user', 'admin', 'SUPER_ADMIN', 'cashier', 'controller', 'service_master', 'event_organizer', 'partner'];
+    const invalidRoles = roles.filter((r: string) => !validRoles.includes(r));
+    if (invalidRoles.length > 0) {
+      return res.status(400).json({ success: false, message: `Недопустимые роли: ${invalidRoles.join(', ')}` });
+    }
+
     const targetUser = await prisma.user.findUnique({ where: { id: userId } });
     if (!targetUser) return res.status(404).json({ success: false, message: 'Пользователь не найден' });
-    if (targetUser.role === 'SUPER_ADMIN') {
-      return res.status(403).json({ success: false, message: 'Роль SUPER_ADMIN не может быть изменена.' });
-    }
+
     if (targetUser.phone === ROOT_PHONE) {
-      return res.status(403).json({ success: false, message: 'Нельзя изменить роль корневого администратора' });
+      return res.status(403).json({ success: false, message: 'Нельзя изменить роли корневого администратора' });
     }
-    const oldRole = targetUser.role;
+
+    const oldRoles = Array.isArray(targetUser.roles) ? targetUser.roles : [targetUser.role || 'user'];
+
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: userId },
-        data: { role, tokenVersion: { increment: 1 } }
+        data: { 
+          roles, 
+          tokenVersion: { increment: 1 } // 🆕 Отзыв старых токенов при смене ролей
+        }
       });
       await tx.treeAuditLog.create({
         data: {
           adminId,
           targetUserId: userId,
           action: 'ROLE_CHANGE',
-          oldData: JSON.stringify({ role: oldRole }),
-          newData: JSON.stringify({ role, reason: req.body.reason || 'Без причины' })
+          oldData: JSON.stringify({ roles: oldRoles }),
+          newData: JSON.stringify({ roles, reason: (req.body as any).reason || 'Без причины' })
         }
       });
     });
-    res.json({ success: true, message: `Роль успешно изменена на ${role}` });
+
+    res.json({ success: true, message: 'Роли успешно обновлены' });
   } catch (err) {
     console.error('Admin role change error:', err);
-    res.status(500).json({ success: false, message: 'Ошибка сервера при смене роли' });
+    res.status(500).json({ success: false, message: 'Ошибка сервера при смене ролей' });
   }
 });
 
@@ -205,12 +229,15 @@ router.post('/users/:id/reset-password', requireAdmin, protectFounder, async (re
     const userId = Number(req.params.id);
     const adminId = (req as any).user!.userId;
     const user = await prisma.user.findUnique({ where: { id: userId } });
+
     if (!user) return res.status(404).json({ success: false, message: 'Пользователь не найден' });
     if (user.phone === ROOT_PHONE) {
       return res.status(403).json({ success: false, message: 'Нельзя сбросить пароль корневого администратора' });
     }
+
     const newPassword = Math.floor(100000 + Math.random() * 900000).toString();
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: userId },
@@ -226,6 +253,7 @@ router.post('/users/:id/reset-password', requireAdmin, protectFounder, async (re
         }
       });
     });
+
     res.json({ success: true, message: 'Пароль успешно сброшен', newPassword });
   } catch (err) {
     console.error('Admin password reset error:', err);
@@ -240,31 +268,39 @@ router.post('/tree/move', requireAdmin, protectFounder, async (req: Request, res
   try {
     const { targetUserId, newReferredById } = req.body;
     const adminId = (req as any).user!.userId;
+
     if (targetUserId === undefined || newReferredById === undefined) {
       return res.status(400).json({ success: false, message: 'targetUserId и newReferredById обязательны' });
     }
     if (targetUserId === newReferredById) {
       return res.status(400).json({ success: false, message: 'Пользователь не может быть своим собственным реферером' });
     }
+
     const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
     if (!targetUser) return res.status(404).json({ success: false, message: 'Целевой пользователь не найден' });
+
     if (newReferredById !== null) {
       const newReferrer = await prisma.user.findUnique({ where: { id: newReferredById } });
       if (!newReferrer) return res.status(404).json({ success: false, message: 'Новый реферер не найден' });
+      
       const willCreateCycle = await checkForCycle(prisma, targetUserId, newReferredById);
       if (willCreateCycle) {
         return res.status(400).json({ success: false, message: 'Ошибка: нельзя переместить пользователя под его собственного потомка.' });
       }
     }
+
     const oldReferredById = targetUser.referredById;
+
     await prisma.$transaction(async (tx) => {
       await tx.user.update({ where: { id: targetUserId }, data: { referredById: newReferredById === null ? null : newReferredById } });
+      
       if (oldReferredById !== null) {
         await tx.user.update({ where: { id: oldReferredById }, data: { referralCount: { decrement: 1 } } });
       }
       if (newReferredById !== null) {
         await tx.user.update({ where: { id: newReferredById }, data: { referralCount: { increment: 1 } } });
       }
+
       await tx.treeAuditLog.create({
         data: {
           adminId,
@@ -275,6 +311,7 @@ router.post('/tree/move', requireAdmin, protectFounder, async (req: Request, res
         }
       });
     });
+
     res.json({ success: true, message: 'Реферер успешно изменен' });
   } catch (err: any) {
     console.error('Admin tree move error:', err);
@@ -293,6 +330,7 @@ router.get('/tree/logs', requireAdmin, async (req: Request, res: Response) => {
       orderBy: { createdAt: 'desc' },
       take: 200
     });
+
     const formattedLogs = logs.map(log => ({
       id: log.id,
       adminPhone: log.admin.phone,
@@ -302,6 +340,7 @@ router.get('/tree/logs', requireAdmin, async (req: Request, res: Response) => {
       newData: safeParse(log.newData),
       createdAt: log.createdAt
     }));
+
     res.json({ success: true, logs: formattedLogs });
   } catch (err) {
     console.error('Admin tree logs error:', err);
@@ -318,6 +357,7 @@ router.get('/tree/logs/export', requireAdmin, async (req: Request, res: Response
       },
       orderBy: { createdAt: 'desc' }
     });
+
     const csvRows: string[][] = [['ID', 'Дата', 'Админ', 'Целевой пользователь', 'Действие', 'Старые данные', 'Новые данные']];
     logs.forEach(log => {
       csvRows.push([
@@ -330,7 +370,9 @@ router.get('/tree/logs/export', requireAdmin, async (req: Request, res: Response
         log.newData || ''
       ]);
     });
+
     const csvContent = csvRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename=tree_audit_logs_${new Date().toISOString().slice(0, 10)}.csv`);
     res.send('\uFEFF' + csvContent);
@@ -343,8 +385,9 @@ router.get('/tree/logs/export', requireAdmin, async (req: Request, res: Response
 router.get('/tree/export', requireAdmin, async (req: Request, res: Response) => {
   try {
     const treeData = await prisma.user.findMany({
-      select: { id: true, phone: true, referredById: true }
+      select: { id: true, phone: true, referredById: true, roles: true } // 🆕 Добавили roles
     });
+    
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', `attachment; filename=tree_backup_${new Date().toISOString().slice(0, 10)}.json`);
     res.json(treeData);
@@ -358,11 +401,14 @@ router.post('/tree/import', requireAdmin, async (req: Request, res: Response) =>
   try {
     const treeData = req.body;
     const adminId = (req as any).user!.userId;
+
     if (!Array.isArray(treeData)) {
       return res.status(400).json({ success: false, message: 'Неверный формат данных' });
     }
+
     const nodeMap = new Map<number, number | null>();
     treeData.forEach(node => nodeMap.set(node.id, node.referredById));
+
     for (const node of treeData) {
       let current = node.id;
       const visited = new Set<number>();
@@ -374,25 +420,38 @@ router.post('/tree/import', requireAdmin, async (req: Request, res: Response) =>
         current = nodeMap.get(current) ?? null;
       }
     }
+
     const userIdsInDb = await prisma.user.findMany({ select: { id: true } });
     const validIds = new Set(userIdsInDb.map(u => u.id));
+
     for (const node of treeData) {
       if (node.referredById !== null && !validIds.has(node.referredById)) {
         return res.status(400).json({ success: false, message: `Ссылка на несуществующего реферера ID ${node.referredById}` });
       }
     }
+
     await prisma.$transaction(async (tx) => {
       const targetIds = treeData.map(n => n.id);
       const oldReferrers = await tx.user.findMany({ where: { id: { in: targetIds } }, select: { id: true } });
+      
       for (const ref of oldReferrers) {
         await tx.user.update({ where: { id: ref.id }, data: { referralCount: 0 } });
       }
+
       for (const node of treeData) {
-        await tx.user.update({ where: { id: node.id }, data: { referredById: node.referredById } });
+        await tx.user.update({ 
+          where: { id: node.id }, 
+          data: { 
+            referredById: node.referredById,
+            // 🆕 Если в импорте есть roles, используем их, иначе оставляем как есть
+            ...(node.roles && Array.isArray(node.roles) ? { roles: node.roles } : {})
+          } 
+        });
         if (node.referredById !== null) {
           await tx.user.update({ where: { id: node.referredById }, data: { referralCount: { increment: 1 } } });
         }
       }
+
       await tx.treeAuditLog.create({
         data: {
           adminId,
@@ -403,6 +462,7 @@ router.post('/tree/import', requireAdmin, async (req: Request, res: Response) =>
         }
       });
     });
+
     res.json({ success: true, message: `Дерево успешно восстановлено (${treeData.length} узлов)` });
   } catch (err: any) {
     console.error('Admin tree import error:', err);
@@ -431,21 +491,36 @@ router.post('/rcb-requests/:id/approve', requireAdmin, async (req: Request, res:
   try {
     const userId = Number(req.params.id);
     const adminId = (req as any).user!.userId;
+
     await prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({ where: { id: userId } });
+      // 🆕 Безопасно добавляем 'partner' в массив ролей, не затирая остальные
+      const currentRoles = Array.isArray(user?.roles) ? user.roles : [user?.role || 'user'];
+      if (!currentRoles.includes('partner')) {
+        currentRoles.push('partner');
+      }
+
       await tx.user.update({
         where: { id: userId },
-        data: { isRcbPaid: true, rcbPaymentRequested: false, role: 'partner' }
+        data: { 
+          isRcbPaid: true, 
+          rcbPaymentRequested: false, 
+          roles: currentRoles,
+          tokenVersion: { increment: 1 } // 🆕 Отзыв токена
+        }
       });
+      
       await tx.treeAuditLog.create({
         data: {
           adminId,
           targetUserId: userId,
           action: 'RCB_APPROVE',
-          oldData: JSON.stringify({ isRcbPaid: false }),
-          newData: JSON.stringify({ isRcbPaid: true, role: 'partner' })
+          oldData: JSON.stringify({ isRcbPaid: false, roles: user?.roles }),
+          newData: JSON.stringify({ isRcbPaid: true, roles: currentRoles })
         }
       });
     });
+
     res.json({ success: true, message: 'Пользователь успешно переведен в статус Партнера РЦБ' });
   } catch (err) {
     console.error('Admin rcb approve error:', err);
@@ -492,13 +567,16 @@ router.put('/auto/records/:id', requireAdmin, async (req: Request, res: Response
     const recordId = Number(req.params.id);
     const { date, mileage, category, work, cost, comment } = req.body;
     const adminId = (req as any).user!.userId;
+
     const originalRecord = await prisma.serviceRecord.findUnique({
       where: { id: recordId },
       include: { user: { select: { id: true } } }
     });
+
     if (!originalRecord) {
       return res.status(404).json({ success: false, message: 'Запись не найдена' });
     }
+
     const updatedRecord = await prisma.serviceRecord.update({
       where: { id: recordId },
       data: {
@@ -510,6 +588,7 @@ router.put('/auto/records/:id', requireAdmin, async (req: Request, res: Response
         comment: comment || originalRecord.comment
       }
     });
+
     await prisma.treeAuditLog.create({
       data: {
         adminId,
@@ -519,6 +598,7 @@ router.put('/auto/records/:id', requireAdmin, async (req: Request, res: Response
         newData: JSON.stringify(updatedRecord)
       }
     });
+
     res.json({ success: true, record: updatedRecord });
   } catch (err) {
     console.error('Admin auto update record error:', err);
@@ -530,14 +610,18 @@ router.delete('/auto/records/:id', requireAdmin, async (req: Request, res: Respo
   try {
     const recordId = Number(req.params.id);
     const adminId = (req as any).user!.userId;
+
     const originalRecord = await prisma.serviceRecord.findUnique({
       where: { id: recordId },
       include: { user: { select: { id: true } } }
     });
+
     if (!originalRecord) {
       return res.status(404).json({ success: false, message: 'Запись не найдена' });
     }
+
     await prisma.serviceRecord.delete({ where: { id: recordId } });
+
     await prisma.treeAuditLog.create({
       data: {
         adminId,
@@ -547,6 +631,7 @@ router.delete('/auto/records/:id', requireAdmin, async (req: Request, res: Respo
         newData: 'DELETED'
       }
     });
+
     res.json({ success: true, message: 'Запись удалена' });
   } catch (err) {
     console.error('Admin auto delete record error:', err);
@@ -560,7 +645,7 @@ router.delete('/auto/records/:id', requireAdmin, async (req: Request, res: Respo
 interface TreeNode {
   id: number;
   phone: string;
-  role: string;
+  roles: string[]; // 🆕 Было: role: string
   referralCount: number;
   totalDescendants: number;
   balance: number;
@@ -581,13 +666,16 @@ const buildTreeNode = async (
     where: { referredById: userId },
     select: { id: true }
   });
+
   const hasMore = currentDepth >= maxDepth && children.length > 0;
   const childrenToProcess = hasMore ? [] : children;
   const childNodes: TreeNode[] = [];
+
   for (const child of childrenToProcess) {
     const childNode = await buildTreeNode(tx, child.id, currentDepth + 1, maxDepth, allUsersMap);
     childNodes.push(childNode);
   }
+
   const countDescendants = async (uid: number): Promise<number> => {
     const kids = await tx.user.findMany({ where: { referredById: uid }, select: { id: true } });
     let count = kids.length;
@@ -596,11 +684,13 @@ const buildTreeNode = async (
     }
     return count;
   };
+
   const totalDescendants = await countDescendants(userId);
+
   return {
     id: user.id,
     phone: user.phone,
-    role: user.role,
+    roles: Array.isArray(user.roles) ? user.roles : [user.role || 'user'], // 🆕
     referralCount: children.length,
     totalDescendants,
     balance: user.wallet?.balance || 0,
@@ -614,16 +704,20 @@ router.get('/tree/visual', requireAdmin, async (req: Request, res: Response) => 
   try {
     const depth = Number(req.query.depth) || 3;
     const searchPhone = req.query.searchPhone as string | undefined;
+
     const allUsers = await prisma.user.findMany({
       include: { wallet: { select: { balance: true } } }
     });
+
     const allUsersMap = new Map<number, any>();
     allUsers.forEach(u => allUsersMap.set(u.id, u));
+
     if (searchPhone) {
       const targetUser = allUsers.find(u => u.phone.includes(searchPhone.replace(/\D/g, '')));
       if (!targetUser) {
         return res.json({ success: true, tree: [], stats: null, message: 'Пользователь не найден' });
       }
+
       const path: number[] = [];
       let current = targetUser.id;
       while (current !== null) {
@@ -631,11 +725,13 @@ router.get('/tree/visual', requireAdmin, async (req: Request, res: Response) => 
         const user = allUsersMap.get(current);
         current = user?.referredById || null;
       }
+
       const rootNodes: TreeNode[] = [];
       for (const rootNodeId of path) {
         const rootNode = await buildTreeNode(prisma, rootNodeId, 0, depth, allUsersMap);
         rootNodes.push(rootNode);
       }
+
       res.json({ success: true, tree: rootNodes, stats: null });
     } else {
       const rootUsers = allUsers.filter(u => u.referredById === null);
@@ -644,21 +740,26 @@ router.get('/tree/visual', requireAdmin, async (req: Request, res: Response) => 
         const rootNode = await buildTreeNode(prisma, root.id, 0, depth, allUsersMap);
         rootNodes.push(rootNode);
       }
+
       const totalUsers = allUsers.length;
       const paidMembers = allUsers.filter(u => u.isPaidMember).length;
       const founders = allUsers.filter(u => u.isFounder).length;
+
       const getMaxDepth = async (uid: number): Promise<number> => {
         const kids = await prisma.user.findMany({ where: { referredById: uid }, select: { id: true } });
         if (kids.length === 0) return 0;
         const depths = await Promise.all(kids.map(k => getMaxDepth(k.id)));
         return 1 + Math.max(...depths);
       };
+
       const depths = await Promise.all(rootUsers.map(r => getMaxDepth(r.id)));
       const maxDepth = depths.length > 0 ? Math.max(...depths) : 0;
+
       const topByDirect = allUsers
         .map(u => ({ phone: u.phone, count: u.referralCount }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 5);
+
       const topByTotal = await Promise.all(
         allUsers.map(async u => ({
           phone: u.phone,
@@ -666,6 +767,7 @@ router.get('/tree/visual', requireAdmin, async (req: Request, res: Response) => 
         }))
       );
       topByTotal.sort((a, b) => b.count - a.count);
+
       const stats = {
         totalUsers,
         maxDepth,
@@ -674,6 +776,7 @@ router.get('/tree/visual', requireAdmin, async (req: Request, res: Response) => 
         topByDirect: topByDirect.slice(0, 5),
         topByTotal: topByTotal.slice(0, 5)
       };
+
       res.json({ success: true, tree: rootNodes, stats });
     }
   } catch (err) {
@@ -694,27 +797,20 @@ const countDescendants = async (tx: any, userId: number): Promise<number> => {
 // ==========================================
 // 🆕 ЭКСПОРТ/ИМПОРТ ДАННЫХ
 // ==========================================
-
-// Экспорт пользователей с балансами и транзакциями
 router.get('/export/users', requireAdmin, async (req: Request, res: Response) => {
   try {
     const users = await prisma.user.findMany({
       include: {
-        wallet: {
-          include: {
-            transactions: {
-              orderBy: { createdAt: 'desc' }
-            }
-          }
-        },
+        wallet: { include: { transactions: { orderBy: { createdAt: 'desc' } } } },
         referredBy: { select: { id: true, phone: true } },
         referrals: { select: { id: true, phone: true } }
       }
     });
+
     const exportData = users.map(u => ({
       id: u.id,
       phone: u.phone,
-      role: u.role,
+      roles: Array.isArray(u.roles) ? u.roles : [u.role || 'user'], // 🆕
       isPaidMember: u.isPaidMember,
       isFounder: u.isFounder,
       balance: u.wallet?.balance || 0,
@@ -723,6 +819,7 @@ router.get('/export/users', requireAdmin, async (req: Request, res: Response) =>
       referredByPhone: u.referredBy?.phone || null,
       referralCount: u.referrals.length
     }));
+
     res.json({ success: true, users: exportData });
   } catch (err) {
     console.error('Export users error:', err);
@@ -730,7 +827,6 @@ router.get('/export/users', requireAdmin, async (req: Request, res: Response) =>
   }
 });
 
-// Экспорт автомобилей с журналом
 router.get('/export/cars', requireAdmin, async (req: Request, res: Response) => {
   try {
     const cars = await prisma.car.findMany({
@@ -739,12 +835,11 @@ router.get('/export/cars', requireAdmin, async (req: Request, res: Response) => 
         user: { select: { id: true, phone: true } },
         records: {
           orderBy: { date: 'desc' },
-          include: {
-            author: { select: { phone: true } }
-          }
+          include: { author: { select: { phone: true } } }
         }
       }
     });
+
     const exportData = cars.map(c => ({
       id: c.id,
       userId: c.userId,
@@ -757,6 +852,7 @@ router.get('/export/cars', requireAdmin, async (req: Request, res: Response) => 
       mileage: c.mileage,
       records: c.records
     }));
+
     res.json({ success: true, cars: exportData });
   } catch (err) {
     console.error('Export cars error:', err);
@@ -764,7 +860,6 @@ router.get('/export/cars', requireAdmin, async (req: Request, res: Response) => 
   }
 });
 
-// Экспорт мероприятий с билетами и контролёрами
 router.get('/export/events', requireAdmin, async (req: Request, res: Response) => {
   try {
     const events = await prisma.event.findMany({
@@ -790,78 +885,65 @@ router.get('/export/events', requireAdmin, async (req: Request, res: Response) =
   }
 });
 
-// Импорт пользователей (умное слияние)
 router.post('/import/users', requireAdmin, async (req: Request, res: Response) => {
   try {
-    const adminRole = (req as any).user!.role;
-    if (adminRole !== 'SUPER_ADMIN') {
+    const adminRole = (req as any).user!.roles?.includes('SUPER_ADMIN') || (req as any).user!.role === 'SUPER_ADMIN';
+    if (!adminRole) {
       return res.status(403).json({ success: false, message: 'Импорт доступен только SUPER_ADMIN' });
     }
+
     const { users } = req.body;
     if (!Array.isArray(users)) {
       return res.status(400).json({ success: false, message: 'Неверный формат данных' });
     }
+
     let created = 0;
     let updated = 0;
+
     await prisma.$transaction(async (tx) => {
       for (const userData of users) {
-        const existingUser = await tx.user.findUnique({
-          where: { phone: userData.phone }
-        });
+        const existingUser = await tx.user.findUnique({ where: { phone: userData.phone } });
+
         if (existingUser) {
-          // Обновляем существующего пользователя
           await tx.user.update({
             where: { id: existingUser.id },
             data: {
-              role: userData.role || existingUser.role,
+              // 🆕 Поддержка массива roles при обновлении
+              roles: Array.isArray(userData.roles) ? userData.roles : (userData.role ? [userData.role] : existingUser.roles),
               isPaidMember: userData.isPaidMember ?? existingUser.isPaidMember,
               isFounder: userData.isFounder ?? existingUser.isFounder
             }
           });
-          // Обновляем баланс если есть wallet
+
           if (userData.balance !== undefined) {
-            const wallet = await tx.wallet.findUnique({
-              where: { userId: existingUser.id }
-            });
+            const wallet = await tx.wallet.findUnique({ where: { userId: existingUser.id } });
             if (wallet) {
-              await tx.wallet.update({
-                where: { id: wallet.id },
-                data: { balance: userData.balance }
-              });
+              await tx.wallet.update({ where: { id: wallet.id }, data: { balance: userData.balance } });
             } else {
-              await tx.wallet.create({
-                data: {
-                  userId: existingUser.id,
-                  balance: userData.balance
-                }
-              });
+              await tx.wallet.create({ data: { userId: existingUser.id, balance: userData.balance } });
             }
           }
           updated++;
         } else {
-          // Создаём нового пользователя
           const newUser = await tx.user.create({
             data: {
               phone: userData.phone,
               passwordHash: await bcrypt.hash('123456', 10),
-              role: userData.role || 'user',
+              // 🆕 Поддержка массива roles при создании
+              roles: Array.isArray(userData.roles) ? userData.roles : (userData.role ? [userData.role] : ['user']),
               isPaidMember: userData.isPaidMember || false,
               isFounder: userData.isFounder || false
             }
           });
-          // Создаём wallet
+
           if (userData.balance !== undefined) {
-            await tx.wallet.create({
-              data: {
-                userId: newUser.id,
-                balance: userData.balance
-              }
-            });
+            await tx.wallet.create({ data: { userId: newUser.id, balance: userData.balance } });
           }
           created++;
         }
       }
     });
+
     res.json({ success: true, message: `Импорт завершён: создано ${created}, обновлено ${updated}` });
   } catch (err) {
     console.error('Import users error:', err);
@@ -869,29 +951,28 @@ router.post('/import/users', requireAdmin, async (req: Request, res: Response) =
   }
 });
 
-// Импорт автомобилей (умное слияние)
 router.post('/import/cars', requireAdmin, async (req: Request, res: Response) => {
   try {
-    const adminRole = (req as any).user!.role;
-    if (adminRole !== 'SUPER_ADMIN') {
+    const adminRole = (req as any).user!.roles?.includes('SUPER_ADMIN') || (req as any).user!.role === 'SUPER_ADMIN';
+    if (!adminRole) {
       return res.status(403).json({ success: false, message: 'Импорт доступен только SUPER_ADMIN' });
     }
+
     const { cars } = req.body;
     if (!Array.isArray(cars)) {
       return res.status(400).json({ success: false, message: 'Неверный формат данных' });
     }
+
     let created = 0;
     let updated = 0;
+
     await prisma.$transaction(async (tx) => {
       for (const carData of cars) {
         const existingCar = await tx.car.findFirst({
-          where: {
-            userId: carData.userId,
-            gosnomer: carData.gosnomer
-          }
+          where: { userId: carData.userId, gosnomer: carData.gosnomer }
         });
+
         if (existingCar) {
-          // Обновляем существующее авто
           await tx.car.update({
             where: { id: existingCar.id },
             data: {
@@ -904,7 +985,6 @@ router.post('/import/cars', requireAdmin, async (req: Request, res: Response) =>
           });
           updated++;
         } else {
-          // Создаём новое авто
           await tx.car.create({
             data: {
               userId: carData.userId,
@@ -920,6 +1000,7 @@ router.post('/import/cars', requireAdmin, async (req: Request, res: Response) =>
         }
       }
     });
+
     res.json({ success: true, message: `Импорт завершён: создано ${created}, обновлено ${updated}` });
   } catch (err) {
     console.error('Import cars error:', err);
@@ -927,26 +1008,26 @@ router.post('/import/cars', requireAdmin, async (req: Request, res: Response) =>
   }
 });
 
-// Импорт мероприятий (умное слияние)
 router.post('/import/events', requireAdmin, async (req: Request, res: Response) => {
   try {
-    const adminRole = (req as any).user!.role;
-    if (adminRole !== 'SUPER_ADMIN') {
+    const adminRole = (req as any).user!.roles?.includes('SUPER_ADMIN') || (req as any).user!.role === 'SUPER_ADMIN';
+    if (!adminRole) {
       return res.status(403).json({ success: false, message: 'Импорт доступен только SUPER_ADMIN' });
     }
+
     const { events } = req.body;
     if (!Array.isArray(events)) {
       return res.status(400).json({ success: false, message: 'Неверный формат данных' });
     }
+
     let created = 0;
     let updated = 0;
+
     await prisma.$transaction(async (tx) => {
       for (const eventData of events) {
-        const existingEvent = await tx.event.findUnique({
-          where: { id: eventData.id }
-        });
+        const existingEvent = await tx.event.findUnique({ where: { id: eventData.id } });
+
         if (existingEvent) {
-          // Обновляем существующее мероприятие
           await tx.event.update({
             where: { id: eventData.id },
             data: {
@@ -962,7 +1043,6 @@ router.post('/import/events', requireAdmin, async (req: Request, res: Response) 
           });
           updated++;
         } else {
-          // Создаём новое мероприятие
           await tx.event.create({
             data: {
               id: eventData.id,
@@ -980,6 +1060,7 @@ router.post('/import/events', requireAdmin, async (req: Request, res: Response) 
         }
       }
     });
+
     res.json({ success: true, message: `Импорт завершён: создано ${created}, обновлено ${updated}` });
   } catch (err) {
     console.error('Import events error:', err);

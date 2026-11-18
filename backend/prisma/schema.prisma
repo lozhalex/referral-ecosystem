@@ -12,7 +12,7 @@ model User {
   phone          String    @unique
   passwordHash   String
   
-  role           String    @default("user")
+  roles          String[]  @default(["user"]) // 🆕 Было: role String @default("user")
   isRcbPaid            Boolean   @default(false) 
   rcbId                String?   
   rcbReferralLink      String?   
@@ -106,8 +106,8 @@ model Event {
   referrerBonus  Int       @default(100)
   isActive       Boolean   @default(true)
   posterUrl      String?
-  isFree         Boolean   @default(false)   // 🆕 Бесплатное мероприятие
-  maxTickets     Int?      // 🆕 Лимит мест (null = безлимит)
+  isFree         Boolean   @default(false)
+  maxTickets     Int?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   

@@ -369,7 +369,7 @@ const Profile: React.FC = () => {
         </div>
       </div>
 
-      {hasRole(user.role, ['admin', 'SUPER_ADMIN', 'cashier', 'controller', 'service_master' as any]) && (
+       {hasRole(user.roles, ['admin', 'SUPER_ADMIN', 'cashier', 'controller', 'service_master', 'event_organizer']) && (
         <div className="glass p-4 mb-6 border border-neon-purple/20">
           <p className="text-xs text-slate-400 mb-1 uppercase tracking-wider">Системная роль</p>
           <p className="text-lg font-semibold text-neon-purple font-display capitalize">{user.role}</p>
@@ -717,7 +717,7 @@ const Profile: React.FC = () => {
         <button onClick={() => navigate('/change-password')} className="w-full py-3 bg-white/5 text-slate-300 rounded-xl font-medium hover:bg-white/10 transition border border-white/5 text-sm">
           Сменить пароль
         </button>
-        {hasRole(user.role, ['admin', 'SUPER_ADMIN']) && (
+        {hasRole(user.roles, ['admin', 'SUPER_ADMIN']) && (
           <button
             onClick={() => navigate('/admin')}
             className="w-full py-3 bg-neon-purple/10 text-neon-purple rounded-xl font-medium hover:bg-neon-purple/20 transition border border-neon-purple/20 text-sm"
