@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { apiClient } from '../api/client';
 import ShareModal from '../components/ShareModal';
@@ -19,14 +19,23 @@ interface Ticket {
 
 export default function Tickets() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
 
-  const token = localStorage.getItem('token');
-  const user = token ? JSON.parse(atob(token.split('.')[1])) : null;
-  const userPhone = user?.phone || '';
+  const userPhone = (() => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      return user.phone || '';
+    } catch {
+      return '';
+    }
+  })();
+
+  // Определяем активную вкладку по текущему пути
+  const isEventsPage = location.pathname === '/events';
 
   useEffect(() => {
     loadTickets();
@@ -81,26 +90,47 @@ export default function Tickets() {
   return (
     <div className="min-h-screen bg-slate-950">
       <div className="bg-slate-900/60 border-b border-white/10">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between flex-wrap gap-2">
+        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <button
             onClick={() => navigate('/')}
             className="text-sm text-gray-400 hover:text-white transition"
           >
             ← На главную
           </button>
-          <h1 className="text-xl font-bold text-gray-100">🎫 Мои билеты</h1>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/events')}
+              className={`px-3 py-1.5 text-sm rounded-lg transition border ${
+                isEventsPage
+                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+                  : 'text-gray-400 hover:text-white border-white/10 hover:bg-white/5'
+              }`}
+            >
+              🎟️ Мероприятия
+            </button>
+            <button
+              onClick={() => navigate('/tickets')}
+              className={`px-3 py-1.5 text-sm rounded-lg transition border ${
+                !isEventsPage
+                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+                  : 'text-gray-400 hover:text-white border-white/10 hover:bg-white/5'
+              }`}
+            >
+              🎫 Мои билеты
+            </button>
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowShareModal(true)}
-              className="text-sm text-gray-300 hover:text-white transition px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5"
+              className="text-xs text-gray-300 hover:text-white transition px-2 py-1 rounded-lg border border-white/10 hover:bg-white/5"
             >
-              🎁 Пригласить друга
+              Пригласить друга
             </button>
             <button
-              onClick={() => navigate('/events')}
-              className="text-sm text-cyan-400 hover:text-cyan-300 transition"
+              onClick={() => navigate('/profile')}
+              className="text-xs text-gray-300 hover:text-white transition px-2 py-1 rounded-lg border border-white/10 hover:bg-white/5"
             >
-              Мероприятия
+              Профиль
             </button>
           </div>
         </div>

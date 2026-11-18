@@ -32,7 +32,7 @@ export default function Header({ user, onLogout }: HeaderProps) {
                   onClick={() => setShowShareModal(true)}
                   className="px-3 py-2 text-sm font-medium text-slate-300 glass hover:bg-white/10 rounded-xl transition border border-white/10"
                 >
-                  🎁 Пригласить друга
+                  Пригласить друга
                 </button>
                 <button
                   onClick={() => navigate('/profile')}
@@ -72,7 +72,6 @@ export default function Header({ user, onLogout }: HeaderProps) {
         </div>
       </div>
 
-      {/* 🆕 Модалка "Поделиться" */}
       {showShareModal && user && (
         <ShareModal
           moduleId="home"

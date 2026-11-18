@@ -5,6 +5,7 @@ import Journal from './Journal';
 import Cars from './Cars';
 import Settings from './Settings';
 import OnboardingModal from '../../components/OnboardingModal';
+import ShareModal from '../../components/ShareModal';
 
 type Tab = 'dashboard' | 'journal' | 'cars' | 'settings';
 
@@ -13,6 +14,16 @@ const AutoHelper: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [selectedCarId, setSelectedCarId] = useState<number | null>(null);
   const [showAutoOnboarding, setShowAutoOnboarding] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+
+  const userPhone = (() => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      return user.phone || '';
+    } catch {
+      return '';
+    }
+  })();
 
   useEffect(() => {
     const hasSeenOnboarding = localStorage.getItem('onboarding_auto_shown');
@@ -76,12 +87,25 @@ const AutoHelper: React.FC = () => {
             onClick={() => navigate('/')}
             className="flex items-center gap-1 text-sm text-gray-400 hover:text-cyan-400 transition-colors"
           >
-            ← Назад
+            ← На главную
           </button>
           <h1 className="text-lg font-bold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
             🚗 Помощник автомобилиста
           </h1>
-          <div className="w-16"></div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="text-xs text-gray-300 hover:text-white transition px-2 py-1 rounded-lg border border-white/10 hover:bg-white/5"
+            >
+              Пригласить друга
+            </button>
+            <button
+              onClick={() => navigate('/profile')}
+              className="text-xs text-gray-300 hover:text-white transition px-2 py-1 rounded-lg border border-white/10 hover:bg-white/5"
+            >
+              Профиль
+            </button>
+          </div>
         </div>
       </div>
 
@@ -119,6 +143,14 @@ const AutoHelper: React.FC = () => {
           steps={autoOnboardingSteps}
           storageKey="onboarding_auto_shown"
           onComplete={handleAutoOnboardingComplete}
+        />
+      )}
+
+      {showShareModal && (
+        <ShareModal
+          moduleId="auto"
+          userPhone={userPhone}
+          onClose={() => setShowShareModal(false)}
         />
       )}
     </div>
