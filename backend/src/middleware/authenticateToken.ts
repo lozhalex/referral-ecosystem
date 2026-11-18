@@ -18,6 +18,9 @@ export const authenticateToken = async (req: any, res: Response, next: NextFunct
       return res.status(403).json({ success: false, message: 'Неверный или истекший токен' });
     }
 
+    // ==========================================
+    // ПУНКТ 6: Token Versioning (Отзыв токенов)
+    // ==========================================
     try {
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
@@ -28,6 +31,8 @@ export const authenticateToken = async (req: any, res: Response, next: NextFunct
         return res.status(401).json({ success: false, message: 'Пользователь не найден' });
       }
 
+      // Если версия в токене не совпадает с версией в БД, значит токен отозван 
+      // (например, после смены пароля или изменения роли админом)
       if (user.tokenVersion !== decoded.version) {
         return res.status(401).json({ 
           success: false, 
@@ -35,10 +40,11 @@ export const authenticateToken = async (req: any, res: Response, next: NextFunct
         });
       }
 
+      // Добавляем актуальную роль из БД в запрос
       req.user = { ...decoded, role: user.role };
       next();
     } catch (error) {
-      console.error('Ошибка аутентификации:', error);
+      console.error('Ошибка аутентификации (Token Version check):', error);
       return res.status(500).json({ success: false, message: 'Ошибка сервера при проверке токена' });
     }
   });

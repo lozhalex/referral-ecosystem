@@ -4,26 +4,16 @@ import Register from './pages/Register';
 import Profile from './pages/Profile';
 import ChangePassword from './pages/ChangePassword';
 import AdminDashboard from './pages/AdminDashboard';
-import AdminAutoHelper from './pages/AdminAutoHelper';
+import AdminAutoHelper from './pages/AdminAutoHelper'; // 🆕 Новый импорт
 import Home from './pages/Home';
-import HomeGuest from './pages/HomeGuest';
 import ProjectStub from './pages/ProjectStub';
 import Events from './pages/Events';
 import Tickets from './pages/Tickets';
 import Scanner from './pages/Scanner';
 import AdminEvents from './pages/AdminEvents';
 import AutoHelper from './pages/AutoHelper';
-import SmartBenefits from './pages/SmartBenefits';
 import ProtectedRoute from './components/ProtectedRoute';
 import ReferralCapture from './components/ReferralCapture';
-
-const HomeRouter = () => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    return <Home />;
-  }
-  return <HomeGuest />;
-};
 
 function App() {
   return (
@@ -31,7 +21,7 @@ function App() {
       <ReferralCapture />
       <Routes>
         {/* Публичные маршруты */}
-        <Route path="/" element={<HomeRouter />} />
+        <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/daylabor" element={<ProjectStub />} />
@@ -45,7 +35,7 @@ function App() {
         <Route path="/building" element={<ProjectStub />} />
         <Route path="/eco" element={<ProjectStub />} />
         <Route path="/dating" element={<ProjectStub />} />
-
+        
         {/* 🛡️ Защищенные маршруты (требуют авторизации) */}
         <Route element={<ProtectedRoute />}>
           <Route path="/auto" element={<AutoHelper />} />
@@ -53,11 +43,10 @@ function App() {
           <Route path="/change-password" element={<ChangePassword />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/events" element={<AdminEvents />} />
-          <Route path="/admin/auto" element={<AdminAutoHelper />} />
+          <Route path="/admin/auto" element={<AdminAutoHelper />} /> {/* 🆕 Новый роут */}
           <Route path="/events" element={<Events />} />
           <Route path="/tickets" element={<Tickets />} />
           <Route path="/scanner" element={<Scanner />} />
-          <Route path="/smart-benefits" element={<SmartBenefits />} />
         </Route>
       </Routes>
     </BrowserRouter>

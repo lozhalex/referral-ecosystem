@@ -1,20 +1,20 @@
-export type SystemRole = 'user' | 'cashier' | 'controller' | 'admin' | 'SUPER_ADMIN' | 'service_master' | 'event_organizer';
+// Типы системных ролей (легко расширять в будущем)
+export type SystemRole = 'user' | 'cashier' | 'controller' | 'admin' | 'SUPER_ADMIN';
 
 /**
  * Проверяет, есть ли у пользователя одна из разрешенных системных ролей.
- * Теперь поддерживает массив string[] (из БД) и legacy string.
+ * Пример: hasRole(user.role, ['admin', 'SUPER_ADMIN'])
  */
-export const hasRole = (userRoles: string[] | string | undefined, allowedRoles: SystemRole[]): boolean => {
-  if (!userRoles) return false;
-  const rolesArray = Array.isArray(userRoles) ? userRoles : [userRoles];
-  return allowedRoles.some(role => rolesArray.includes(role));
+export const hasRole = (userRole: string | undefined, allowedRoles: SystemRole[]): boolean => {
+  return userRole ? (allowedRoles as string[]).includes(userRole) : false;
 };
 
 /**
  * Проверяет бизнес-статус пользователя (платный партнер РЦБ или бесплатный).
+ * Это НЕ системная роль, а признак монетизации.
  */
 export const isPartner = (user: any): boolean => {
-  return user?.isRcbPaid === true || (Array.isArray(user?.roles) && user.roles.includes('partner'));
+  return user?.isRcbPaid === true || user?.role === 'partner'; // fallback для совместимости
 };
 
 /**

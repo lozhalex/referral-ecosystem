@@ -4,9 +4,6 @@ interface Step {
   title: string;
   text: string;
   actionLabel?: string;
-  secondaryActionLabel?: string;
-  onSecondaryAction?: () => void;
-  iconType?: 'emoji' | 'logo';
 }
 
 interface OnboardingModalProps {
@@ -28,8 +25,6 @@ export default function OnboardingModal({ steps, storageKey, onComplete }: Onboa
   };
 
   const step = steps[currentStep];
-  const isLastStep = currentStep === steps.length - 1;
-  const hasSecondaryAction = isLastStep && step.secondaryActionLabel;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark-900/90 backdrop-blur-sm p-4">
@@ -46,52 +41,21 @@ export default function OnboardingModal({ steps, storageKey, onComplete }: Onboa
           ))}
         </div>
 
-        {/* Иконка/логотип */}
-        <div className="mb-4 flex justify-center">
-          {step.iconType === 'logo' ? (
-            <img src="/logo-mark.svg" alt="Бумеранг" className="w-16 h-16" />
-          ) : (
-            <div className="text-4xl">{step.title.split(' ')[0]}</div>
-          )}
-        </div>
-
-        <h2 className="text-2xl font-bold text-white mb-4 font-display tracking-tight text-center">
-          {step.iconType === 'logo' ? step.title : step.title.replace(/^[^\s]+\s/, '')}
+        <h2 className="text-2xl font-bold text-white mb-4 font-display tracking-tight">
+          {step.title}
         </h2>
-        <p className="text-slate-300 mb-8 leading-relaxed text-base text-center">
+        <p className="text-slate-300 mb-8 leading-relaxed text-base">
           {step.text}
         </p>
 
-        {/* Кнопки */}
-        {hasSecondaryAction ? (
-          <div className="space-y-3">
-            <button
-              onClick={handleNext}
-              className="w-full py-3.5 px-4 rounded-xl text-white font-bold transition btn-neon flex items-center justify-center gap-2"
-            >
-              {step.actionLabel || 'Начать'}
-            </button>
-            <button
-              onClick={() => {
-                if (step.onSecondaryAction) step.onSecondaryAction();
-                else {
-                  localStorage.setItem(storageKey, 'true');
-                  onComplete();
-                }
-              }}
-              className="w-full py-3 px-4 rounded-xl text-cyan-400 font-medium transition bg-white/5 border border-white/10 hover:bg-white/10"
-            >
-              {step.secondaryActionLabel}
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={handleNext}
-            className="w-full py-3.5 px-4 rounded-xl text-white font-bold transition btn-neon flex items-center justify-center gap-2"
-          >
-            {isLastStep ? (step.actionLabel || 'Начать') : 'Далее →'}
-          </button>
-        )}
+        <button
+          onClick={handleNext}
+          className="w-full py-3.5 px-4 rounded-xl text-white font-bold transition btn-neon flex items-center justify-center gap-2"
+        >
+          {currentStep === steps.length - 1
+            ? (step.actionLabel || 'Начать')
+            : 'Далее →'}
+        </button>
       </div>
     </div>
   );

@@ -3,12 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { getAdminRcbRequests, approveAdminRcbRequest } from '../api/rcb';
 import ReferralTree from '../components/ReferralTree';
-import ExportImport from '../components/ExportImport';
 
 interface User {
   id: number;
   phone: string;
-  roles: string[]; // 🆕 Было: role: string
+  role: string;
   balance: number;
   referralCount: number;
   isPaidMember: boolean;
@@ -45,8 +44,7 @@ const ROLE_LABELS: { [key: string]: string } = {
   SUPER_ADMIN: 'Супер-админ',
   cashier: 'Кассир',
   controller: 'Контроллер',
-  service_master: 'Сервисмен СТО',
-  event_organizer: 'Организатор мероприятий', // 🆕
+  service_master: 'Сервисмен СТО'
 };
 
 const ROLE_BADGE_CLASS: { [key: string]: string } = {
@@ -55,58 +53,39 @@ const ROLE_BADGE_CLASS: { [key: string]: string } = {
   SUPER_ADMIN: 'bg-red-500/20 text-red-300',
   cashier: 'bg-blue-500/20 text-blue-300',
   controller: 'bg-indigo-500/20 text-indigo-300',
-  service_master: 'bg-cyan-500/20 text-cyan-300',
-  event_organizer: 'bg-yellow-500/20 text-yellow-300', // 🆕
+  service_master: 'bg-cyan-500/20 text-cyan-300'
 };
-
-const AVAILABLE_ROLES = [
-  { value: 'user', label: 'Пользователь' },
-  { value: 'event_organizer', label: 'Организатор мероприятий' },
-  { value: 'service_master', label: 'Сервисмен СТО' },
-  { value: 'controller', label: 'Контроллер' },
-  { value: 'cashier', label: 'Кассир' },
-  { value: 'admin', label: 'Администратор' },
-  { value: 'SUPER_ADMIN', label: 'Супер-админ' },
-];
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'tree' | 'logs' | 'rcb' | 'export'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'tree' | 'logs' | 'rcb'>('users');
   const [users, setUsers] = useState<User[]>([]);
   const [searchPhone, setSearchPhone] = useState('');
   const [selectedUser, setSelectedUser] = useState<UserDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [adjustForm, setAdjustForm] = useState({ amount: '', type: 'MANUAL_ADJUSTMENT', description: '' });
   const [adjustLoading, setAdjustLoading] = useState(false);
-  
   const [showMoveModal, setShowMoveModal] = useState(false);
   const [moveForm, setMoveForm] = useState({ newReferredId: '' });
   const [moveLoading, setMoveLoading] = useState(false);
-  
   const [showRoleModal, setShowRoleModal] = useState(false);
-  const [roleForm, setRoleForm] = useState({ roles: ['user'] }); // 🆕 Массив ролей
+  const [roleForm, setRoleForm] = useState({ role: 'user' });
   const [roleLoading, setRoleLoading] = useState(false);
-  
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [generatedPassword, setGeneratedPassword] = useState('');
-  
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
-  
   const [showImportModal, setShowImportModal] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
   const [alerts, setAlerts] = useState<{ largeAdjustments: any[]; frequentChanges: any[] } | null>(null);
-  
   const [rcbRequests, setRcbRequests] = useState<RcbRequest[]>([]);
   const [rcbLoading, setRcbLoading] = useState(false);
   const [rcbApprovingId, setRcbApprovingId] = useState<number | null>(null);
-  
+
   const token = localStorage.getItem('token');
 
   useEffect(() => {
@@ -211,27 +190,17 @@ export default function AdminDashboard() {
     finally { setMoveLoading(false); }
   };
 
-  const toggleRole = (role: string) => {
-    if (roleForm.roles.includes(role)) {
-      setRoleForm({ roles: roleForm.roles.filter(r => r !== role) });
-    } else {
-      setRoleForm({ roles: [...roleForm.roles, role] });
-    }
-  };
-
   const handleRoleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
-    if (roleForm.roles.length === 0) return alert('Должна быть выбрана хотя бы одна роль');
-    
     setRoleLoading(true);
     try {
-      await apiClient.put(`/api/admin/users/${selectedUser.id}/role`, { roles: roleForm.roles }); // 🆕
-      alert('Роли успешно обновлены!');
+      await apiClient.put(`/api/admin/users/${selectedUser.id}/role`, { role: roleForm.role });
+      alert(`Роль успешно изменена на ${ROLE_LABELS[roleForm.role] || roleForm.role}!`);
       setShowRoleModal(false);
       await loadUserDetail(selectedUser.id);
       loadUsers();
-    } catch (err: any) { alert(err.response?.data?.message || 'Ошибка при смене ролей'); }
+    } catch (err: any) { alert(err.response?.data?.message || 'Ошибка при смене роли'); }
     finally { setRoleLoading(false); }
   };
 
@@ -367,7 +336,6 @@ export default function AdminDashboard() {
           <button onClick={() => setActiveTab('tree')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition whitespace-nowrap ${activeTab === 'tree' ? 'bg-slate-800 text-cyan-400 border-t border-l border-r border-white/10' : 'text-gray-400 hover:text-gray-200 hover:bg-slate-800/50'}`}>🌳 Визуальное дерево</button>
           <button onClick={() => setActiveTab('logs')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition whitespace-nowrap ${activeTab === 'logs' ? 'bg-slate-800 text-cyan-400 border-t border-l border-r border-white/10' : 'text-gray-400 hover:text-gray-200 hover:bg-slate-800/50'}`}>📋 Аудит</button>
           <button onClick={() => setActiveTab('rcb')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition whitespace-nowrap ${activeTab === 'rcb' ? 'bg-slate-800 text-cyan-400 border-t border-l border-r border-white/10' : 'text-gray-400 hover:text-gray-200 hover:bg-slate-800/50'}`}>🌉 Заявки РЦБ</button>
-          <button onClick={() => setActiveTab('export')} className={`px-6 py-3 font-medium text-sm rounded-t-lg transition whitespace-nowrap ${activeTab === 'export' ? 'bg-slate-800 text-cyan-400 border-t border-l border-r border-white/10' : 'text-gray-400 hover:text-gray-200 hover:bg-slate-800/50'}`}>💾 Экспорт/Импорт</button>
         </div>
 
         {error && <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg mb-6">{error}</div>}
@@ -388,7 +356,7 @@ export default function AdminDashboard() {
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">ID</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Телефон</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Роли</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Роль</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">💳 Статус</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Баланс</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Рефералы</th>
@@ -402,13 +370,9 @@ export default function AdminDashboard() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{user.id}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300 font-mono">{user.phone}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex flex-wrap gap-1">
-                            {(Array.isArray(user.roles) ? user.roles : [user.roles]).map((r: string, idx: number) => (
-                              <span key={idx} className={`px-2 py-1 text-xs font-semibold rounded-full ${ROLE_BADGE_CLASS[r] || 'bg-gray-500/20 text-gray-300'}`}>
-                                {ROLE_LABELS[r] || r}
-                              </span>
-                            ))}
-                          </div>
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${ROLE_BADGE_CLASS[user.role] || 'bg-gray-500/20 text-gray-300'}`}>
+                            {ROLE_LABELS[user.role] || user.role}
+                          </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {user.isPaidMember ? <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-500/20 text-green-300">✅ Платный</span> : <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-500/20 text-gray-400">⚪ Бесплатный</span>}
@@ -512,8 +476,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {activeTab === 'export' && <ExportImport />}
-
         {selectedUser && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-slate-900 border border-white/10 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -525,30 +487,25 @@ export default function AdminDashboard() {
                 <div className="space-y-4">
                   <div><label className="text-sm font-medium text-gray-400">ID</label><p className="text-gray-100">{selectedUser.id}</p></div>
                   <div><label className="text-sm font-medium text-gray-400">Телефон</label><p className="text-gray-100 font-mono">{selectedUser.phone}</p></div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-400">Роли</label>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {(Array.isArray(selectedUser.roles) ? selectedUser.roles : [selectedUser.roles]).map((r: string, idx: number) => (
-                        <span key={idx} className={`px-2 py-1 text-xs font-semibold rounded-full ${ROLE_BADGE_CLASS[r] || 'bg-gray-500/20 text-gray-300'}`}>
-                          {ROLE_LABELS[r] || r}
-                        </span>
-                      ))}
-                    </div>
+                  <div><label className="text-sm font-medium text-gray-400">Роль</label>
+                    <p className="text-gray-100">
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${ROLE_BADGE_CLASS[selectedUser.role] || 'bg-gray-500/20 text-gray-300'}`}>
+                        {ROLE_LABELS[selectedUser.role] || selectedUser.role}
+                      </span>
+                    </p>
                   </div>
                   <div><label className="text-sm font-medium text-gray-400">💳 Статус участия</label><p className="text-gray-100">{selectedUser.isPaidMember ? '✅ Платный участник' : '⚪ Бесплатный участник'}</p></div>
                   <div><label className="text-sm font-medium text-gray-400">Баланс</label><p className="text-gray-100">{selectedUser.balance} ₽</p></div>
                   <div><label className="text-sm font-medium text-gray-400">Дата регистрации</label><p className="text-gray-100">{formatDate(selectedUser.createdAt)}</p></div>
-                  
                   <div className="pt-4 border-t border-white/10 grid grid-cols-2 gap-3">
                     <button onClick={() => setShowAdjustModal(true)} className="py-2 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium flex items-center justify-center gap-2">💰 Баланс</button>
                     <button onClick={() => setShowMoveModal(true)} className="py-2 px-4 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition font-medium flex items-center justify-center gap-2">🔄 Реферер</button>
-                    <button onClick={() => { setRoleForm({ roles: Array.isArray(selectedUser.roles) ? selectedUser.roles : [selectedUser.roles || 'user'] }); setShowRoleModal(true); }} className="py-2 px-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium flex items-center justify-center gap-2">🛡️ Роли</button>
+                    <button onClick={() => { setRoleForm({ role: selectedUser.role }); setShowRoleModal(true); }} className="py-2 px-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium flex items-center justify-center gap-2">🛡️ Роль</button>
                     <button onClick={handleResetPassword} disabled={resetLoading} className="py-2 px-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium flex items-center justify-center gap-2 disabled:opacity-50">{resetLoading ? 'Сброс...' : '🔑 Сброс пароля'}</button>
                     <button onClick={handleToggleMembership} className={`py-2 px-4 rounded-lg transition font-medium flex items-center justify-center gap-2 col-span-2 ${selectedUser.isPaidMember ? 'bg-slate-700 text-gray-300 hover:bg-slate-600' : 'bg-green-600 text-white hover:bg-green-700'}`}>
                       {selectedUser.isPaidMember ? '⬇️ Сделать бесплатным' : '⬆️ Сделать платным'}
                     </button>
                   </div>
-
                   <div><label className="text-sm font-medium text-gray-400">Текущий пригласитель</label><p className="text-gray-100">{selectedUser.referredBy ? `${selectedUser.referredBy.phone} (ID: ${selectedUser.referredBy.id})` : 'Нет (корневой)'}</p></div>
                   <div>
                     <label className="text-sm font-medium text-gray-400 mb-2 block">Рефералы ({selectedUser.referrals.length})</label>
@@ -607,29 +564,22 @@ export default function AdminDashboard() {
         {showRoleModal && selectedUser && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-slate-900 border border-white/10 rounded-lg shadow-xl max-w-md w-full p-6">
-              <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-gray-100">Управление ролями</h3><button onClick={() => setShowRoleModal(false)} className="text-gray-400 hover:text-gray-200 text-2xl">✕</button></div>
+              <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-gray-100">Смена роли</h3><button onClick={() => setShowRoleModal(false)} className="text-gray-400 hover:text-gray-200 text-2xl">✕</button></div>
               <form onSubmit={handleRoleSubmit} className="space-y-4">
                 <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3 text-sm text-purple-300">
                   <p>Пользователь: <strong>{selectedUser.phone}</strong></p>
+                  <p className="mt-1">Текущая роль: <strong>{ROLE_LABELS[selectedUser.role] || selectedUser.role}</strong></p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Выберите роли:</label>
-                  <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
-                    {AVAILABLE_ROLES.map((r) => (
-                      <label key={r.value} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer transition">
-                        <input
-                          type="checkbox"
-                          checked={roleForm.roles.includes(r.value)}
-                          onChange={() => toggleRole(r.value)}
-                          className="w-4 h-4 rounded border-gray-600 text-purple-600 focus:ring-purple-500 bg-slate-800"
-                        />
-                        <span className="text-sm text-gray-200">{r.label}</span>
-                        <span className={`ml-auto px-2 py-0.5 text-xs rounded-full ${ROLE_BADGE_CLASS[r.value]}`}>
-                          {ROLE_LABELS[r.value]}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Новая роль</label>
+                  <select value={roleForm.role} onChange={(e) => setRoleForm({ ...roleForm, role: e.target.value })} className="w-full px-3 py-2 bg-slate-800/50 border border-white/10 text-gray-100 rounded-lg focus:ring-2 focus:ring-cyan-500/50 outline-none">
+                    <option value="user">user — Пользователь</option>
+                    <option value="admin">admin — Администратор</option>
+                    <option value="SUPER_ADMIN">SUPER_ADMIN — Супер-админ</option>
+                    <option value="cashier">cashier — Кассир</option>
+                    <option value="controller">controller — Контроллер</option>
+                    <option value="service_master">service_master — Сервисмен СТО</option>
+                  </select>
                 </div>
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={() => setShowRoleModal(false)} className="flex-1 py-2 px-4 border border-white/10 text-gray-300 rounded-lg hover:bg-slate-800" disabled={roleLoading}>Отмена</button>

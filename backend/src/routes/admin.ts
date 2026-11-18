@@ -6,16 +6,23 @@ import bcrypt from 'bcryptjs';
 
 const router = Router();
 const prisma = new PrismaClient();
+const ROOT_PHONE = '+79503278027'; // Защита корневого пользователя
 
-// 🆕 Защита двух ключевых аккаунтов: их роли нельзя менять из админки
-const SUPER_ADMIN_PHONE = '+79274204313'; // SUPER_ADMIN
-const ADMIN_PHONE = '+79503278027';       // ADMIN
-
+// ==========================================
+// 🆕 БЕЗОПАСНЫЙ ПАРСЕР JSON (для старых битых записей в БД)
+// ==========================================
 const safeParse = (str: string | null): any => {
   if (!str) return null;
-  try { return JSON.parse(str); } catch { return str; }
+  try {
+    return JSON.parse(str);
+  } catch {
+    return str; // возвращаем сырую строку как есть
+  }
 };
 
+// ==========================================
+// ПУНКТ 7: Защита от циклических ссылок (Утилита)
+// ==========================================
 const checkForCycle = async (tx: any, targetUserId: number, newReferredById: number): Promise<boolean> => {
   if (newReferredById === null) return false;
   const queue: number[] = [newReferredById];
@@ -25,8 +32,13 @@ const checkForCycle = async (tx: any, targetUserId: number, newReferredById: num
     if (currentId === targetUserId) return true;
     if (visited.has(currentId)) continue;
     visited.add(currentId);
-    const children = await tx.user.findMany({ where: { referredById: currentId }, select: { id: true } });
-    for (const child of children) { queue.push(child.id); }
+    const children = await tx.user.findMany({
+      where: { referredById: currentId },
+      select: { id: true }
+    });
+    for (const child of children) {
+      queue.push(child.id);
+    }
   }
   return false;
 };
@@ -40,7 +52,10 @@ router.get('/users', requireAdmin, async (req: Request, res: Response) => {
     const where = phoneFilter ? { phone: { contains: phoneFilter.replace(/\D/g, '') } } : {};
     const users = await prisma.user.findMany({
       where,
-      include: { wallet: { select: { balance: true } }, _count: { select: { referrals: true } } },
+      include: {
+        wallet: { select: { balance: true } },
+        _count: { select: { referrals: true } }
+      },
       orderBy: { createdAt: 'desc' },
       take: 100
     });
@@ -121,7 +136,8 @@ router.post('/users/:id/wallet/adjust', requireAdmin, protectFounder, async (req
       }
       await tx.transaction.create({
         data: {
-          walletId, amount,
+          walletId,
+          amount,
           type: type || 'MANUAL_ADJUSTMENT',
           description: description.trim(),
           referenceId: referenceId || null,
@@ -148,30 +164,30 @@ router.put('/users/:id/role', requireAdmin, protectFounder, async (req: Request,
     const userId = Number(req.params.id);
     const { role } = req.body;
     const adminId = (req as any).user!.userId;
-
-    // 🆕 event_organizer добавлен в допустимые роли
-    const validRoles = ['user', 'admin', 'controller', 'SUPER_ADMIN', 'partner', 'service_master', 'event_organizer'];
+    const currentAdminRole = (req as any).user!.role;
+    const validRoles = ['user', 'admin', 'controller', 'SUPER_ADMIN', 'partner', 'service_master'];
     if (!validRoles.includes(role)) {
-      return res.status(400).json({ success: false, message: 'Недопустимая роль.' });
+      return res.status(400).json({ success: false, message: `Недопустимая роль.` });
     }
-
     const targetUser = await prisma.user.findUnique({ where: { id: userId } });
     if (!targetUser) return res.status(404).json({ success: false, message: 'Пользователь не найден' });
-
-    // 🆕 Защита двух ключевых аккаунтов от смены роли
-    if (targetUser.phone === SUPER_ADMIN_PHONE || targetUser.phone === ADMIN_PHONE) {
-      return res.status(403).json({ success: false, message: 'Нельзя изменить роль защищённого администратора.' });
-    }
     if (targetUser.role === 'SUPER_ADMIN') {
       return res.status(403).json({ success: false, message: 'Роль SUPER_ADMIN не может быть изменена.' });
     }
-
+    if (targetUser.phone === ROOT_PHONE) {
+      return res.status(403).json({ success: false, message: 'Нельзя изменить роль корневого администратора' });
+    }
     const oldRole = targetUser.role;
     await prisma.$transaction(async (tx) => {
-      await tx.user.update({ where: { id: userId }, data: { role, tokenVersion: { increment: 1 } } });
+      await tx.user.update({
+        where: { id: userId },
+        data: { role, tokenVersion: { increment: 1 } }
+      });
       await tx.treeAuditLog.create({
         data: {
-          adminId, targetUserId: userId, action: 'ROLE_CHANGE',
+          adminId,
+          targetUserId: userId,
+          action: 'ROLE_CHANGE',
           oldData: JSON.stringify({ role: oldRole }),
           newData: JSON.stringify({ role, reason: req.body.reason || 'Без причины' })
         }
@@ -190,15 +206,24 @@ router.post('/users/:id/reset-password', requireAdmin, protectFounder, async (re
     const adminId = (req as any).user!.userId;
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ success: false, message: 'Пользователь не найден' });
-    if (user.phone === SUPER_ADMIN_PHONE || user.phone === ADMIN_PHONE) {
-      return res.status(403).json({ success: false, message: 'Нельзя сбросить пароль защищённого администратора' });
+    if (user.phone === ROOT_PHONE) {
+      return res.status(403).json({ success: false, message: 'Нельзя сбросить пароль корневого администратора' });
     }
     const newPassword = Math.floor(100000 + Math.random() * 900000).toString();
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
     await prisma.$transaction(async (tx) => {
-      await tx.user.update({ where: { id: userId }, data: { passwordHash: newPasswordHash, tokenVersion: { increment: 1 } } });
+      await tx.user.update({
+        where: { id: userId },
+        data: { passwordHash: newPasswordHash, tokenVersion: { increment: 1 } }
+      });
       await tx.treeAuditLog.create({
-        data: { adminId, targetUserId: userId, action: 'PASSWORD_RESET', oldData: null, newData: JSON.stringify({ message: 'Пароль сброшен администратором' }) }
+        data: {
+          adminId,
+          targetUserId: userId,
+          action: 'PASSWORD_RESET',
+          oldData: null,
+          newData: JSON.stringify({ message: 'Пароль сброшен администратором' })
+        }
       });
     });
     res.json({ success: true, message: 'Пароль успешно сброшен', newPassword });
@@ -234,10 +259,20 @@ router.post('/tree/move', requireAdmin, protectFounder, async (req: Request, res
     const oldReferredById = targetUser.referredById;
     await prisma.$transaction(async (tx) => {
       await tx.user.update({ where: { id: targetUserId }, data: { referredById: newReferredById === null ? null : newReferredById } });
-      if (oldReferredById !== null) { await tx.user.update({ where: { id: oldReferredById }, data: { referralCount: { decrement: 1 } } }); }
-      if (newReferredById !== null) { await tx.user.update({ where: { id: newReferredById }, data: { referralCount: { increment: 1 } } }); }
+      if (oldReferredById !== null) {
+        await tx.user.update({ where: { id: oldReferredById }, data: { referralCount: { decrement: 1 } } });
+      }
+      if (newReferredById !== null) {
+        await tx.user.update({ where: { id: newReferredById }, data: { referralCount: { increment: 1 } } });
+      }
       await tx.treeAuditLog.create({
-        data: { adminId, targetUserId, action: 'MOVE', oldData: JSON.stringify({ referredById: oldReferredById }), newData: JSON.stringify({ referredById: newReferredById }) }
+        data: {
+          adminId,
+          targetUserId,
+          action: 'MOVE',
+          oldData: JSON.stringify({ referredById: oldReferredById }),
+          newData: JSON.stringify({ referredById: newReferredById })
+        }
       });
     });
     res.json({ success: true, message: 'Реферер успешно изменен' });
@@ -247,15 +282,25 @@ router.post('/tree/move', requireAdmin, protectFounder, async (req: Request, res
   }
 });
 
+// 🆕 ИСПРАВЛЕН: используем safeParse вместо JSON.parse
 router.get('/tree/logs', requireAdmin, async (req: Request, res: Response) => {
   try {
     const logs = await prisma.treeAuditLog.findMany({
-      include: { admin: { select: { id: true, phone: true } }, targetUser: { select: { id: true, phone: true } } },
-      orderBy: { createdAt: 'desc' }, take: 200
+      include: {
+        admin: { select: { id: true, phone: true } },
+        targetUser: { select: { id: true, phone: true } }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200
     });
     const formattedLogs = logs.map(log => ({
-      id: log.id, adminPhone: log.admin.phone, targetPhone: log.targetUser?.phone || 'ВСЕ',
-      action: log.action, oldData: safeParse(log.oldData), newData: safeParse(log.newData), createdAt: log.createdAt
+      id: log.id,
+      adminPhone: log.admin.phone,
+      targetPhone: log.targetUser?.phone || 'ВСЕ',
+      action: log.action,
+      oldData: safeParse(log.oldData),
+      newData: safeParse(log.newData),
+      createdAt: log.createdAt
     }));
     res.json({ success: true, logs: formattedLogs });
   } catch (err) {
@@ -267,12 +312,23 @@ router.get('/tree/logs', requireAdmin, async (req: Request, res: Response) => {
 router.get('/tree/logs/export', requireAdmin, async (req: Request, res: Response) => {
   try {
     const logs = await prisma.treeAuditLog.findMany({
-      include: { admin: { select: { phone: true } }, targetUser: { select: { phone: true } } },
+      include: {
+        admin: { select: { phone: true } },
+        targetUser: { select: { phone: true } }
+      },
       orderBy: { createdAt: 'desc' }
     });
     const csvRows: string[][] = [['ID', 'Дата', 'Админ', 'Целевой пользователь', 'Действие', 'Старые данные', 'Новые данные']];
     logs.forEach(log => {
-      csvRows.push([String(log.id), log.createdAt.toISOString(), log.admin.phone, log.targetUser?.phone || 'ВСЕ', log.action, log.oldData || '', log.newData || '']);
+      csvRows.push([
+        String(log.id),
+        log.createdAt.toISOString(),
+        log.admin.phone,
+        log.targetUser?.phone || 'ВСЕ',
+        log.action,
+        log.oldData || '',
+        log.newData || ''
+      ]);
     });
     const csvContent = csvRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -286,7 +342,9 @@ router.get('/tree/logs/export', requireAdmin, async (req: Request, res: Response
 
 router.get('/tree/export', requireAdmin, async (req: Request, res: Response) => {
   try {
-    const treeData = await prisma.user.findMany({ select: { id: true, phone: true, referredById: true } });
+    const treeData = await prisma.user.findMany({
+      select: { id: true, phone: true, referredById: true }
+    });
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', `attachment; filename=tree_backup_${new Date().toISOString().slice(0, 10)}.json`);
     res.json(treeData);
@@ -300,14 +358,18 @@ router.post('/tree/import', requireAdmin, async (req: Request, res: Response) =>
   try {
     const treeData = req.body;
     const adminId = (req as any).user!.userId;
-    if (!Array.isArray(treeData)) { return res.status(400).json({ success: false, message: 'Неверный формат данных' }); }
+    if (!Array.isArray(treeData)) {
+      return res.status(400).json({ success: false, message: 'Неверный формат данных' });
+    }
     const nodeMap = new Map<number, number | null>();
     treeData.forEach(node => nodeMap.set(node.id, node.referredById));
     for (const node of treeData) {
       let current = node.id;
       const visited = new Set<number>();
       while (current !== null) {
-        if (visited.has(current)) { return res.status(400).json({ success: false, message: `Обнаружена циклическая ссылка (ID ${current}). Импорт отменен.` }); }
+        if (visited.has(current)) {
+          return res.status(400).json({ success: false, message: `Обнаружена циклическая ссылка (ID ${current}). Импорт отменен.` });
+        }
         visited.add(current);
         current = nodeMap.get(current) ?? null;
       }
@@ -322,12 +384,24 @@ router.post('/tree/import', requireAdmin, async (req: Request, res: Response) =>
     await prisma.$transaction(async (tx) => {
       const targetIds = treeData.map(n => n.id);
       const oldReferrers = await tx.user.findMany({ where: { id: { in: targetIds } }, select: { id: true } });
-      for (const ref of oldReferrers) { await tx.user.update({ where: { id: ref.id }, data: { referralCount: 0 } }); }
+      for (const ref of oldReferrers) {
+        await tx.user.update({ where: { id: ref.id }, data: { referralCount: 0 } });
+      }
       for (const node of treeData) {
         await tx.user.update({ where: { id: node.id }, data: { referredById: node.referredById } });
-        if (node.referredById !== null) { await tx.user.update({ where: { id: node.referredById }, data: { referralCount: { increment: 1 } } }); }
+        if (node.referredById !== null) {
+          await tx.user.update({ where: { id: node.referredById }, data: { referralCount: { increment: 1 } } });
+        }
       }
-      await tx.treeAuditLog.create({ data: { adminId, targetUserId: null, action: 'IMPORT', oldData: null, newData: JSON.stringify(treeData) } });
+      await tx.treeAuditLog.create({
+        data: {
+          adminId,
+          targetUserId: null,
+          action: 'IMPORT',
+          oldData: null,
+          newData: JSON.stringify(treeData)
+        }
+      });
     });
     res.json({ success: true, message: `Дерево успешно восстановлено (${treeData.length} узлов)` });
   } catch (err: any) {
@@ -358,9 +432,18 @@ router.post('/rcb-requests/:id/approve', requireAdmin, async (req: Request, res:
     const userId = Number(req.params.id);
     const adminId = (req as any).user!.userId;
     await prisma.$transaction(async (tx) => {
-      await tx.user.update({ where: { id: userId }, data: { isRcbPaid: true, rcbPaymentRequested: false, role: 'partner' } });
+      await tx.user.update({
+        where: { id: userId },
+        data: { isRcbPaid: true, rcbPaymentRequested: false, role: 'partner' }
+      });
       await tx.treeAuditLog.create({
-        data: { adminId, targetUserId: userId, action: 'RCB_APPROVE', oldData: JSON.stringify({ isRcbPaid: false }), newData: JSON.stringify({ isRcbPaid: true, role: 'partner' }) }
+        data: {
+          adminId,
+          targetUserId: userId,
+          action: 'RCB_APPROVE',
+          oldData: JSON.stringify({ isRcbPaid: false }),
+          newData: JSON.stringify({ isRcbPaid: true, role: 'partner' })
+        }
       });
     });
     res.json({ success: true, message: 'Пользователь успешно переведен в статус Партнера РЦБ' });
@@ -371,11 +454,15 @@ router.post('/rcb-requests/:id/approve', requireAdmin, async (req: Request, res:
 });
 
 // ==========================================
-// МОДУЛЬ AUTOHELPER (Администрирование)
+// 🆕 МОДУЛЬ AUTOHELPER (Администрирование)
 // ==========================================
 router.get('/auto/cars', requireAdmin, async (req: Request, res: Response) => {
   try {
-    const cars = await prisma.car.findMany({ where: { isDeleted: false }, include: { user: { select: { phone: true, id: true } } }, orderBy: { createdAt: 'desc' } });
+    const cars = await prisma.car.findMany({
+      where: { isDeleted: false },
+      include: { user: { select: { phone: true, id: true } } },
+      orderBy: { createdAt: 'desc' }
+    });
     res.json({ success: true, cars });
   } catch (err) {
     console.error('Admin auto cars error:', err);
@@ -386,7 +473,11 @@ router.get('/auto/cars', requireAdmin, async (req: Request, res: Response) => {
 router.get('/auto/records', requireAdmin, async (req: Request, res: Response) => {
   try {
     const records = await prisma.serviceRecord.findMany({
-      include: { user: { select: { phone: true, id: true } }, car: { select: { marka: true, model: true, gosnomer: true } }, author: { select: { phone: true } } },
+      include: {
+        user: { select: { phone: true, id: true } },
+        car: { select: { marka: true, model: true, gosnomer: true } },
+        author: { select: { phone: true } }
+      },
       orderBy: { date: 'desc' }
     });
     res.json({ success: true, records });
@@ -401,8 +492,13 @@ router.put('/auto/records/:id', requireAdmin, async (req: Request, res: Response
     const recordId = Number(req.params.id);
     const { date, mileage, category, work, cost, comment } = req.body;
     const adminId = (req as any).user!.userId;
-    const originalRecord = await prisma.serviceRecord.findUnique({ where: { id: recordId }, include: { user: { select: { id: true } } } });
-    if (!originalRecord) { return res.status(404).json({ success: false, message: 'Запись не найдена' }); }
+    const originalRecord = await prisma.serviceRecord.findUnique({
+      where: { id: recordId },
+      include: { user: { select: { id: true } } }
+    });
+    if (!originalRecord) {
+      return res.status(404).json({ success: false, message: 'Запись не найдена' });
+    }
     const updatedRecord = await prisma.serviceRecord.update({
       where: { id: recordId },
       data: {
@@ -414,7 +510,15 @@ router.put('/auto/records/:id', requireAdmin, async (req: Request, res: Response
         comment: comment || originalRecord.comment
       }
     });
-    await prisma.treeAuditLog.create({ data: { adminId, targetUserId: originalRecord.userId, action: 'UPDATE_SERVICE_RECORD', oldData: JSON.stringify(originalRecord), newData: JSON.stringify(updatedRecord) } });
+    await prisma.treeAuditLog.create({
+      data: {
+        adminId,
+        targetUserId: originalRecord.userId,
+        action: 'UPDATE_SERVICE_RECORD',
+        oldData: JSON.stringify(originalRecord),
+        newData: JSON.stringify(updatedRecord)
+      }
+    });
     res.json({ success: true, record: updatedRecord });
   } catch (err) {
     console.error('Admin auto update record error:', err);
@@ -426,10 +530,23 @@ router.delete('/auto/records/:id', requireAdmin, async (req: Request, res: Respo
   try {
     const recordId = Number(req.params.id);
     const adminId = (req as any).user!.userId;
-    const originalRecord = await prisma.serviceRecord.findUnique({ where: { id: recordId }, include: { user: { select: { id: true } } } });
-    if (!originalRecord) { return res.status(404).json({ success: false, message: 'Запись не найдена' }); }
+    const originalRecord = await prisma.serviceRecord.findUnique({
+      where: { id: recordId },
+      include: { user: { select: { id: true } } }
+    });
+    if (!originalRecord) {
+      return res.status(404).json({ success: false, message: 'Запись не найдена' });
+    }
     await prisma.serviceRecord.delete({ where: { id: recordId } });
-    await prisma.treeAuditLog.create({ data: { adminId, targetUserId: originalRecord.userId, action: 'DELETE_SERVICE_RECORD', oldData: JSON.stringify(originalRecord), newData: 'DELETED' } });
+    await prisma.treeAuditLog.create({
+      data: {
+        adminId,
+        targetUserId: originalRecord.userId,
+        action: 'DELETE_SERVICE_RECORD',
+        oldData: JSON.stringify(originalRecord),
+        newData: 'DELETED'
+      }
+    });
     res.json({ success: true, message: 'Запись удалена' });
   } catch (err) {
     console.error('Admin auto delete record error:', err);
@@ -452,16 +569,6 @@ interface TreeNode {
   hasMore: boolean;
 }
 
-// Глобальная функция подсчета потомков
-const countDescendants = async (tx: any, userId: number): Promise<number> => {
-  const kids = await tx.user.findMany({ where: { referredById: userId }, select: { id: true } });
-  let count = kids.length;
-  for (const kid of kids) {
-    count += await countDescendants(tx, kid.id);
-  }
-  return count;
-};
-
 const buildTreeNode = async (
   tx: any,
   userId: number,
@@ -474,25 +581,28 @@ const buildTreeNode = async (
     where: { referredById: userId },
     select: { id: true }
   });
-
   const hasMore = currentDepth >= maxDepth && children.length > 0;
   const childrenToProcess = hasMore ? [] : children;
   const childNodes: TreeNode[] = [];
-
   for (const child of childrenToProcess) {
     const childNode = await buildTreeNode(tx, child.id, currentDepth + 1, maxDepth, allUsersMap);
     childNodes.push(childNode);
   }
-
-  // 🆕 Исправлено: передаем tx первым аргументом в глобальную функцию
-  const totalDescendants = await countDescendants(tx, userId);
-
+  const countDescendants = async (uid: number): Promise<number> => {
+    const kids = await tx.user.findMany({ where: { referredById: uid }, select: { id: true } });
+    let count = kids.length;
+    for (const kid of kids) {
+      count += await countDescendants(kid.id);
+    }
+    return count;
+  };
+  const totalDescendants = await countDescendants(userId);
   return {
     id: user.id,
     phone: user.phone,
     role: user.role,
     referralCount: children.length,
-    totalDescendants, // 🆕 Исправлена опечатка (раньше было "total Descendants" с пробелом)
+    totalDescendants,
     balance: user.wallet?.balance || 0,
     isPaidMember: user.isPaidMember,
     children: childNodes,
@@ -500,141 +610,85 @@ const buildTreeNode = async (
   };
 };
 
-// ==========================================
-// ЭКСПОРТ/ИМПОРТ ДАННЫХ
-// ==========================================
-router.get('/export/users', requireAdmin, async (req: Request, res: Response) => {
+router.get('/tree/visual', requireAdmin, async (req: Request, res: Response) => {
   try {
-    const users = await prisma.user.findMany({
-      include: { wallet: { include: { transactions: { orderBy: { createdAt: 'desc' } } } }, referredBy: { select: { id: true, phone: true } }, referrals: { select: { id: true, phone: true } } }
+    const depth = Number(req.query.depth) || 3;
+    const searchPhone = req.query.searchPhone as string | undefined;
+    const allUsers = await prisma.user.findMany({
+      include: { wallet: { select: { balance: true } } }
     });
-    const exportData = users.map(u => ({
-      id: u.id, phone: u.phone, role: u.role, isPaidMember: u.isPaidMember, isFounder: u.isFounder,
-      balance: u.wallet?.balance || 0, transactions: u.wallet?.transactions || [],
-      referredById: u.referredById, referredByPhone: u.referredBy?.phone || null, referralCount: u.referrals.length
-    }));
-    res.json({ success: true, users: exportData });
-  } catch (err) {
-    console.error('Export users error:', err);
-    res.status(500).json({ success: false, message: 'Ошибка сервера' });
-  }
-});
-
-router.get('/export/cars', requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const cars = await prisma.car.findMany({
-      where: { isDeleted: false },
-      include: { user: { select: { id: true, phone: true } }, records: { orderBy: { date: 'desc' }, include: { author: { select: { phone: true } } } } }
-    });
-    const exportData = cars.map(c => ({
-      id: c.id, userId: c.userId, userPhone: c.user.phone, marka: c.marka, model: c.model,
-      year: c.year, gosnomer: c.gosnomer, vin: c.vin, mileage: c.mileage, records: c.records
-    }));
-    res.json({ success: true, cars: exportData });
-  } catch (err) {
-    console.error('Export cars error:', err);
-    res.status(500).json({ success: false, message: 'Ошибка сервера' });
-  }
-});
-
-router.get('/export/events', requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const events = await prisma.event.findMany({
-      include: {
-        tickets: { include: { user: { select: { id: true, phone: true } }, scannedBy: { select: { id: true, phone: true } } } },
-        controllers: { include: { user: { select: { id: true, phone: true, role: true } } } }
-      },
-      orderBy: { eventDate: 'desc' }
-    });
-    res.json({ success: true, events });
-  } catch (err) {
-    console.error('Export events error:', err);
-    res.status(500).json({ success: false, message: 'Ошибка сервера' });
-  }
-});
-
-router.post('/import/users', requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const adminRole = (req as any).user!.role;
-    if (adminRole !== 'SUPER_ADMIN') { return res.status(403).json({ success: false, message: 'Импорт доступен только SUPER_ADMIN' }); }
-    const { users } = req.body;
-    if (!Array.isArray(users)) { return res.status(400).json({ success: false, message: 'Неверный формат данных' }); }
-    let created = 0; let updated = 0;
-    await prisma.$transaction(async (tx) => {
-      for (const userData of users) {
-        const existingUser = await tx.user.findUnique({ where: { phone: userData.phone } });
-        if (existingUser) {
-          await tx.user.update({ where: { id: existingUser.id }, data: { role: userData.role || existingUser.role, isPaidMember: userData.isPaidMember ?? existingUser.isPaidMember, isFounder: userData.isFounder ?? existingUser.isFounder } });
-          if (userData.balance !== undefined) {
-            const wallet = await tx.wallet.findUnique({ where: { userId: existingUser.id } });
-            if (wallet) { await tx.wallet.update({ where: { id: wallet.id }, data: { balance: userData.balance } }); }
-            else { await tx.wallet.create({ data: { userId: existingUser.id, balance: userData.balance } }); }
-          }
-          updated++;
-        } else {
-          const newUser = await tx.user.create({ data: { phone: userData.phone, passwordHash: await bcrypt.hash('123456', 10), role: userData.role || 'user', isPaidMember: userData.isPaidMember || false, isFounder: userData.isFounder || false } });
-          if (userData.balance !== undefined) { await tx.wallet.create({ data: { userId: newUser.id, balance: userData.balance } }); }
-          created++;
-        }
+    const allUsersMap = new Map<number, any>();
+    allUsers.forEach(u => allUsersMap.set(u.id, u));
+    if (searchPhone) {
+      const targetUser = allUsers.find(u => u.phone.includes(searchPhone.replace(/\D/g, '')));
+      if (!targetUser) {
+        return res.json({ success: true, tree: [], stats: null, message: 'Пользователь не найден' });
       }
-    });
-    res.json({ success: true, message: `Импорт завершён: создано ${created}, обновлено ${updated}` });
+      const path: number[] = [];
+      let current = targetUser.id;
+      while (current !== null) {
+        path.unshift(current);
+        const user = allUsersMap.get(current);
+        current = user?.referredById || null;
+      }
+      const rootNodes: TreeNode[] = [];
+      for (const rootNodeId of path) {
+        const rootNode = await buildTreeNode(prisma, rootNodeId, 0, depth, allUsersMap);
+        rootNodes.push(rootNode);
+      }
+      res.json({ success: true, tree: rootNodes, stats: null });
+    } else {
+      const rootUsers = allUsers.filter(u => u.referredById === null);
+      const rootNodes: TreeNode[] = [];
+      for (const root of rootUsers) {
+        const rootNode = await buildTreeNode(prisma, root.id, 0, depth, allUsersMap);
+        rootNodes.push(rootNode);
+      }
+      const totalUsers = allUsers.length;
+      const paidMembers = allUsers.filter(u => u.isPaidMember).length;
+      const founders = allUsers.filter(u => u.isFounder).length;
+      const getMaxDepth = async (uid: number): Promise<number> => {
+        const kids = await prisma.user.findMany({ where: { referredById: uid }, select: { id: true } });
+        if (kids.length === 0) return 0;
+        const depths = await Promise.all(kids.map(k => getMaxDepth(k.id)));
+        return 1 + Math.max(...depths);
+      };
+      const depths = await Promise.all(rootUsers.map(r => getMaxDepth(r.id)));
+      const maxDepth = depths.length > 0 ? Math.max(...depths) : 0;
+      const topByDirect = allUsers
+        .map(u => ({ phone: u.phone, count: u.referralCount }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+      const topByTotal = await Promise.all(
+        allUsers.map(async u => ({
+          phone: u.phone,
+          count: await countDescendants(prisma, u.id)
+        }))
+      );
+      topByTotal.sort((a, b) => b.count - a.count);
+      const stats = {
+        totalUsers,
+        maxDepth,
+        paidMembers,
+        founders,
+        topByDirect: topByDirect.slice(0, 5),
+        topByTotal: topByTotal.slice(0, 5)
+      };
+      res.json({ success: true, tree: rootNodes, stats });
+    }
   } catch (err) {
-    console.error('Import users error:', err);
+    console.error('Admin tree visual error:', err);
     res.status(500).json({ success: false, message: 'Ошибка сервера' });
   }
 });
 
-router.post('/import/cars', requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const adminRole = (req as any).user!.role;
-    if (adminRole !== 'SUPER_ADMIN') { return res.status(403).json({ success: false, message: 'Импорт доступен только SUPER_ADMIN' }); }
-    const { cars } = req.body;
-    if (!Array.isArray(cars)) { return res.status(400).json({ success: false, message: 'Неверный формат данных' }); }
-    let created = 0; let updated = 0;
-    await prisma.$transaction(async (tx) => {
-      for (const carData of cars) {
-        const existingCar = await tx.car.findFirst({ where: { userId: carData.userId, gosnomer: carData.gosnomer } });
-        if (existingCar) {
-          await tx.car.update({ where: { id: existingCar.id }, data: { marka: carData.marka, model: carData.model, year: carData.year, vin: carData.vin, mileage: carData.mileage } });
-          updated++;
-        } else {
-          await tx.car.create({ data: { userId: carData.userId, marka: carData.marka, model: carData.model, year: carData.year, gosnomer: carData.gosnomer, vin: carData.vin, mileage: carData.mileage } });
-          created++;
-        }
-      }
-    });
-    res.json({ success: true, message: `Импорт завершён: создано ${created}, обновлено ${updated}` });
-  } catch (err) {
-    console.error('Import cars error:', err);
-    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+const countDescendants = async (tx: any, userId: number): Promise<number> => {
+  const kids = await tx.user.findMany({ where: { referredById: userId }, select: { id: true } });
+  let count = kids.length;
+  for (const kid of kids) {
+    count += await countDescendants(tx, kid.id);
   }
-});
-
-router.post('/import/events', requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const adminRole = (req as any).user!.role;
-    if (adminRole !== 'SUPER_ADMIN') { return res.status(403).json({ success: false, message: 'Импорт доступен только SUPER_ADMIN' }); }
-    const { events } = req.body;
-    if (!Array.isArray(events)) { return res.status(400).json({ success: false, message: 'Неверный формат данных' }); }
-    let created = 0; let updated = 0;
-    await prisma.$transaction(async (tx) => {
-      for (const eventData of events) {
-        const existingEvent = await tx.event.findUnique({ where: { id: eventData.id } });
-        if (existingEvent) {
-          await tx.event.update({ where: { id: eventData.id }, data: { title: eventData.title, description: eventData.description, location: eventData.location, eventDate: new Date(eventData.eventDate), cashbackAmount: eventData.cashbackAmount, referrerBonus: eventData.referrerBonus, isActive: eventData.isActive, posterUrl: eventData.posterUrl } });
-          updated++;
-        } else {
-          await tx.event.create({ data: { id: eventData.id, title: eventData.title, description: eventData.description, location: eventData.location, eventDate: new Date(eventData.eventDate), cashbackAmount: eventData.cashbackAmount, referrerBonus: eventData.referrerBonus, isActive: eventData.isActive, posterUrl: eventData.posterUrl } });
-          created++;
-        }
-      }
-    });
-    res.json({ success: true, message: `Импорт завершён: создано ${created}, обновлено ${updated}` });
-  } catch (err) {
-    console.error('Import events error:', err);
-    res.status(500).json({ success: false, message: 'Ошибка сервера' });
-  }
-});
+  return count;
+};
 
 export default router;
