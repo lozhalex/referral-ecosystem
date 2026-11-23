@@ -24,6 +24,10 @@ interface Apartment {
 export default function AddMeter({ onBack }: { onBack: () => void }) {
   const [apartments, setApartments] = useState<Apartment[]>([]);
   const [selectedApartmentId, setSelectedApartmentId] = useState<number | ''>('');
+  const [showCreateApartment, setShowCreateApartment] = useState(false);
+  const [newApartmentComment, setNewApartmentComment] = useState('');
+  const [newApartmentBillingDay, setNewApartmentBillingDay] = useState('20');
+  
   const [type, setType] = useState('');
   const [tariffType, setTariffType] = useState('SINGLE');
   const [comment, setComment] = useState('');
@@ -51,10 +55,41 @@ export default function AddMeter({ onBack }: { onBack: () => void }) {
     }
   };
 
+  const handleCreateApartment = async () => {
+    if (!newApartmentComment.trim()) {
+      setError('Укажите название квартиры');
+      return;
+    }
+
+    try {
+      const res = await apiClient.post('/api/apartments', {
+        comment: newApartmentComment.trim(),
+        billingDay: Number(newApartmentBillingDay) || 20
+      });
+
+      if (res.data.success) {
+        await loadApartments();
+        setSelectedApartmentId(res.data.apartment.id);
+        setShowCreateApartment(false);
+        setNewApartmentComment('');
+        setNewApartmentBillingDay('20');
+        setError('');
+      } else {
+        setError(res.data.message || 'Ошибка создания квартиры');
+      }
+    } catch (err: any) {
+      if (err.response?.data?.code === 'NEED_SMART') {
+        setError('Добавление второй квартиры доступно в тарифе СМАРТ');
+      } else {
+        setError('Ошибка сервера');
+      }
+    }
+  };
+
   const handleSubmit = async () => {
     setError('');
 
-    if (!selectedApartmentId) return setError('Выберите квартиру');
+    if (!selectedApartmentId) return setError('Выберите или создайте квартиру');
     if (!type) return setError('Выберите тип ресурса');
     if (!comment.trim()) return setError('Укажите комментарий (например, "Кухня, верхний")');
     if (!serialNumber.trim()) return setError('Укажите серийный номер');
@@ -73,7 +108,7 @@ export default function AddMeter({ onBack }: { onBack: () => void }) {
       });
 
       if (res.data.success) {
-        onBack(); // Возврат на главную — там обновится список
+        onBack();
       } else {
         setError(res.data.message || 'Ошибка сохранения');
       }
@@ -95,8 +130,53 @@ export default function AddMeter({ onBack }: { onBack: () => void }) {
       <div>
         <label className="text-sm text-slate-400 block mb-1.5">Квартира *</label>
         {apartments.length === 0 ? (
-          <div className="text-sm text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
-            Сначала создайте квартиру в настройках
+          <div className="space-y-3">
+            {!showCreateApartment ? (
+              <button
+                onClick={() => setShowCreateApartment(true)}
+                className="w-full py-3 bg-neon-purple/20 border border-neon-purple/30 text-neon-purple rounded-lg hover:bg-neon-purple/30 transition"
+              >
+                ➕ Создать первую квартиру
+              </button>
+            ) : (
+              <div className="bg-white/5 border border-white/10 rounded-lg p-4 space-y-3">
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Название</label>
+                  <input
+                    type="text"
+                    value={newApartmentComment}
+                    onChange={(e) => setNewApartmentComment(e.target.value)}
+                    placeholder="Например: Моя квартира"
+                    className="w-full bg-dark-900 border border-white/10 rounded px-3 py-2 text-white outline-none focus:border-neon-cyan"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">День подачи показаний</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="28"
+                    value={newApartmentBillingDay}
+                    onChange={(e) => setNewApartmentBillingDay(e.target.value)}
+                    className="w-full bg-dark-900 border border-white/10 rounded px-3 py-2 text-white outline-none focus:border-neon-cyan"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCreateApartment}
+                    className="flex-1 py-2 bg-neon-purple text-white rounded hover:bg-purple-600 transition"
+                  >
+                    Создать
+                  </button>
+                  <button
+                    onClick={() => setShowCreateApartment(false)}
+                    className="flex-1 py-2 bg-white/10 text-slate-300 rounded hover:bg-white/20 transition"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <select
