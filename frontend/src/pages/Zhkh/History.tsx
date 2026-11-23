@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { apiClient } from '../../api/client';
 
 const RESOURCE_NAMES: Record<string, string> = {
@@ -10,14 +10,37 @@ const RESOURCE_NAMES: Record<string, string> = {
   HEAT: 'Тепло',
 };
 
+const FILTER_OPTIONS = [
+  { value: 'all', label: 'Все ресурсы' },
+  { value: 'HWS', label: 'Холодная вода' },
+  { value: 'GWS', label: 'Горячая вода' },
+  { value: 'DRINKING_WATER', label: 'Питьевая вода' },
+  { value: 'ELECTRICITY', 'Электричество' },
+  { value: 'GAS', label: 'Газ' },
+  { value: 'HEAT', label: 'Тепло' },
+];
+
 export default function History() {
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState('all');
   const [copied, setCopied] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadHistory();
+  }, []);
+
+  // Закрытие dropdown при клике вне
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const loadHistory = async () => {
@@ -38,7 +61,6 @@ export default function History() {
       ? history 
       : history.filter(h => h.meter.type === filterType);
 
-    // Группируем по периоду
     const byPeriod = filtered.reduce((acc: any, item: any) => {
       if (!acc[item.periodKey]) acc[item.periodKey] = [];
       acc[item.periodKey].push(item);
@@ -52,7 +74,7 @@ export default function History() {
       .reverse()
       .forEach(period => {
         lines.push(`📅 Период: ${period}`);
-        lines.push('─'.repeat(40));
+        lines.push('─'.repeat(15)); // 🆕 короткая черта
         
         byPeriod[period].forEach((item: any) => {
           const meter = item.meter;
@@ -60,7 +82,6 @@ export default function History() {
           
           lines.push(`Тип: ${resourceName}`);
           lines.push(`Номер счетчика: ${meter.serialNumber}`);
-          lines.push(`Комментарий: ${meter.comment}`);
           lines.push(`Текущие показания: ${item.t1}`);
           
           if (meter.tariffType === 'TWO_TARIFF' || meter.tariffType === 'THREE_TARIFF') {
@@ -68,10 +89,10 @@ export default function History() {
             if (item.t3) lines.push(`  Тариф 3 (полупик): ${item.t3}`);
           }
           
-          lines.push(''); // пустая строка между счетчиками
+          lines.push('');
         });
         
-        lines.push(''); // пустая строка между периодами
+        lines.push('');
       });
 
     const text = lines.join('\n');
@@ -88,22 +109,41 @@ export default function History() {
     ? history 
     : history.filter(h => h.meter.type === filterType);
 
+  const currentFilterLabel = FILTER_OPTIONS.find(o => o.value === filterType)?.label || 'Все ресурсы';
+
   return (
     <div className="space-y-4 pb-20">
-      <div className="sticky top-0 bg-dark-900/95 backdrop-blur-md z-10 py-2 space-y-2">
-        <select 
-          value={filterType}
-          onChange={(e) => setFilterType(e.target.value)}
-          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white outline-none"
+      {/* 🆕 Кастомный тёмный dropdown */}
+      <div className="sticky top-0 bg-dark-900/95 backdrop-blur-md z-10 py-2" ref={dropdownRef}>
+        <button
+          onClick={() => setDropdownOpen(!dropdownOpen)}
+          className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white text-left flex items-center justify-between hover:bg-white/10 transition"
         >
-          <option value="all">Все ресурсы</option>
-          <option value="HWS">Холодная вода</option>
-          <option value="GWS">Горячая вода</option>
-          <option value="DRINKING_WATER">Питьевая вода</option>
-          <option value="ELECTRICITY">Электричество</option>
-          <option value="GAS">Газ</option>
-          <option value="HEAT">Тепло</option>
-        </select>
+          <span>{currentFilterLabel}</span>
+          <span className={`transition-transform ${dropdownOpen ? 'rotate-180' : ''}`}>▼</span>
+        </button>
+
+        {dropdownOpen && (
+          <div className="absolute left-4 right-4 mt-1 bg-dark-900 border border-white/10 rounded-lg shadow-2xl overflow-hidden z-20">
+            {FILTER_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  setFilterType(opt.value);
+                  setDropdownOpen(false);
+                }}
+                className={`w-full px-4 py-3 text-left flex items-center justify-between transition ${
+                  filterType === opt.value
+                    ? 'bg-neon-purple/20 text-white'
+                    : 'text-slate-300 hover:bg-white/5'
+                }`}
+              >
+                <span>{opt.label}</span>
+                {filterType === opt.value && <span className="text-neon-cyan">●</span>}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {filteredHistory.length === 0 ? (

@@ -5,8 +5,9 @@ import History from './History';
 import Input from './Input';
 import Profile from './Profile';
 import AddMeter from './AddMeter';
+import Settings from './Settings'; // 🆕
 
-type Tab = 'dashboard' | 'history' | 'input' | 'profile' | 'addMeter';
+type Tab = 'dashboard' | 'history' | 'input' | 'profile' | 'addMeter' | 'settings';
 
 export default function Zhkh() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
@@ -19,6 +20,7 @@ export default function Zhkh() {
       case 'input': return <Input onBack={() => setActiveTab('dashboard')} />;
       case 'profile': return <Profile />;
       case 'addMeter': return <AddMeter onBack={() => setActiveTab('dashboard')} />;
+      case 'settings': return <Settings onBack={() => setActiveTab('dashboard')} onAddMeter={() => setActiveTab('addMeter')} />;
       default: return <Dashboard onNavigateToInput={() => setActiveTab('input')} onAddMeter={() => setActiveTab('addMeter')} />;
     }
   };
@@ -30,8 +32,8 @@ export default function Zhkh() {
     { key: 'profile', icon: '👤', label: 'Профиль' },
   ];
 
-  // Показываем таб-бар везде, кроме input и addMeter (это полноэкранные формы)
-  const showTabBar = activeTab !== 'input' && activeTab !== 'addMeter';
+  // Таб-бар скрываем на полноэкранных формах (ввод, добавление, настройки)
+  const showTabBar = activeTab !== 'input' && activeTab !== 'addMeter' && activeTab !== 'settings';
 
   return (
     <div className="min-h-screen bg-dark-900 text-white pb-24 relative">
@@ -41,9 +43,19 @@ export default function Zhkh() {
           ← Назад
         </button>
         <h1 className="text-base font-bold font-display text-white">Счетчики ЖКХ</h1>
-        {/* 🆕 Буми в хедере: прямоугольник, не квадрат */}
-        <div className="w-8 h-12 flex items-center justify-center">
-          <img src="/bumi/pose-1.png" alt="Буми" className="h-full w-auto object-contain" />
+        <div className="flex items-center gap-2">
+          {/* 🆕 Кнопка настроек */}
+          <button 
+            onClick={() => setActiveTab('settings')}
+            className="p-2 text-slate-300 hover:text-white transition"
+            title="Настройки"
+          >
+            ⚙️
+          </button>
+          {/* Буми */}
+          <div className="w-8 h-12 flex items-center justify-center">
+            <img src="/bumi/pose-1.png" alt="Буми" className="h-full w-auto object-contain" />
+          </div>
         </div>
       </div>
 
@@ -52,7 +64,7 @@ export default function Zhkh() {
         {renderContent()}
       </main>
 
-      {/* Нижний таб-бар: 4 равные кнопки в ряд */}
+      {/* Нижний таб-бар */}
       {showTabBar && (
         <div className="fixed bottom-0 left-0 right-0 bg-dark-900/95 backdrop-blur-md border-t border-white/10 pb-[env(safe-area-inset-bottom)] z-30">
           <div className="grid grid-cols-4 h-16">
