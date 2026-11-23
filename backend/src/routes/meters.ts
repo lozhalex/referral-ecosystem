@@ -114,19 +114,28 @@ router.post('/', async (req: any, res: Response) => {
 });
 
 // ==========================================
-// 3. ОБНОВИТЬ / АРХИВИРОВАТЬ СЧЕТЧИК
+// 3. ОБНОВИТЬ СЧЕТЧИК
 // ==========================================
 router.put('/:id', async (req: any, res: Response) => {
   try {
-    const { comment, serialNumber, nextVerificationDate, tariffType } = req.body;
+    const { comment, serialNumber, nextVerificationDate, tariffType, type } = req.body;
+    
+    const updateData: any = {};
+    if (comment !== undefined) updateData.comment = String(comment).slice(0, 100);
+    if (serialNumber !== undefined) updateData.serialNumber = String(serialNumber);
+    if (tariffType !== undefined && ['SINGLE', 'TWO_TARIFF', 'THREE_TARIFF'].includes(tariffType)) {
+      updateData.tariffType = tariffType;
+    }
+    if (type !== undefined && ['HWS', 'GWS', 'DRINKING_WATER', 'ELECTRICITY', 'GAS', 'HEAT'].includes(type)) {
+      updateData.type = type;
+    }
+    if (nextVerificationDate !== undefined) {
+      updateData.nextVerificationDate = nextVerificationDate ? new Date(nextVerificationDate) : null;
+    }
+
     await prisma.meter.updateMany({
       where: { id: Number(req.params.id), userId: req.user.userId, isActive: true },
-      data: {
-        ...(comment !== undefined && { comment: String(comment).slice(0, 100) }),
-        ...(serialNumber !== undefined && { serialNumber: String(serialNumber) }),
-        ...(tariffType !== undefined && VALID_TARIFFS.includes(tariffType) && { tariffType }),
-        ...(nextVerificationDate !== undefined && { nextVerificationDate: nextVerificationDate ? new Date(nextVerificationDate) : null })
-      }
+      data: updateData
     });
     res.json({ success: true });
   } catch (err) {

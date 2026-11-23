@@ -15,7 +15,7 @@ const FILTER_OPTIONS = [
   { value: 'HWS', label: 'Холодная вода' },
   { value: 'GWS', label: 'Горячая вода' },
   { value: 'DRINKING_WATER', label: 'Питьевая вода' },
-  { value: 'ELECTRICITY', 'Электричество' },
+  { value: 'ELECTRICITY', label: 'Электроэнергия' }, // 🆕 Исправлено: добавлено label:
   { value: 'GAS', label: 'Газ' },
   { value: 'HEAT', label: 'Тепло' },
 ];
@@ -32,7 +32,6 @@ export default function History() {
     loadHistory();
   }, []);
 
-  // Закрытие dropdown при клике вне
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -74,7 +73,7 @@ export default function History() {
       .reverse()
       .forEach(period => {
         lines.push(`📅 Период: ${period}`);
-        lines.push('─'.repeat(15)); // 🆕 короткая черта
+        lines.push('─'.repeat(15));
         
         byPeriod[period].forEach((item: any) => {
           const meter = item.meter;
@@ -91,7 +90,6 @@ export default function History() {
           
           lines.push('');
         });
-        
         lines.push('');
       });
 
@@ -113,7 +111,6 @@ export default function History() {
 
   return (
     <div className="space-y-4 pb-20">
-      {/* 🆕 Кастомный тёмный dropdown */}
       <div className="sticky top-0 bg-dark-900/95 backdrop-blur-md z-10 py-2" ref={dropdownRef}>
         <button
           onClick={() => setDropdownOpen(!dropdownOpen)}
