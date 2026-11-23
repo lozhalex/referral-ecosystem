@@ -6,14 +6,15 @@ import ChangePassword from './pages/ChangePassword';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminAutoHelper from './pages/AdminAutoHelper';
 import Home from './pages/Home';
-import HomeGuest from './pages/HomeGuest'; // 🆕
+import HomeGuest from './pages/HomeGuest';
 import ProjectStub from './pages/ProjectStub';
 import Events from './pages/Events';
 import Tickets from './pages/Tickets';
 import Scanner from './pages/Scanner';
 import AdminEvents from './pages/AdminEvents';
 import AutoHelper from './pages/AutoHelper';
-import SmartBenefits from './pages/SmartBenefits'; // 🆕
+import Zhkh from './pages/Zhkh'; // 🆕
+import SmartBenefits from './pages/SmartBenefits';
 import ProtectedRoute from './components/ProtectedRoute';
 import ReferralCapture from './components/ReferralCapture';
 
@@ -30,7 +31,7 @@ function App() {
     <BrowserRouter>
       <ReferralCapture />
       <Routes>
-        <Route path="/" element={<HomeRouter />} /> {/* 🆕 HomeRouter вместо просто Home */}
+        <Route path="/" element={<HomeRouter />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/daylabor" element={<ProjectStub />} />
@@ -44,10 +45,11 @@ function App() {
         <Route path="/building" element={<ProjectStub />} />
         <Route path="/eco" element={<ProjectStub />} />
         <Route path="/dating" element={<ProjectStub />} />
-        <Route path="/smart-benefits" element={<SmartBenefits />} /> {/* 🆕 */}
-
+        <Route path="/smart-benefits" element={<SmartBenefits />} />
+        
         <Route element={<ProtectedRoute />}>
           <Route path="/auto" element={<AutoHelper />} />
+          <Route path="/zhkh" element={<Zhkh />} /> {/* 🆕 Маршрут ЖКХ */}
           <Route path="/profile" element={<Profile />} />
           <Route path="/change-password" element={<ChangePassword />} />
           <Route path="/admin" element={<AdminDashboard />} />

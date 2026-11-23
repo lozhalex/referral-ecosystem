@@ -22,7 +22,15 @@ export const projects: Project[] = [
     route: '/auto',
     stage: 1,
   },
-
+  {
+    id: 'zhkh',
+    icon: '🏠',
+    title: 'Счетчики ЖКХ',
+    description: 'Умный учет ресурсов, напоминания и контроль расходов',
+    status: 'available',
+    route: '/zhkh',
+    stage: 1,
+  },
   // === ЭТАП 2: Синергия ===
   {
     id: 'daylabor',
@@ -65,16 +73,15 @@ export const projects: Project[] = [
     stage: 2,
   },
   {
-   id: 'tickets',
-   icon: '🎟️',
-   title: 'Билеты на мероприятия',
-   description: 'Кэшбек за посещение + бонус рефереру',
-   status: 'available', // Было: 'development'
-   progress: 100, // Было: 15
-   route: '/events', // Было: '/tickets'
-   stage: 2,
-  },  
-
+    id: 'tickets',
+    icon: '🎟️',
+    title: 'Билеты на мероприятия',
+    description: 'Кэшбек за посещение + бонус рефереру',
+    status: 'available',
+    progress: 100,
+    route: '/events',
+    stage: 2,
+  },
   // === ЭТАП 3: Дом и Жильё ===
   {
     id: 'housing',
@@ -94,7 +101,6 @@ export const projects: Project[] = [
     route: '/booking',
     stage: 3,
   },
-
   // === ЭТАП 4: Досуг и нишевые ===
   {
     id: 'glamping',
