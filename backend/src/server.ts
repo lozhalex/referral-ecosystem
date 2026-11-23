@@ -13,6 +13,9 @@ import alertsRoutes from './routes/alerts';
 import membershipRoutes from './routes/membership';
 import rcbRoutes from './routes/rcb';
 import autoRoutes from './routes/auto';
+// 🆕 ЖКХ
+import apartmentsRoutes from './routes/apartments';
+import metersRoutes from './routes/meters';
 
 const app = express();
 const PORT: number = Number(process.env.PORT) || 3000;
@@ -81,6 +84,9 @@ app.use('/api/stats', statsRoutes);
 app.use('/api/admin/alerts', alertsRoutes);
 app.use('/api/rcb', rcbRoutes);
 app.use('/api/auto', autoRoutes);
+// 🆕 ЖКХ
+app.use('/api/apartments', apartmentsRoutes);
+app.use('/api/meters', metersRoutes);
 
 // Health check освобождаем от CSRF для удобства мониторинга
 app.get('/api/health', (req, res) => {
@@ -129,7 +135,6 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 process.on('uncaughtException', (err) => {
   console.error('[UNCAUGHT EXCEPTION]', err);
 });
-
 process.on('unhandledRejection', (reason) => {
   console.error('[UNHANDLED REJECTION]', reason);
 });

@@ -50,6 +50,10 @@ model User {
   masters                Master[]
   mileageChecks          MileageCheck[]
   autoSettings           UserAutoSettings?
+
+  // 🆕 ЖКХ: квартиры и ачивки
+  apartments             Apartment[]
+  achievements           UserAchievement[]
   
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -105,9 +109,9 @@ model Event {
   cashbackAmount Int       @default(50)
   referrerBonus  Int       @default(100)
   isActive       Boolean   @default(true)
-  posterUrl      String?   // 🆕 URL афиши мероприятия
-  isFree         Boolean   @default(false)   // 🆕 Бесплатное мероприятие
-  maxTickets     Int?      // 🆕 Лимит мест (null = безлимит)
+  posterUrl      String?
+  isFree         Boolean   @default(false)
+  maxTickets     Int?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   
@@ -277,4 +281,119 @@ model ServiceAccessQR {
   
   car       Car      @relation(fields: [carId], references: [id])
   client    User     @relation("ServiceAccessQRClient", fields: [clientId], references: [id])
+}
+
+// ============================================================
+// 🆕 МОДУЛЬ «СЧЕТЧИКИ ЖКХ»
+// ============================================================
+
+model Apartment {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  comment    String
+  billingDay Int      @default(20)
+  isActive   Boolean  @default(true)
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  meters     Meter[]
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Meter {
+  id                   Int       @id @default(autoincrement())
+  userId               Int
+  apartmentId          Int
+  type                 String    // 'HWS'|'GWS'|'DRINKING_WATER'|'ELECTRICITY'|'GAS'|'HEAT'
+  tariffType           String    @default("SINGLE") // 'SINGLE'|'TWO_TARIFF'|'THREE_TARIFF'
+  comment              String
+  serialNumber         String
+  initialReading       Float
+  nextVerificationDate DateTime?
+  sortOrder            Int       @default(0)
+  isActive             Boolean   @default(true)
+
+  apartment            Apartment @relation(fields: [apartmentId], references: [id], onDelete: Cascade)
+  readings             MeterReading[]
+
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([userId, sortOrder])
+  @@index([apartmentId])
+}
+
+model MeterReading {
+  id            Int      @id @default(autoincrement())
+  meterId       Int
+  periodKey     String   // 'YYYY-MM'
+
+  prevT1        Float
+  prevT2        Float?
+  prevT3        Float?
+  t1            Float
+  t2            Float?
+  t3            Float?
+
+  ocrT1         Float?
+  photoUrl      String?
+  usedOcr       Boolean  @default(false)
+  mlConsent     Boolean  @default(false)
+
+  status        String   @default("confirmed") // 'confirmed'|'locked'|'change_requested'
+  lockedAt      DateTime?
+
+  meter         Meter    @relation(fields: [meterId], references: [id], onDelete: Cascade)
+  changeRequests MeterChangeRequest[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([meterId, periodKey])
+  @@index([meterId])
+}
+
+model MeterChangeRequest {
+  id               Int      @id @default(autoincrement())
+  readingId        Int
+  userId           Int
+  requestedT1      Float
+  requestedT2      Float?
+  requestedT3      Float?
+  reason           String
+  evidencePhotoUrl String
+  status           String   @default("pending") // 'pending'|'approved'|'rejected'
+  processedBy      Int?
+  processedAt      DateTime?
+
+  reading          MeterReading @relation(fields: [readingId], references: [id], onDelete: Cascade)
+
+  createdAt        DateTime @default(now())
+
+  @@index([status])
+}
+
+model Achievement {
+  id          Int    @id @default(autoincrement())
+  code        String @unique
+  title       String
+  description String
+  icon        String
+  module      String   // 'zhkh'|'auto'|'global'
+
+  users       UserAchievement[]
+}
+
+model UserAchievement {
+  userId        Int
+  achievementId Int
+  unlockedAt    DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@id([userId, achievementId])
 }
