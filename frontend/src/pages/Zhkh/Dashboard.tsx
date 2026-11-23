@@ -21,7 +21,7 @@ const getResourceIcon = (type: string) => {
   }
 };
 
-export default function Dashboard({ onNavigateToInput }: { onNavigateToInput: () => void }) {
+export default function Dashboard({ onNavigateToInput, onAddMeter }: { onNavigateToInput: () => void; onAddMeter: () => void }) {
   const [meters, setMeters] = useState<Meter[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -46,14 +46,17 @@ export default function Dashboard({ onNavigateToInput }: { onNavigateToInput: ()
     return <div className="text-center text-slate-400 py-10">Загрузка...</div>;
   }
 
+  // 🆕 Пустое состояние: Буми в прямоугольнике, не квадрат
   if (meters.length === 0) {
     return (
       <div className="text-center py-12">
-        <img src="/bumi/pose-2.png" alt="Буми" className="w-24 h-24 mx-auto mb-4 opacity-80" />
+        <div className="w-32 h-40 mx-auto mb-4 flex items-center justify-center">
+          <img src="/bumi/pose-2.png" alt="Буми" className="h-full w-auto object-contain" />
+        </div>
         <h3 className="text-xl font-bold text-white mb-2">Пока нет счетчиков</h3>
         <p className="text-slate-400 mb-6">Добавьте первый счетчик, чтобы начать учет</p>
         <button 
-          onClick={onNavigateToInput}
+          onClick={onAddMeter}
           className="px-6 py-3 bg-neon-purple text-white rounded-xl font-bold hover:bg-purple-600 transition"
         >
           Добавить первый счетчик
@@ -101,7 +104,7 @@ export default function Dashboard({ onNavigateToInput }: { onNavigateToInput: ()
       ))}
 
       <button 
-        onClick={onNavigateToInput}
+        onClick={onAddMeter}
         className="w-full mt-6 py-3 border border-dashed border-white/20 text-slate-400 rounded-xl hover:bg-white/5 hover:text-white transition flex items-center justify-center gap-2"
       >
         ➕ Добавить новый счетчик

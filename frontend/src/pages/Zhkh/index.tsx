@@ -4,8 +4,9 @@ import Dashboard from './Dashboard';
 import History from './History';
 import Input from './Input';
 import Profile from './Profile';
+import AddMeter from './AddMeter';
 
-type Tab = 'dashboard' | 'history' | 'input' | 'profile';
+type Tab = 'dashboard' | 'history' | 'input' | 'profile' | 'addMeter';
 
 export default function Zhkh() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
@@ -13,11 +14,12 @@ export default function Zhkh() {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'dashboard': return <Dashboard onNavigateToInput={() => setActiveTab('input')} />;
+      case 'dashboard': return <Dashboard onNavigateToInput={() => setActiveTab('input')} onAddMeter={() => setActiveTab('addMeter')} />;
       case 'history': return <History />;
       case 'input': return <Input onBack={() => setActiveTab('dashboard')} />;
       case 'profile': return <Profile />;
-      default: return <Dashboard onNavigateToInput={() => setActiveTab('input')} />;
+      case 'addMeter': return <AddMeter onBack={() => setActiveTab('dashboard')} />;
+      default: return <Dashboard onNavigateToInput={() => setActiveTab('input')} onAddMeter={() => setActiveTab('addMeter')} />;
     }
   };
 
@@ -28,28 +30,30 @@ export default function Zhkh() {
     { key: 'profile', icon: '👤', label: 'Профиль' },
   ];
 
+  // Показываем таб-бар везде, кроме input и addMeter (это полноэкранные формы)
+  const showTabBar = activeTab !== 'input' && activeTab !== 'addMeter';
+
   return (
     <div className="min-h-screen bg-dark-900 text-white pb-24 relative">
-      {/* Верхний бар (только для не-input экранов) */}
-      {activeTab !== 'input' && (
-        <div className="sticky top-0 z-20 bg-dark-900/90 backdrop-blur-md border-b border-white/5 px-4 py-3 flex items-center justify-between">
-          <button onClick={() => navigate('/')} className="p-2 text-slate-300 hover:text-white transition">
-            ← Назад
-          </button>
-          <h1 className="text-base font-bold font-display text-white">Счетчики ЖКХ</h1>
-          <div className="w-10 h-10 flex items-center justify-center">
-            <img src="/bumi/pose-1.png" alt="Буми" className="w-10 h-10 object-contain" />
-          </div>
+      {/* Верхний бар */}
+      <div className="sticky top-0 z-20 bg-dark-900/90 backdrop-blur-md border-b border-white/5 px-4 py-3 flex items-center justify-between">
+        <button onClick={() => navigate('/')} className="p-2 text-slate-300 hover:text-white transition">
+          ← Назад
+        </button>
+        <h1 className="text-base font-bold font-display text-white">Счетчики ЖКХ</h1>
+        {/* 🆕 Буми в хедере: прямоугольник, не квадрат */}
+        <div className="w-8 h-12 flex items-center justify-center">
+          <img src="/bumi/pose-1.png" alt="Буми" className="h-full w-auto object-contain" />
         </div>
-      )}
+      </div>
 
       {/* Контент */}
       <main className="px-4 py-4">
         {renderContent()}
       </main>
 
-      {/* Нижний таб-бар: 4 равные кнопки в ряд, без FAB */}
-      {activeTab !== 'input' && (
+      {/* Нижний таб-бар: 4 равные кнопки в ряд */}
+      {showTabBar && (
         <div className="fixed bottom-0 left-0 right-0 bg-dark-900/95 backdrop-blur-md border-t border-white/10 pb-[env(safe-area-inset-bottom)] z-30">
           <div className="grid grid-cols-4 h-16">
             {tabs.map((tab) => {
