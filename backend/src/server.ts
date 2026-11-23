@@ -13,7 +13,7 @@ import alertsRoutes from './routes/alerts';
 import membershipRoutes from './routes/membership';
 import rcbRoutes from './routes/rcb';
 import autoRoutes from './routes/auto';
-// 🆕 ЖКХ
+// 🆕 ЖКХ: импорты новых роутов
 import apartmentsRoutes from './routes/apartments';
 import metersRoutes from './routes/meters';
 
@@ -21,10 +21,8 @@ const app = express();
 const PORT: number = Number(process.env.PORT) || 3000;
 const prisma = new PrismaClient();
 
-// ✅ КРИТИЧНО: доверяем 1 прокси (Nginx). Без этого express-rate-limit падает.
 app.set('trust proxy', 1);
 
-// ПУНКТ 16: Строгая настройка CORS
 const allowedOrigins = [
   'http://localhost:5173',
   'http://177.177.212.220',
@@ -36,11 +34,9 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Разрешаем запросы без origin (Postman, мобильные приложения, серверные вызовы)
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      // 🔧 ФИКС: НЕ выбрасываем ошибку! Раньше это роняло процесс → crash-loop.
       console.warn(`[CORS] Заблокирован origin: "${origin}"`);
       callback(null, false);
     }
@@ -52,7 +48,6 @@ app.use(cors({
 
 app.use(express.json());
 
-// ПУНКТ 16: Базовая защита от CSRF для мутационных запросов
 const csrfProtection = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
     if (req.headers['x-requested-with'] !== 'XMLHttpRequest') {
@@ -84,18 +79,14 @@ app.use('/api/stats', statsRoutes);
 app.use('/api/admin/alerts', alertsRoutes);
 app.use('/api/rcb', rcbRoutes);
 app.use('/api/auto', autoRoutes);
-// 🆕 ЖКХ
+// 🆕 ЖКХ: подключение роутов
 app.use('/api/apartments', apartmentsRoutes);
 app.use('/api/meters', metersRoutes);
 
-// Health check освобождаем от CSRF для удобства мониторинга
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'OK', timestamp: new Date().toISOString() });
 });
 
-// =================================================================
-// 🕒 CRON-ЗАДАЧА: Ежедневная разморозка бонусов (Пункт 4)
-// =================================================================
 cron.schedule('0 3 * * *', async () => {
   try {
     const now = new Date();
@@ -104,9 +95,7 @@ cron.schedule('0 3 * * *', async () => {
         status: 'PENDING',
         unlockDate: { lte: now }
       },
-      data: {
-        status: 'AVAILABLE'
-      }
+      data: { status: 'AVAILABLE' }
     });
     if (result.count > 0) {
       console.log(`[CRON] ✅ Успешно разморожено ${result.count} транзакций бонусов.`);
@@ -117,9 +106,6 @@ cron.schedule('0 3 * * *', async () => {
 });
 console.log('✅ Cron-задача разморозки бонусов зарегистрирована');
 
-// =================================================================
-// 🆕 GLOBAL ERROR HANDLER — перехватывает все необработанные ошибки
-// =================================================================
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('[ERROR]', err?.message || err);
   if (res.headersSent) {
@@ -131,7 +117,6 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-// Защита от uncaught exceptions — логируем, но НЕ убиваем процесс
 process.on('uncaughtException', (err) => {
   console.error('[UNCAUGHT EXCEPTION]', err);
 });
@@ -139,7 +124,6 @@ process.on('unhandledRejection', (reason) => {
   console.error('[UNHANDLED REJECTION]', reason);
 });
 
-// =================================================================
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
 });
