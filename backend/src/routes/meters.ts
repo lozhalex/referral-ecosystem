@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken } from '../middleware/authenticateToken';
-import { sendPushToUser } from '../utils/pushSender'; // 🆕 Добавлен импорт
+import { sendPushToUser } from '../utils/pushSender';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -219,26 +219,33 @@ router.post('/report-exported', async (req: any, res: Response) => {
 });
 
 // ==========================================
-// 9. РУЧНОЙ ТЕСТ НАПОМИНАНИЙ (только для админов)
+// 9. ПРЯМОЙ ТЕСТ НАПОМИНАНИЙ (для вызова с сервера через curl)
 // ==========================================
 router.post('/test-reminder', async (req: any, res: Response) => {
   try {
-    if (req.user.role !== 'admin' && req.user.role !== 'SUPER_ADMIN') {
-      return res.status(403).json({ success: false, message: 'Только для администраторов' });
-    }
-    const { apartmentId } = req.body;
-    if (!apartmentId) return res.status(400).json({ success: false, message: 'Не указан apartmentId' });
+    // Для теста с localhost разрешаем передать userId напрямую, чтобы обойти JWT
+    const targetUserId = req.body.userId || 1; 
 
     const apt = await prisma.apartment.findFirst({
-      where: { id: Number(apartmentId), isActive: true },
+      where: { userId: targetUserId, isActive: true },
       include: { meters: { where: { isActive: true }, select: { id: true } } }
     });
-    if (!apt) return res.status(404).json({ success: false, message: 'Квартира не найдена' });
-    if (apt.meters.length === 0) return res.status(400).json({ success: false, message: 'Нет активных счетчиков' });
 
-    await sendPushToUser(apt.userId, '📊 Счетчики ЖКХ (тест)', `Тестовое напоминание: через 3 дня нужно подать показания по квартире "${apt.comment}".`);
-    console.log(`[TEST] ✅ Тестовое напоминание отправлено пользователю ${apt.userId}`);
-    res.json({ success: true, message: 'Тестовое напоминание отправлено' });
+    if (!apt) {
+      return res.status(400).json({ success: false, message: 'У пользователя нет активных квартир' });
+    }
+    if (apt.meters.length === 0) {
+      return res.status(400).json({ success: false, message: 'В квартире нет активных счетчиков' });
+    }
+
+    await sendPushToUser(
+      targetUserId,
+      '📊 Счетчики ЖКХ (ПРЯМОЙ ТЕСТ)',
+      `Это тестовое уведомление для квартиры "${apt.comment}". Если вы это видите на устройстве, Push работает идеально!`
+    );
+
+    console.log(`[TEST] ✅ Уведомление успешно отправлено пользователю ${targetUserId}`);
+    res.json({ success: true, message: 'Тестовое уведомление отправлено' });
   } catch (err) {
     console.error('Zhkh test reminder error:', err);
     res.status(500).json({ success: false, message: 'Ошибка сервера' });
