@@ -105,16 +105,23 @@ export default function Home() {
               applicationServerKey: urlBase64ToUint8Array(vapidKey)
             });
 
-            await fetch('/api/auto/push/subscribe', {
+            // 🆕 Исправлено: добавлен заголовок X-Requested-With и проверка ответа
+            const response = await fetch('/api/auto/push/subscribe', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`,
-                'X-Requested-With': 'XMLHttpRequest'
+                'X-Requested-With': 'XMLHttpRequest' // 🆕 Критично для CSRF-защиты
               },
               body: JSON.stringify(subscription.toJSON())
             });
-            console.log('Push subscription created and saved');
+
+            const data = await response.json();
+            if (response.ok && data.success) {
+              console.log('Push subscription saved successfully');
+            } else {
+              console.error('Push subscription save failed:', data.message);
+            }
           } else {
             console.log('Push subscription already exists:', subscription.endpoint);
           }
