@@ -83,10 +83,8 @@ export default function Home() {
           const registration = await navigator.serviceWorker.register('/sw.js');
           console.log('Service Worker registered:', registration);
 
-          // Проверяем, есть ли уже активная подписка
           let subscription = await registration.pushManager.getSubscription();
 
-          // Если подписки нет, запрашиваем разрешение и создаём новую
           if (!subscription) {
             if (Notification.permission === 'default') {
               const permission = await Notification.requestPermission();
@@ -105,13 +103,13 @@ export default function Home() {
               applicationServerKey: urlBase64ToUint8Array(vapidKey)
             });
 
-            // 🆕 Исправлено: добавлен заголовок X-Requested-With и проверка ответа
+            // 🆕 ИСПРАВЛЕНИЕ: Добавлен заголовок X-Requested-With для прохождения CSRF-защиты
             const response = await fetch('/api/auto/push/subscribe', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`,
-                'X-Requested-With': 'XMLHttpRequest' // 🆕 Критично для CSRF-защиты
+                'X-Requested-With': 'XMLHttpRequest' 
               },
               body: JSON.stringify(subscription.toJSON())
             });
