@@ -342,4 +342,41 @@ router.post('/report-exported', async (req: any, res: Response) => {
   }
 });
 
+// ==========================================
+// 9. РУЧНОЙ ТЕСТ НАПОМИНАНИЙ (только для админов)
+// ==========================================
+router.post('/test-reminder', async (req: any, res: Response) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, message: 'Только для администраторов' });
+    }
+
+    const { apartmentId } = req.body;
+    if (!apartmentId) {
+      return res.status(400).json({ success: false, message: 'Не указан apartmentId' });
+    }
+
+    const apt = await prisma.apartment.findFirst({
+      where: { id: Number(apartmentId), isActive: true },
+      include: { meters: { where: { isActive: true }, select: { id: true } } }
+    });
+
+    if (!apt) return res.status(404).json({ success: false, message: 'Квартира не найдена' });
+    if (apt.meters.length === 0) return res.status(400).json({ success: false, message: 'Нет активных счетчиков' });
+
+    await sendPushToUser(
+      apt.userId,
+      '📊 Счетчики ЖКХ (тест)',
+      `Тестовое напоминание: через 3 дня нужно подать показания по квартире "${apt.comment}".`
+    );
+
+    console.log(`[TEST] ✅ Тестовое напоминание отправлено пользователю ${apt.userId}`);
+    res.json({ success: true, message: 'Тестовое напоминание отправлено' });
+  } catch (err) {
+    console.error('Zhkh test reminder error:', err);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
+
 export default router;

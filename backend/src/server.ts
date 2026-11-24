@@ -13,9 +13,9 @@ import alertsRoutes from './routes/alerts';
 import membershipRoutes from './routes/membership';
 import rcbRoutes from './routes/rcb';
 import autoRoutes from './routes/auto';
-// 🆕 ЖКХ: импорты новых роутов
 import apartmentsRoutes from './routes/apartments';
 import metersRoutes from './routes/meters';
+import { sendPushToUser } from './utils/pushSender';
 
 const app = express();
 const PORT: number = Number(process.env.PORT) || 3000;
@@ -79,7 +79,6 @@ app.use('/api/stats', statsRoutes);
 app.use('/api/admin/alerts', alertsRoutes);
 app.use('/api/rcb', rcbRoutes);
 app.use('/api/auto', autoRoutes);
-// 🆕 ЖКХ: подключение роутов
 app.use('/api/apartments', apartmentsRoutes);
 app.use('/api/meters', metersRoutes);
 
@@ -87,6 +86,9 @@ app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'OK', timestamp: new Date().toISOString() });
 });
 
+// =================================================================
+// 🕒 CRON 1: Ежедневная разморозка бонусов (Пункт 4)
+// =================================================================
 cron.schedule('0 3 * * *', async () => {
   try {
     const now = new Date();
@@ -104,8 +106,65 @@ cron.schedule('0 3 * * *', async () => {
     console.error('[CRON] ❌ Ошибка при разморозке бонусов:', error);
   }
 });
-console.log('✅ Cron-задача разморозки бонусов зарегистрирована');
+console.log('✅ Cron-задача разморозки бонусов зарегистрирована (ежедневно в 3:00)');
 
+// =================================================================
+// 🕒 CRON 2: Напоминания ЖКХ о подаче показаний (ежедневно в 9:00)
+// =================================================================
+cron.schedule('0 9 * * *', async () => {
+  try {
+    const today = new Date();
+    const todayDay = today.getDate();
+    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+
+    const apartments = await prisma.apartment.findMany({
+      where: { isActive: true },
+      include: {
+        meters: { where: { isActive: true }, select: { id: true } }
+      }
+    });
+
+    let sentCount = 0;
+
+    for (const apt of apartments) {
+      // Пропускаем квартиры без активных счетчиков
+      if (apt.meters.length === 0) continue;
+
+      const billingDay = apt.billingDay;
+      let daysUntil: number;
+
+      if (billingDay > todayDay) {
+        daysUntil = billingDay - todayDay;
+      } else {
+        daysUntil = (daysInMonth - todayDay) + billingDay;
+      }
+
+      // Напоминаем ровно за 3 дня до billingDay
+      if (daysUntil === 3) {
+        await sendPushToUser(
+          apt.userId,
+          '📊 Счетчики ЖКХ',
+          `Через 3 дня нужно подать показания по квартире "${apt.comment}". Не забудьте!`
+        );
+        sentCount++;
+        console.log(`[CRON ЖКХ] ✅ Напоминание отправлено пользователю ${apt.userId} (квартира "${apt.comment}", billingDay=${billingDay})`);
+      }
+    }
+
+    if (sentCount > 0) {
+      console.log(`[CRON ЖКХ] 📬 Всего отправлено напоминаний: ${sentCount}`);
+    } else {
+      console.log('[CRON ЖКХ] ℹ️ Сегодня напоминаний не требуется');
+    }
+  } catch (error) {
+    console.error('[CRON ЖКХ] ❌ Ошибка:', error);
+  }
+});
+console.log('✅ Cron-задача напоминаний ЖКХ зарегистрирована (ежедневно в 9:00)');
+
+// =================================================================
+// 🆕 GLOBAL ERROR HANDLER
+// =================================================================
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('[ERROR]', err?.message || err);
   if (res.headersSent) {
