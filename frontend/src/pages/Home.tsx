@@ -97,7 +97,7 @@ export default function Home() {
               return;
             }
 
-            const vapidKey = 'BA2kcZEdRwChZpsy0sBuFZGSQwUoBaXTKPSNF525EXIfU1eIUD1XOmOG_37pGDMciePJW36i6rVM59fNFGMY6dY';
+             const vapidKey = 'BNtSJ3sYcQjaZiz9p4uhwznZS5gNaDa2Pt67F_om9NxlY4EPtfYQHSag2IYUbK4CxhpAHhRU1Aaf3vZ7gG3maPY';
             subscription = await registration.pushManager.subscribe({
               userVisibleOnly: true,
               applicationServerKey: urlBase64ToUint8Array(vapidKey)
