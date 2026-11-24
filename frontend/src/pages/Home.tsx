@@ -79,30 +79,47 @@ export default function Home() {
   useEffect(() => {
     const initPush = async () => {
       if (user && 'serviceWorker' in navigator && 'PushManager' in window) {
-        if (Notification.permission === 'default') {
-          const permission = await Notification.requestPermission();
-          if (permission === 'granted') {
-            try {
-              const registration = await navigator.serviceWorker.register('/sw.js');
-              console.log('Service Worker registered:', registration);
-              const vapidKey = 'BA2kcZEdRwChZpsy0sBuFZGSQwUoBaXTKPSNF525EXIfU1eIUD1XOmOG_37pGDMciePJW36i6rVM59fNFGMY6dY';
-              const subscription = await registration.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(vapidKey)
-              });
-              await fetch('/api/auto/push/subscribe', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(subscription.toJSON())
-              });
-              console.log('Push subscription successful');
-            } catch (err) {
-              console.error('Push subscription failed:', err);
+        try {
+          const registration = await navigator.serviceWorker.register('/sw.js');
+          console.log('Service Worker registered:', registration);
+
+          // Проверяем, есть ли уже активная подписка
+          let subscription = await registration.pushManager.getSubscription();
+
+          // Если подписки нет, запрашиваем разрешение и создаём новую
+          if (!subscription) {
+            if (Notification.permission === 'default') {
+              const permission = await Notification.requestPermission();
+              if (permission !== 'granted') {
+                console.log('Push permission denied');
+                return;
+              }
+            } else if (Notification.permission === 'denied') {
+              console.log('Push permission previously denied');
+              return;
             }
+
+            const vapidKey = 'BA2kcZEdRwChZpsy0sBuFZGSQwUoBaXTKPSNF525EXIfU1eIUD1XOmOG_37pGDMciePJW36i6rVM59fNFGMY6dY';
+            subscription = await registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(vapidKey)
+            });
+
+            await fetch('/api/auto/push/subscribe', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                'X-Requested-With': 'XMLHttpRequest'
+              },
+              body: JSON.stringify(subscription.toJSON())
+            });
+            console.log('Push subscription created and saved');
+          } else {
+            console.log('Push subscription already exists:', subscription.endpoint);
           }
+        } catch (err) {
+          console.error('Push subscription failed:', err);
         }
       }
     };
@@ -159,9 +176,7 @@ export default function Home() {
     <div className="min-h-screen bg-dark-900 relative">
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-neon-purple/10 rounded-full mix-blend-screen filter blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-neon-cyan/10 rounded-full mix-blend-screen filter blur-3xl pointer-events-none"></div>
-
       <Header user={user} onLogout={handleLogout} />
-
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
         <section className="text-center mb-10">
           <h1 className="text-4xl sm:text-5xl font-bold text-white mb-4 font-display tracking-tight">
@@ -171,7 +186,6 @@ export default function Home() {
             Один аккаунт — доступ ко всем сервисам. Приглашай друзей и получай бонусы за каждое действие.
           </p>
         </section>
-
         <section className="text-center mb-12">
           <div className="inline-flex items-center gap-2 glass px-6 py-3 border border-neon-cyan/20">
             {userCount !== null ? (
@@ -183,7 +197,6 @@ export default function Home() {
             )}
           </div>
         </section>
-
         {available.length > 0 && (
           <section className="mb-12">
             <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3 font-display">
@@ -195,7 +208,6 @@ export default function Home() {
             </div>
           </section>
         )}
-
         {development.length > 0 && (
           <section className="mb-12">
             <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3 font-display">
@@ -207,7 +219,6 @@ export default function Home() {
             </div>
           </section>
         )}
-
         {!showAll && hiddenCount > 0 && (
           <section className="text-center mb-12">
             <button
@@ -218,7 +229,6 @@ export default function Home() {
             </button>
           </section>
         )}
-
         {showAll && planned.length > 0 && (
           <section className="mb-12">
             <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3 font-display">
@@ -230,7 +240,6 @@ export default function Home() {
             </div>
           </section>
         )}
-
         <section className="glass rounded-2xl border border-white/5 p-8 sm:p-10 mb-12">
           <h2 className="text-2xl font-bold text-white mb-8 text-center font-display">
             Как работает экосистема
@@ -265,12 +274,10 @@ export default function Home() {
             </div>
           </div>
         </section>
-
         <footer className="text-center text-sm text-slate-500 pb-8 border-t border-white/5 pt-8">
           <p>© 2026 Бумеранг · Один аккаунт — все сервисы</p>
         </footer>
       </main>
-
       {showSystemOnboarding && (
         <OnboardingModal
           steps={systemOnboardingSteps}
