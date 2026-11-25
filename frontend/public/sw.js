@@ -11,12 +11,20 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('push', (event) => {
   console.log('Push message received', event);
-  const data = event.data ? event.data.json() : { title: 'Бумеранг', body: 'Новое уведомление' };
+  
+  let data = { title: 'Бумеранг', body: 'Новое уведомление' };
+  try {
+    if (event.data) {
+      data = event.data.json();
+    }
+  } catch (e) {
+    console.error('Ошибка парсинга данных push:', e);
+  }
   
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: '/icon-192.png', // Убедитесь, что у вас есть иконка в public
+    self.registration.showNotification(data.title || 'Бумеранг', {
+      body: data.body || 'Новое уведомление',
+      icon: '/icon-192.png',
       badge: '/icon-192.png',
       data: data.url || '/'
     })
