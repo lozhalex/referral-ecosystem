@@ -108,58 +108,22 @@ cron.schedule('0 3 * * *', async () => {
 });
 console.log('✅ Cron-задача разморозки бонусов зарегистрирована (ежедневно в 3:00)');
 
-// =================================================================
-// 🕒 CRON 2: Напоминания ЖКХ о подаче показаний (ВРЕМЕННО: каждую минуту для теста)
-// =================================================================
-cron.schedule('*/1 * * * *', async () => {
+// ВРЕМЕННЫЙ КРОН ДЛЯ ТЕСТА (каждую минуту)
+cron.schedule('* * * * *', async () => {
+  console.log('[CRON ЖКХ ТЕСТ] Запуск отправки...');
   try {
-    const today = new Date();
-    const todayDay = today.getDate();
-    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-
-    const apartments = await prisma.apartment.findMany({
-      where: { isActive: true },
-      include: {
-        meters: { where: { isActive: true }, select: { id: true } }
-      }
-    });
-
-    let sentCount = 0;
-
-    for (const apt of apartments) {
-      if (apt.meters.length === 0) continue;
-
-      const billingDay = apt.billingDay;
-      let daysUntil: number;
-
-      if (billingDay > todayDay) {
-        daysUntil = billingDay - todayDay;
-      } else {
-        daysUntil = (daysInMonth - todayDay) + billingDay;
-      }
-
-      // Напоминаем ровно за 3 дня до billingDay
-      if (daysUntil === 3) {
-        await sendPushToUser(
-          apt.userId,
-          '📊 Счетчики ЖКХ',
-          `Через 3 дня нужно подать показания по квартире "${apt.comment}". Не забудьте!`
-        );
-        sentCount++;
-        console.log(`[CRON ЖКХ] ✅ Напоминание отправлено пользователю ${apt.userId} (квартира "${apt.comment}", billingDay=${billingDay})`);
-      }
-    }
-
-    if (sentCount > 0) {
-      console.log(`[CRON ЖКХ] 📬 Всего отправлено напоминаний: ${sentCount}`);
-    } else {
-      console.log('[CRON ЖКХ] ℹ️ Сегодня напоминаний не требуется (или до подачи не ровно 3 дня)');
-    }
+    // Импортируем функцию отправки
+    const { sendPushToUser } = require('./utils/pushSender');
+    
+    // Принудительно отправляем реальное уведомление пользователю 1
+    await sendPushToUser(1, '🔔 Напоминание ЖКХ', 'Пожалуйста, введите показания счетчиков до конца месяца!');
+    
+    console.log('[CRON ЖКХ ТЕСТ] ✅ Уведомление успешно отправлено пользователю 1');
   } catch (error) {
-    console.error('[CRON ЖКХ] ❌ Ошибка:', error);
+    console.error('[CRON ЖКХ ТЕСТ] ❌ Ошибка отправки:', error);
   }
 });
-console.log('✅ Cron-задача напоминаний ЖКХ зарегистрирована (ВРЕМЕННО: каждую минуту для теста)');
+console.log('✅ Временный Cron-задача ЖКХ зарегистрирована (каждую минуту)');
 
 // =================================================================
 // 🆕 GLOBAL ERROR HANDLER
