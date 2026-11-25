@@ -24,7 +24,6 @@ export default function Input({ onBack }: { onBack: () => void }) {
     try {
       const res = await apiClient.get('/api/meters');
       if (res.data.success) {
-        // Показываем ВСЕ счетчики (включая уже поданные) — для возможности повторного ввода
         setMeters(res.data.meters);
         if (res.data.meters.length === 0) {
           onBack();
@@ -38,6 +37,26 @@ export default function Input({ onBack }: { onBack: () => void }) {
   };
 
   const currentMeter = meters[currentIndex];
+  
+  const consumption = newValue && currentMeter 
+    ? (parseFloat(newValue) - currentMeter.initialReading).toFixed(1)
+    : null;
+
+  const handlePrev = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(prev => prev - 1);
+      setNewValue('');
+      setError('');
+    }
+  };
+
+  const handleNext = () => {
+    if (currentIndex < meters.length - 1) {
+      setCurrentIndex(prev => prev + 1);
+      setNewValue('');
+      setError('');
+    }
+  };
 
   const handleConfirm = async () => {
     const val = parseFloat(newValue);
@@ -81,7 +100,23 @@ export default function Input({ onBack }: { onBack: () => void }) {
     <div className="flex flex-col h-[calc(100vh-80px)]">
       <div className="flex items-center justify-between mb-8">
         <button onClick={onBack} className="text-slate-400 hover:text-white">← Назад</button>
-        <span className="text-sm text-slate-500">Счетчик {currentIndex + 1} из {meters.length}</span>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={handlePrev}
+            disabled={currentIndex === 0}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/20 transition"
+          >
+            ‹
+          </button>
+          <span className="text-sm text-slate-500">Счетчик {currentIndex + 1} из {meters.length}</span>
+          <button 
+            onClick={handleNext}
+            disabled={currentIndex === meters.length - 1}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/20 transition"
+          >
+            ›
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center space-y-8">
@@ -112,16 +147,31 @@ export default function Input({ onBack }: { onBack: () => void }) {
             />
             {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
           </div>
+          
+          {consumption !== null && parseFloat(consumption) >= 0 && (
+            <div className="bg-neon-cyan/10 border border-neon-cyan/30 rounded-lg p-3 text-center">
+              <div className="text-xs text-slate-400 mb-1">Расход за период</div>
+              <div className="text-2xl font-bold text-neon-cyan">{consumption}</div>
+            </div>
+          )}
         </div>
       </div>
 
-      <button
-        onClick={handleConfirm}
-        disabled={!newValue}
-        className="w-full py-4 bg-neon-purple text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-purple-600 transition mt-auto mb-4"
-      >
-        Подтвердить
-      </button>
+      <div className="space-y-3 mt-auto mb-4">
+        <button
+          onClick={handleConfirm}
+          disabled={!newValue}
+          className="w-full py-4 bg-neon-purple text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-purple-600 transition"
+        >
+          Подтвердить
+        </button>
+        <button
+          onClick={onBack}
+          className="w-full py-3 bg-white/10 text-slate-300 rounded-xl hover:bg-white/20 transition"
+        >
+          Отмена
+        </button>
+      </div>
     </div>
   );
 }
