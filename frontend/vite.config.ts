@@ -6,6 +6,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       registerType: 'autoUpdate',
       manifest: {
         name: 'Бумеранг — Экосистема',
@@ -43,8 +46,8 @@ export default defineConfig({
           }
         ]
       },
-      workbox: {
-        navigateFallbackDenylist: [/^\/api/]
+      injectManifest: {
+        maximumFileSizeToCacheInBytes: 5000000
       }
     })
   ],
