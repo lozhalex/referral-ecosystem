@@ -108,22 +108,51 @@ cron.schedule('0 3 * * *', async () => {
 });
 console.log('✅ Cron-задача разморозки бонусов зарегистрирована (ежедневно в 3:00)');
 
-// ВРЕМЕННЫЙ КРОН ДЛЯ ТЕСТА (каждую минуту)
-cron.schedule('* * * * *', async () => {
-  console.log('[CRON ЖКХ ТЕСТ] Запуск отправки...');
+// Cron ЖКХ: ежедневная проверка в 9:00 утра
+cron.schedule('0 9 * * *', async () => {
+  console.log('[CRON ЖКХ] Запуск ежедневной проверки напоминаний...');
   try {
-    // Импортируем функцию отправки
     const { sendPushToUser } = require('./utils/pushSender');
+    const prisma = new (require('@prisma/client').PrismaClient)();
     
-    // Принудительно отправляем реальное уведомление пользователю 1
-    await sendPushToUser(1, '🔔 Напоминание ЖКХ', 'Пожалуйста, введите показания счетчиков до конца месяца!');
+    const today = new Date();
+    const targetDay = today.getDate() + 3; // Напоминать за 3 дня до даты подачи
     
-    console.log('[CRON ЖКХ ТЕСТ] ✅ Уведомление успешно отправлено пользователю 1');
+    // Получаем квартиры, у которых день подачи совпадает с целевым
+    const apartments = await prisma.apartment.findMany({
+      where: { billingDay: targetDay },
+      include: { user: true }
+    });
+
+    let sentCount = 0;
+    for (const apt of apartments) {
+      if (apt.user) {
+        try {
+          await sendPushToUser(
+            apt.user.id, 
+            '🔔 Напоминание ЖКХ', 
+            `Пожалуйста, введите показания счетчиков для квартиры "${apt.comment || 'вашей квартиры'}" в ближайшие дни!`
+          );
+          console.log(`[CRON ЖКХ] ✅ Напоминание отправлено пользователю ${apt.user.id} (квартира "${apt.comment}", billingDay=${apt.billingDay})`);
+          sentCount++;
+        } catch (err) {
+          console.error(`[CRON ЖКХ] ❌ Ошибка отправки пользователю ${apt.user.id}:`, err);
+        }
+      }
+    }
+
+    if (sentCount > 0) {
+      console.log(`[CRON ЖКХ] 📬 Всего отправлено напоминаний: ${sentCount}`);
+    } else {
+      console.log('[CRON ЖКХ] ℹ️ Сегодня напоминаний не требуется (или до подачи не ровно 3 дня)');
+    }
+    
+    await prisma.$disconnect();
   } catch (error) {
-    console.error('[CRON ЖКХ ТЕСТ] ❌ Ошибка отправки:', error);
+    console.error('[CRON ЖКХ] ❌ Ошибка:', error);
   }
 });
-console.log('✅ Временный Cron-задача ЖКХ зарегистрирована (каждую минуту)');
+console.log('✅ Cron-задача напоминаний ЖКХ зарегистрирована (ежедневно в 9:00)');
 
 // =================================================================
 // 🆕 GLOBAL ERROR HANDLER
