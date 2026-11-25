@@ -24,11 +24,10 @@ export default function Input({ onBack }: { onBack: () => void }) {
     try {
       const res = await apiClient.get('/api/meters');
       if (res.data.success) {
-        // Фильтруем только те, что не поданы, или берем все для навигации
-        const pending = res.data.meters.filter((m: Meter) => !m.isSubmittedCurrent);
-        setMeters(pending.length > 0 ? pending : res.data.meters);
-        if (pending.length === 0) {
-          onBack(); // Если все подано, возвращаемся назад
+        // Показываем ВСЕ счетчики (включая уже поданные) — для возможности повторного ввода
+        setMeters(res.data.meters);
+        if (res.data.meters.length === 0) {
+          onBack();
         }
       }
     } catch (err) {
@@ -50,14 +49,12 @@ export default function Input({ onBack }: { onBack: () => void }) {
       setError(`Новое показание не может быть меньше предыдущего (${currentMeter.initialReading})`);
       return;
     }
-
     try {
       const res = await apiClient.post(`/api/meters/${currentMeter.id}/readings`, {
         t1: val,
         usedOcr: false,
         mlConsent: false
       });
-      
       if (res.data.success) {
         setNewValue('');
         setError('');
@@ -100,7 +97,6 @@ export default function Input({ onBack }: { onBack: () => void }) {
             <label className="text-sm text-slate-400 block mb-1">Предыдущее показание</label>
             <div className="text-3xl font-mono text-slate-500">{currentMeter.initialReading}</div>
           </div>
-
           <div>
             <label className="text-sm text-slate-400 block mb-1">Новое показание</label>
             <input

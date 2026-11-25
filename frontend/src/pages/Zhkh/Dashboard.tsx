@@ -46,7 +46,6 @@ export default function Dashboard({ onNavigateToInput, onAddMeter }: { onNavigat
     return <div className="text-center text-slate-400 py-10">Загрузка...</div>;
   }
 
-  // 🆕 Пустое состояние: Буми в прямоугольнике, не квадрат
   if (meters.length === 0) {
     return (
       <div className="text-center py-12">
@@ -55,7 +54,7 @@ export default function Dashboard({ onNavigateToInput, onAddMeter }: { onNavigat
         </div>
         <h3 className="text-xl font-bold text-white mb-2">Пока нет счетчиков</h3>
         <p className="text-slate-400 mb-6">Добавьте первый счетчик, чтобы начать учет</p>
-        <button 
+        <button
           onClick={onAddMeter}
           className="px-6 py-3 bg-neon-purple text-white rounded-xl font-bold hover:bg-purple-600 transition"
         >
@@ -78,7 +77,11 @@ export default function Dashboard({ onNavigateToInput, onAddMeter }: { onNavigat
       )}
 
       {meters.map(meter => (
-        <div key={meter.id} className="glass rounded-xl p-4 border border-white/5 relative overflow-hidden">
+        <div
+          key={meter.id}
+          onClick={onNavigateToInput}
+          className="glass rounded-xl p-4 border border-white/5 relative overflow-hidden cursor-pointer hover:border-neon-cyan/30 transition"
+        >
           <div className="flex items-start justify-between mb-3">
             <div className="flex items-center gap-3">
               <span className="text-2xl">{getResourceIcon(meter.type)}</span>
@@ -91,19 +94,13 @@ export default function Dashboard({ onNavigateToInput, onAddMeter }: { onNavigat
               {meter.isSubmittedCurrent ? '✅ Передано' : '⏳ Ожидает'}
             </span>
           </div>
-          
-          {!meter.isSubmittedCurrent && (
-            <button 
-              onClick={onNavigateToInput}
-              className="w-full mt-2 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium transition text-sm"
-            >
-              Ввести показания
-            </button>
-          )}
+          <div className="text-xs text-slate-500 text-center mt-2">
+            {meter.isSubmittedCurrent ? 'Нажмите, чтобы ввести новые показания' : 'Нажмите, чтобы ввести показания'}
+          </div>
         </div>
       ))}
 
-      <button 
+      <button
         onClick={onAddMeter}
         className="w-full mt-6 py-3 border border-dashed border-white/20 text-slate-400 rounded-xl hover:bg-white/5 hover:text-white transition flex items-center justify-center gap-2"
       >
