@@ -5,11 +5,18 @@ interface Meter {
   id: number;
   type: string;
   comment: string;
+  serialNumber: string;
   initialReading: number;
   isSubmittedCurrent: boolean;
 }
 
-export default function Input({ onBack }: { onBack: () => void }) {
+export default function Input({ 
+  onBack, 
+  onBackToInputList 
+}: { 
+  onBack: () => void;
+  onBackToInputList?: () => void;
+}) {
   const [meters, setMeters] = useState<Meter[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [newValue, setNewValue] = useState('');
@@ -99,7 +106,7 @@ export default function Input({ onBack }: { onBack: () => void }) {
   return (
     <div className="flex flex-col h-[calc(100vh-80px)]">
       <div className="flex items-center justify-between mb-8">
-        <button onClick={onBack} className="text-slate-400 hover:text-white">← Назад</button>
+        <button onClick={onBackToInputList || onBack} className="text-slate-400 hover:text-white">← Назад</button>
         <div className="flex items-center gap-3">
           <button 
             onClick={handlePrev}
@@ -125,6 +132,7 @@ export default function Input({ onBack }: { onBack: () => void }) {
             {currentMeter.type === 'HWS' ? '💧' : currentMeter.type === 'GWS' ? '🔴' : '⚡'}
           </div>
           <h2 className="text-2xl font-bold text-white">{currentMeter.comment}</h2>
+          <div className="text-sm text-slate-400 mt-1">№ {currentMeter.serialNumber}</div>
         </div>
 
         <div className="w-full max-w-xs space-y-6">
@@ -166,7 +174,7 @@ export default function Input({ onBack }: { onBack: () => void }) {
           Подтвердить
         </button>
         <button
-          onClick={onBack}
+          onClick={onBackToInputList || onBack}
           className="w-full py-3 bg-white/10 text-slate-300 rounded-xl hover:bg-white/20 transition"
         >
           Отмена
