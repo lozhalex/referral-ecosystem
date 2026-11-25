@@ -5,18 +5,28 @@ import { clientsClaim } from 'workbox-core';
 declare let self: ServiceWorkerGlobalScope;
 
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
-self.clientsClaim();
+clientsClaim(); // Правильный вызов импортированной функции
+
+interface PushData {
+  title?: string;
+  body?: string;
+  url?: string;
+}
 
 self.addEventListener('push', (event) => {
   console.log('SW: Push событие получено!');
-  let data = { title: 'Бумеранг', body: 'Новое уведомление' };
+  let data: PushData = { title: 'Бумеранг', body: 'Новое уведомление' };
   try {
-    if (event.data) data = event.data.json();
+    if (event.data) {
+      data = event.data.json();
+    }
   } catch (e) {
     console.error('Ошибка парсинга push:', e);
   }
@@ -33,5 +43,6 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  event.waitUntil(self.clients.openWindow(event.notification.data || '/'));
+  const clickData = event.notification.data as string;
+  event.waitUntil(self.clients.openWindow(clickData || '/'));
 });
