@@ -5,6 +5,7 @@ import { sendPushToUser } from '../utils/pushSender';
 
 const router = Router();
 const prisma = new PrismaClient();
+
 router.use(authenticateToken);
 
 const VALID_TYPES = ['HWS', 'GWS', 'DRINKING_WATER', 'ELECTRICITY', 'GAS', 'HEAT'];
@@ -15,11 +16,13 @@ function currentPeriodKey(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
+
 function shiftPeriodKey(key: string, monthsBack: number): string {
   const [y, m] = key.split('-').map(Number);
   const d = new Date(y, m - 1 - monthsBack, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
+
 async function unlockAchievement(
   userId: number, code: string, title: string, description: string, icon: string, module: string
 ) {
@@ -36,19 +39,49 @@ async function unlockAchievement(
   }
 }
 
+// 🆕 GET / — список счетчиков с датой последнего показания
 router.get('/', async (req: any, res: Response) => {
   try {
     const apartmentId = req.query.apartmentId ? Number(req.query.apartmentId) : undefined;
     const periodKey = currentPeriodKey();
+
     const meters = await prisma.meter.findMany({
       where: { userId: req.user.userId, isActive: true, ...(apartmentId && { apartmentId }) },
       orderBy: { sortOrder: 'asc' }
     });
+
+    const meterIds = meters.map(m => m.id);
+
+    // Текущие показания (для статуса "передано")
     const currentReadings = await prisma.meterReading.findMany({
-      where: { meterId: { in: meters.map(m => m.id) }, periodKey }
+      where: { meterId: { in: meterIds }, periodKey }
     });
     const submittedIds = new Set(currentReadings.map(r => r.meterId));
-    const result = meters.map(m => ({ ...m, isSubmittedCurrent: submittedIds.has(m.id) }));
+
+    // 🆕 Последнее показание по каждому счетчику (для даты)
+    const allReadings = await prisma.meterReading.findMany({
+      where: { meterId: { in: meterIds } },
+      orderBy: { periodKey: 'desc' },
+      select: { meterId: true, periodKey: true, createdAt: true }
+    });
+
+    const lastByMeter = new Map<number, { periodKey: string; createdAt: Date }>();
+    for (const r of allReadings) {
+      if (!lastByMeter.has(r.meterId)) {
+        lastByMeter.set(r.meterId, { periodKey: r.periodKey, createdAt: r.createdAt });
+      }
+    }
+
+    const result = meters.map(m => {
+      const last = lastByMeter.get(m.id);
+      return {
+        ...m,
+        isSubmittedCurrent: submittedIds.has(m.id),
+        lastReadingDate: last ? last.createdAt.toISOString() : null,
+        lastReadingPeriod: last ? last.periodKey : null
+      };
+    });
+
     res.json({ success: true, meters: result, periodKey });
   } catch (err) {
     console.error('Zhkh meters get error:', err);
@@ -59,6 +92,7 @@ router.get('/', async (req: any, res: Response) => {
 router.post('/', async (req: any, res: Response) => {
   try {
     const { apartmentId, type, tariffType, comment, serialNumber, initialReading, nextVerificationDate } = req.body;
+
     if (!apartmentId) return res.status(400).json({ success: false, message: 'Не указана квартира' });
     if (!VALID_TYPES.includes(type)) return res.status(400).json({ success: false, message: 'Неверный тип ресурса' });
     if (!comment || String(comment).trim() === '') return res.status(400).json({ success: false, message: 'Укажите комментарий' });
@@ -68,6 +102,7 @@ router.post('/', async (req: any, res: Response) => {
     if (!apt) return res.status(404).json({ success: false, message: 'Квартира не найдена' });
 
     const maxSort = await prisma.meter.aggregate({ where: { userId: req.user.userId, isActive: true }, _max: { sortOrder: true } });
+
     const meter = await prisma.meter.create({
       data: {
         userId: req.user.userId, apartmentId: Number(apartmentId), type,
@@ -78,7 +113,9 @@ router.post('/', async (req: any, res: Response) => {
         sortOrder: (maxSort._max.sortOrder ?? 0) + 1
       }
     });
+
     await unlockAchievement(req.user.userId, 'FIRST_METER', 'Первый счетчик', 'Добавлен первый счетчик', '🥉', 'zhkh');
+
     res.json({ success: true, meter });
   } catch (err) {
     console.error('Zhkh meter create error:', err);
@@ -130,14 +167,16 @@ router.post('/:id/readings', async (req: any, res: Response) => {
   try {
     const meterId = Number(req.params.id);
     const { t1, t2, t3, usedOcr, mlConsent, photoUrl, ocrT1 } = req.body;
+
     const meter = await prisma.meter.findFirst({ where: { id: meterId, userId: req.user.userId, isActive: true } });
     if (!meter) return res.status(404).json({ success: false, message: 'Счетчик не найден' });
 
     const periodKey = currentPeriodKey();
+
     const last = await prisma.meterReading.findFirst({ where: { meterId }, orderBy: { periodKey: 'desc' } });
     const prevT1 = last ? last.t1 : meter.initialReading;
     const newT1 = Number(t1);
-    
+
     if (isNaN(newT1)) return res.status(400).json({ success: false, message: 'Неверное значение' });
     if (newT1 < prevT1) return res.status(400).json({ success: false, code: 'READING_DECREASED', prevT1, message: `Новое показание не может быть меньше предыдущего (${prevT1})` });
 
@@ -156,11 +195,13 @@ router.post('/:id/readings', async (req: any, res: Response) => {
     });
 
     await unlockAchievement(req.user.userId, 'FIRST_READING', 'Первые показания', 'Внесены первые показания', '📝', 'zhkh');
+
     const keys = [periodKey, shiftPeriodKey(periodKey, 1), shiftPeriodKey(periodKey, 2)];
     const monthsWithReadings = await prisma.meterReading.findMany({ where: { meter: { userId: req.user.userId }, periodKey: { in: keys } }, select: { periodKey: true } });
     if (new Set(monthsWithReadings.map(r => r.periodKey)).size >= 3) {
       await unlockAchievement(req.user.userId, 'RESPONSIBLE_3', 'Ответственный', 'Показания 3 месяца подряд', '🔥', 'zhkh');
     }
+
     res.json({ success: true });
   } catch (err) {
     console.error('Zhkh reading create error:', err);
@@ -173,8 +214,10 @@ router.put('/:id/readings/:rid', async (req: any, res: Response) => {
     const meterId = Number(req.params.id);
     const readingId = Number(req.params.rid);
     const { t1, t2, t3 } = req.body;
+
     const meter = await prisma.meter.findFirst({ where: { id: meterId, userId: req.user.userId, isActive: true } });
     if (!meter) return res.status(404).json({ success: false, message: 'Счетчик не найден' });
+
     const reading = await prisma.meterReading.findFirst({ where: { id: readingId, meterId } });
     if (!reading) return res.status(404).json({ success: false, message: 'Показание не найдено' });
     if (reading.lockedAt && new Date() > reading.lockedAt) return res.status(403).json({ success: false, code: 'READONLY', message: 'Окно редактирования истекло.' });
@@ -186,6 +229,7 @@ router.put('/:id/readings/:rid', async (req: any, res: Response) => {
       where: { id: readingId },
       data: { t1: newT1, t2: meter.tariffType !== 'SINGLE' ? Number(t2) || null : null, t3: meter.tariffType === 'THREE_TARIFF' ? Number(t3) || null : null }
     });
+
     res.json({ success: true });
   } catch (err) {
     console.error('Zhkh reading update error:', err);
@@ -218,32 +262,21 @@ router.post('/report-exported', async (req: any, res: Response) => {
   }
 });
 
-// ==========================================
-// 9. ПРЯМОЙ ТЕСТ НАПОМИНАНИЙ (для вызова с сервера через curl)
-// ==========================================
 router.post('/test-reminder', async (req: any, res: Response) => {
   try {
-    // Для теста с localhost разрешаем передать userId напрямую, чтобы обойти JWT
-    const targetUserId = req.body.userId || 1; 
-
+    const targetUserId = req.body.userId || 1;
     const apt = await prisma.apartment.findFirst({
       where: { userId: targetUserId, isActive: true },
       include: { meters: { where: { isActive: true }, select: { id: true } } }
     });
-
-    if (!apt) {
-      return res.status(400).json({ success: false, message: 'У пользователя нет активных квартир' });
-    }
-    if (apt.meters.length === 0) {
-      return res.status(400).json({ success: false, message: 'В квартире нет активных счетчиков' });
-    }
+    if (!apt) return res.status(400).json({ success: false, message: 'У пользователя нет активных квартир' });
+    if (apt.meters.length === 0) return res.status(400).json({ success: false, message: 'В квартире нет активных счетчиков' });
 
     await sendPushToUser(
       targetUserId,
       '📊 Счетчики ЖКХ (ПРЯМОЙ ТЕСТ)',
       `Это тестовое уведомление для квартиры "${apt.comment}". Если вы это видите на устройстве, Push работает идеально!`
     );
-
     console.log(`[TEST] ✅ Уведомление успешно отправлено пользователю ${targetUserId}`);
     res.json({ success: true, message: 'Тестовое уведомление отправлено' });
   } catch (err) {
