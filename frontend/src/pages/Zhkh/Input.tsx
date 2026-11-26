@@ -1,192 +1,103 @@
-import { useState, useEffect } from 'react';
-import { apiClient } from '../../api/client';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Dashboard from './Dashboard';
+import History from './History';
+import Input from './Input';
+import Profile from './Profile';
+import AddMeter from './AddMeter';
+import Settings from './Settings';
 
-interface Apartment {
-  id: number;
-  comment: string;
-  billingDay: number;
-}
+type Tab = 'dashboard' | 'history' | 'input' | 'profile' | 'addMeter' | 'settings';
 
-interface Meter {
-  id: number;
-  type: string;
-  comment: string;
-  serialNumber: string;
-  initialReading: number;
-  isSubmittedCurrent: boolean;
-}
+export default function Zhkh() {
+  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  const navigate = useNavigate();
 
-const getResourceIcon = (type: string) => {
-  switch (type) {
-    case 'HWS': return '💧';
-    case 'GWS': return '🔴';
-    case 'DRINKING_WATER': return '💧';
-    case 'ELECTRICITY': return '⚡';
-    case 'GAS': return '🔥';
-    case 'HEAT': return '🔥';
-    default: return '📏';
-  }
-};
-
-export default function Input({ onAddMeter }: { onAddMeter: () => void }) {
-  const [apartments, setApartments] = useState<Apartment[]>([]);
-  const [currentAptIndex, setCurrentAptIndex] = useState(0);
-  const [meters, setMeters] = useState<Meter[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadApartments();
-  }, []);
-
-  useEffect(() => {
-    if (apartments.length > 0) {
-      loadMeters(apartments[currentAptIndex].id);
-    }
-  }, [currentAptIndex, apartments]);
-
-  const loadApartments = async () => {
-    try {
-      const res = await apiClient.get('/api/apartments');
-      if (res.data.success) {
-        setApartments(res.data.apartments);
-      }
-    } catch (err) {
-      console.error('Ошибка загрузки квартир:', err);
-    } finally {
-      setLoading(false);
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'dashboard': return <Dashboard onNavigateToInput={() => setActiveTab('input')} onAddMeter={() => setActiveTab('addMeter')} />;
+      case 'history': return <History />;
+      case 'input': return <Input onAddMeter={() => setActiveTab('addMeter')} />;
+      case 'profile': return <Profile />;
+      case 'addMeter': return <AddMeter onBack={() => setActiveTab('input')} />;
+      case 'settings': return <Settings onBack={() => setActiveTab('dashboard')} onAddMeter={() => setActiveTab('addMeter')} />;
+      default: return <Dashboard onNavigateToInput={() => setActiveTab('input')} onAddMeter={() => setActiveTab('addMeter')} />;
     }
   };
 
-  const loadMeters = async (apartmentId: number) => {
-    try {
-      const res = await apiClient.get(`/api/meters?apartmentId=${apartmentId}`);
-      if (res.data.success) {
-        setMeters(res.data.meters);
-      }
-    } catch (err) {
-      console.error('Ошибка загрузки счётчиков:', err);
-    }
-  };
+  const tabs: { key: Tab; icon: string; label: string }[] = [
+    { key: 'dashboard', icon: '🏠', label: 'Главная' },
+    { key: 'history', icon: '📊', label: 'История' },
+    { key: 'input', icon: '➕', label: 'Ввод' },
+    { key: 'profile', icon: '👤', label: 'Профиль' },
+  ];
 
-  const handlePrevApartment = () => {
-    if (currentAptIndex > 0) {
-      setCurrentAptIndex(prev => prev - 1);
-    }
-  };
-
-  const handleNextApartment = () => {
-    if (currentAptIndex < apartments.length - 1) {
-      setCurrentAptIndex(prev => prev + 1);
-    }
-  };
-
-  if (loading) {
-    return <div className="text-center text-slate-400 py-10">Загрузка...</div>;
-  }
-
-  if (apartments.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <div className="w-32 h-40 mx-auto mb-4 flex items-center justify-center">
-          <img src="/bumi/pose-2.png" alt="Буми" className="h-full w-auto object-contain" />
-        </div>
-        <h3 className="text-xl font-bold text-white mb-2">Пока нет квартир</h3>
-        <p className="text-slate-400 mb-6">Добавьте первую квартиру, чтобы начать учёт</p>
-        <button
-          onClick={onAddMeter}
-          className="px-6 py-3 bg-neon-purple text-white rounded-xl font-bold hover:bg-purple-600 transition"
-        >
-          Добавить квартиру и счётчик
-        </button>
-      </div>
-    );
-  }
-
-  const currentApartment = apartments[currentAptIndex];
-  const needsSubmission = meters.filter(m => !m.isSubmittedCurrent);
+  // Таб-бар скрываем ТОЛЬКО на полноэкранных формах (добавление, настройки)
+  // Вкладка 'input' — это теперь список счётчиков, таб-бар там НУЖЕН
+  const showTabBar = activeTab !== 'addMeter' && activeTab !== 'settings';
 
   return (
-    <div className="space-y-4">
-      {/* 2. Название квартиры и дата показаний со стрелками */}
-      <div className="flex items-center justify-between glass rounded-xl p-4 border border-white/5">
-        <button
-          onClick={handlePrevApartment}
-          disabled={currentAptIndex === 0}
-          className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/20 transition"
-        >
-          ‹
+    <div className="min-h-screen bg-dark-900 text-white pb-24 relative">
+      {/* Верхний бар */}
+      <div className="sticky top-0 z-20 bg-dark-900/90 backdrop-blur-md border-b border-white/5 px-4 py-3 flex items-center justify-between">
+        <button onClick={() => navigate('/')} className="p-2 text-slate-300 hover:text-white transition">
+          ← Назад
         </button>
-        <div className="text-center flex-1">
-          <div className="font-bold text-white text-lg">{currentApartment.comment}</div>
-          <div className="text-sm text-slate-400">Дата показаний: до {currentApartment.billingDay}-го числа</div>
+        <h1 className="text-base font-bold font-display text-white">Счетчики ЖКХ</h1>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveTab('settings')}
+            className="p-2 text-slate-300 hover:text-white transition"
+            title="Настройки"
+          >
+            ⚙️
+          </button>
+          <div className="w-8 h-12 flex items-center justify-center">
+            <img src="/bumi/pose-1.png" alt="Буми" className="h-full w-auto object-contain" />
+          </div>
         </div>
-        <button
-          onClick={handleNextApartment}
-          disabled={currentAptIndex === apartments.length - 1}
-          className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/20 transition"
-        >
-          ›
-        </button>
       </div>
 
-      {/* Предупреждение о необходимости подачи */}
-      {needsSubmission.length > 0 && (
-        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
-          <p className="text-yellow-400 font-medium flex items-center gap-2">
-            ⚠️ Пора подать показания ({needsSubmission.length} шт.)
-          </p>
+      {/* Контент */}
+      <main className="px-4 py-4">
+        {renderContent()}
+      </main>
+
+      {/* Нижний таб-бар */}
+      {showTabBar && (
+        <div className="fixed bottom-0 left-0 right-0 bg-dark-900/95 backdrop-blur-md border-t border-white/10 pb-[env(safe-area-inset-bottom)] z-30">
+          <div className="grid grid-cols-4 h-16">
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab.key;
+              const isInput = tab.key === 'input';
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`flex flex-col items-center justify-center gap-1 transition ${
+                    isActive ? 'text-neon-cyan' : 'text-slate-500'
+                  }`}
+                >
+                  {isInput ? (
+                    <span
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-base font-bold ${
+                        isActive
+                          ? 'bg-gradient-to-r from-neon-purple to-neon-cyan text-white'
+                          : 'bg-white/10 text-slate-300'
+                      }`}
+                    >
+                      ➕
+                    </span>
+                  ) : (
+                    <span className="text-xl leading-none">{tab.icon}</span>
+                  )}
+                  <span className="text-[10px]">{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
-
-      {/* 3. Список текущих счетчиков */}
-      {meters.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-slate-400 mb-4">В этой квартире пока нет счётчиков</p>
-          <button
-            onClick={onAddMeter}
-            className="px-6 py-3 bg-neon-purple text-white rounded-xl font-bold hover:bg-purple-600 transition"
-          >
-            Добавить первый счётчик
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {meters.map(meter => (
-            <div
-              key={meter.id}
-              className="glass rounded-xl p-4 border border-white/5 relative overflow-hidden cursor-pointer hover:border-neon-cyan/30 transition"
-              onClick={() => console.log('Клик по счетчику:', meter.id)} // Временный лог, далее добавим открытие формы ввода
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">{getResourceIcon(meter.type)}</span>
-                  <div>
-                    <div className="font-bold text-white">{meter.comment}</div>
-                    <div className="text-sm text-slate-400">Пред.: {meter.initialReading}</div>
-                  </div>
-                </div>
-                <span className={`text-xs px-2 py-1 rounded-full ${
-                  meter.isSubmittedCurrent 
-                    ? 'bg-green-500/20 text-green-400' 
-                    : 'bg-yellow-500/20 text-yellow-400'
-                }`}>
-                  {meter.isSubmittedCurrent ? '✅ Передано' : '⏳ Ожидает'}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* 4. Кнопка "добавить счетчик" */}
-      <button
-        onClick={onAddMeter}
-        className="w-full mt-6 py-3 border border-dashed border-white/20 text-slate-400 rounded-xl hover:bg-white/5 hover:text-white transition flex items-center justify-center gap-2"
-      >
-        ➕ Добавить новый счётчик
-      </button>
-      
-      {/* 5. Нижнее меню отображается автоматически, так как в index.tsx для activeTab === 'input' showTabBar = true */}
     </div>
   );
 }
