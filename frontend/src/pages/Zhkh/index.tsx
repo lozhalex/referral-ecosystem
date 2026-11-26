@@ -5,7 +5,7 @@ import History from './History';
 import Input from './Input';
 import Profile from './Profile';
 import AddMeter from './AddMeter';
-import Settings from './Settings'; // 🆕
+import Settings from './Settings';
 
 type Tab = 'dashboard' | 'history' | 'input' | 'profile' | 'addMeter' | 'settings';
 
@@ -17,9 +17,9 @@ export default function Zhkh() {
     switch (activeTab) {
       case 'dashboard': return <Dashboard onNavigateToInput={() => setActiveTab('input')} onAddMeter={() => setActiveTab('addMeter')} />;
       case 'history': return <History />;
-      case 'input': return <Input onBack={() => setActiveTab('dashboard')} />;
+      case 'input': return <Input onAddMeter={() => setActiveTab('addMeter')} />;
       case 'profile': return <Profile />;
-      case 'addMeter': return <AddMeter onBack={() => setActiveTab('dashboard')} />;
+      case 'addMeter': return <AddMeter onBack={() => setActiveTab('input')} />;
       case 'settings': return <Settings onBack={() => setActiveTab('dashboard')} onAddMeter={() => setActiveTab('addMeter')} />;
       default: return <Dashboard onNavigateToInput={() => setActiveTab('input')} onAddMeter={() => setActiveTab('addMeter')} />;
     }
@@ -32,8 +32,9 @@ export default function Zhkh() {
     { key: 'profile', icon: '👤', label: 'Профиль' },
   ];
 
-  // Таб-бар скрываем на полноэкранных формах (ввод, добавление, настройки)
-  const showTabBar = activeTab !== 'input' && activeTab !== 'addMeter' && activeTab !== 'settings';
+  // Таб-бар скрываем ТОЛЬКО на полноэкранных формах (добавление, настройки)
+  // Вкладка 'input' — это теперь список счётчиков, таб-бар там НУЖЕН
+  const showTabBar = activeTab !== 'addMeter' && activeTab !== 'settings';
 
   return (
     <div className="min-h-screen bg-dark-900 text-white pb-24 relative">
@@ -44,15 +45,13 @@ export default function Zhkh() {
         </button>
         <h1 className="text-base font-bold font-display text-white">Счетчики ЖКХ</h1>
         <div className="flex items-center gap-2">
-          {/* 🆕 Кнопка настроек */}
-          <button 
+          <button
             onClick={() => setActiveTab('settings')}
             className="p-2 text-slate-300 hover:text-white transition"
             title="Настройки"
           >
             ⚙️
           </button>
-          {/* Буми */}
           <div className="w-8 h-12 flex items-center justify-center">
             <img src="/bumi/pose-1.png" alt="Буми" className="h-full w-auto object-contain" />
           </div>
