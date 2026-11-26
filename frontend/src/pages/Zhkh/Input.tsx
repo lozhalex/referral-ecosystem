@@ -33,6 +33,11 @@ export default function Input({ onAddMeter }: { onAddMeter: () => void }) {
   const [currentAptIndex, setCurrentAptIndex] = useState(0);
   const [meters, setMeters] = useState<Meter[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Состояние для формы ввода
+  const [selectedMeter, setSelectedMeter] = useState<Meter | null>(null);
+  const [newValue, setNewValue] = useState('');
+  const [inputError, setInputError] = useState('');
 
   useEffect(() => {
     loadApartments();
@@ -80,6 +85,54 @@ export default function Input({ onAddMeter }: { onAddMeter: () => void }) {
     }
   };
 
+  const handleMeterClick = (meter: Meter) => {
+    setSelectedMeter(meter);
+    setNewValue('');
+    setInputError('');
+  };
+
+  const handleCancelInput = () => {
+    setSelectedMeter(null);
+    setNewValue('');
+    setInputError('');
+  };
+
+  const handleConfirm = async () => {
+    if (!selectedMeter) return;
+    
+    const val = parseFloat(newValue);
+    if (isNaN(val)) {
+      setInputError('Введите корректное число');
+      return;
+    }
+    if (val < selectedMeter.initialReading) {
+      setInputError(`Новое показание не может быть меньше предыдущего (${selectedMeter.initialReading})`);
+      return;
+    }
+    
+    try {
+      const res = await apiClient.post(`/api/meters/${selectedMeter.id}/readings`, {
+        t1: val,
+        usedOcr: false,
+        mlConsent: false
+      });
+      if (res.data.success) {
+        await loadMeters(apartments[currentAptIndex].id);
+        handleCancelInput();
+      }
+    } catch (err: any) {
+      if (err.response?.data?.code === 'READING_DECREASED') {
+        setInputError(err.response.data.message);
+      } else {
+        setInputError('Ошибка сохранения');
+      }
+    }
+  };
+
+  const consumption = newValue && selectedMeter 
+    ? (parseFloat(newValue) - selectedMeter.initialReading).toFixed(1)
+    : null;
+
   if (loading) {
     return <div className="text-center text-slate-400 py-10">Загрузка...</div>;
   }
@@ -105,9 +158,75 @@ export default function Input({ onAddMeter }: { onAddMeter: () => void }) {
   const currentApartment = apartments[currentAptIndex];
   const needsSubmission = meters.filter(m => !m.isSubmittedCurrent);
 
+  // Если выбран счетчик для ввода — показываем форму ввода
+  if (selectedMeter) {
+    return (
+      <div className="flex flex-col h-[calc(100vh-80px)]">
+        <div className="flex items-center justify-between mb-8">
+          <button onClick={handleCancelInput} className="text-slate-400 hover:text-white">← Назад</button>
+        </div>
+
+        <div className="flex-1 flex flex-col items-center justify-center space-y-8">
+          <div className="text-center">
+            <div className="text-4xl mb-2">
+              {getResourceIcon(selectedMeter.type)}
+            </div>
+            <h2 className="text-2xl font-bold text-white">{selectedMeter.comment}</h2>
+            <div className="text-sm text-slate-400 mt-1">№ {selectedMeter.serialNumber}</div>
+          </div>
+
+          <div className="w-full max-w-xs space-y-6">
+            <div>
+              <label className="text-sm text-slate-400 block mb-1">Предыдущее показание</label>
+              <div className="text-3xl font-mono text-slate-500">{selectedMeter.initialReading}</div>
+            </div>
+            <div>
+              <label className="text-sm text-slate-400 block mb-1">Новое показание</label>
+              <input
+                type="number"
+                value={newValue}
+                onChange={(e) => {
+                  setNewValue(e.target.value);
+                  setInputError('');
+                }}
+                className={`w-full bg-dark-900 border ${inputError ? 'border-red-500' : 'border-white/20 focus:border-neon-cyan'} rounded-xl px-4 py-3 text-2xl font-mono text-white outline-none transition`}
+                placeholder="00000"
+                autoFocus
+              />
+              {inputError && <p className="text-red-400 text-sm mt-2">{inputError}</p>}
+            </div>
+            
+            {consumption !== null && parseFloat(consumption) >= 0 && (
+              <div className="bg-neon-cyan/10 border border-neon-cyan/30 rounded-lg p-3 text-center">
+                <div className="text-xs text-slate-400 mb-1">Расход за период</div>
+                <div className="text-2xl font-bold text-neon-cyan">{consumption}</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-3 mt-auto mb-4">
+          <button
+            onClick={handleConfirm}
+            disabled={!newValue}
+            className="w-full py-4 bg-neon-purple text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-purple-600 transition"
+          >
+            Подтвердить
+          </button>
+          <button
+            onClick={handleCancelInput}
+            className="w-full py-3 bg-white/10 text-slate-300 rounded-xl hover:bg-white/20 transition"
+          >
+            Отмена
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Иначе показываем список счетчиков
   return (
     <div className="space-y-4">
-      {/* 2. Название квартиры и дата показаний со стрелками */}
       <div className="flex items-center justify-between glass rounded-xl p-4 border border-white/5">
         <button
           onClick={handlePrevApartment}
@@ -129,7 +248,6 @@ export default function Input({ onAddMeter }: { onAddMeter: () => void }) {
         </button>
       </div>
 
-      {/* Предупреждение о необходимости подачи */}
       {needsSubmission.length > 0 && (
         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
           <p className="text-yellow-400 font-medium flex items-center gap-2">
@@ -138,7 +256,6 @@ export default function Input({ onAddMeter }: { onAddMeter: () => void }) {
         </div>
       )}
 
-      {/* 3. Список текущих счетчиков */}
       {meters.length === 0 ? (
         <div className="text-center py-8">
           <p className="text-slate-400 mb-4">В этой квартире пока нет счётчиков</p>
@@ -154,8 +271,8 @@ export default function Input({ onAddMeter }: { onAddMeter: () => void }) {
           {meters.map(meter => (
             <div
               key={meter.id}
+              onClick={() => handleMeterClick(meter)}
               className="glass rounded-xl p-4 border border-white/5 relative overflow-hidden cursor-pointer hover:border-neon-cyan/30 transition"
-              onClick={() => console.log('Клик по счетчику:', meter.id)} // Временный лог, далее добавим открытие формы ввода
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
@@ -178,15 +295,12 @@ export default function Input({ onAddMeter }: { onAddMeter: () => void }) {
         </div>
       )}
 
-      {/* 4. Кнопка "добавить счетчик" */}
       <button
         onClick={onAddMeter}
         className="w-full mt-6 py-3 border border-dashed border-white/20 text-slate-400 rounded-xl hover:bg-white/5 hover:text-white transition flex items-center justify-center gap-2"
       >
         ➕ Добавить новый счётчик
       </button>
-      
-      {/* 5. Нижнее меню отображается автоматически, так как в index.tsx для activeTab === 'input' showTabBar = true */}
     </div>
   );
 }
