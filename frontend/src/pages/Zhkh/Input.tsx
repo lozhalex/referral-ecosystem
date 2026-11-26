@@ -43,7 +43,6 @@ export default function Input({ onAddMeter }: { onAddMeter: () => void }) {
   const [meters, setMeters] = useState<Meter[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Состояние формы ввода
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [newValue, setNewValue] = useState('');
   const [inputError, setInputError] = useState('');
@@ -97,15 +96,11 @@ export default function Input({ onAddMeter }: { onAddMeter: () => void }) {
   };
 
   const goToPrevMeter = () => {
-    if (selectedIdx !== null && selectedIdx > 0) {
-      openMeterForm(selectedIdx - 1);
-    }
+    if (selectedIdx !== null && selectedIdx > 0) openMeterForm(selectedIdx - 1);
   };
 
   const goToNextMeter = () => {
-    if (selectedIdx !== null && selectedIdx < meters.length - 1) {
-      openMeterForm(selectedIdx + 1);
-    }
+    if (selectedIdx !== null && selectedIdx < meters.length - 1) openMeterForm(selectedIdx + 1);
   };
 
   const handleConfirm = async () => {
@@ -125,12 +120,10 @@ export default function Input({ onAddMeter }: { onAddMeter: () => void }) {
         t1: val, usedOcr: false, mlConsent: false
       });
       if (res.data.success) {
-        // 🆕 Перезагружаем список (чтобы initialReading обновился)
         await loadMeters(apartments[currentAptIndex].id);
         setInputError('');
         setNewValue('');
 
-        // 🆕 Автоматический переход к следующему счетчику
         if (selectedIdx < meters.length - 1) {
           setSelectedIdx(selectedIdx + 1);
         } else {
@@ -174,7 +167,7 @@ export default function Input({ onAddMeter }: { onAddMeter: () => void }) {
   const needsSubmission = meters.filter(m => !m.isSubmittedCurrent);
 
   // ===== ФОРМА ВВОДА =====
-  if (selectedMeter) {
+  if (selectedMeter && selectedIdx !== null) {
     return (
       <div className="flex flex-col h-[calc(100vh-80px)]">
         <div className="flex items-center justify-between mb-6">
